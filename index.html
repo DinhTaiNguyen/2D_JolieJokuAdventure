@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Joku 💙 & Jolie 💗 — Enchanted Forest Adventure</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0e2f3c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💞</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+
+  <!-- ============ MAIN MENU ============ -->
+  <div id="menu" class="overlay">
+    <div class="titleWrap">
+      <h1 class="title"><span class="tj">Joku</span> <span class="amp">💙&nbsp;💗</span> <span class="tl">Jolie</span></h1>
+      <div class="subtitle">An Enchanted Forest Love Adventure</div>
+    </div>
+    <div class="menuBtns">
+      <button id="btnHost" class="mbtn host">💙 Host as Joku</button>
+      <button id="btnJoin" class="mbtn join">💗 Join as Jolie</button>
+      <button id="btnSolo" class="mbtn solo">🐾 Practice Solo</button>
+    </div>
+    <div class="menuRow">
+      <button id="btnSound" class="sbtn" title="Sound">🔊</button>
+      <button id="btnFull" class="sbtn" title="Fullscreen">⛶</button>
+      <button id="btnHelp" class="sbtn" title="How to play">❓</button>
+    </div>
+    <div class="credit">made with love, for playing together 💞</div>
+  </div>
+
+  <!-- ============ HELP ============ -->
+  <div id="helpPanel" class="overlay hidden">
+    <div class="panel">
+      <h2>How to Play 💞</h2>
+      <div class="helpCols">
+        <div>
+          <h3>⌨️ Keyboard</h3>
+          <p><b>Move</b> — A/D or ◀ ▶<br>
+          <b>Jump</b> — W / ▲ / Space (press again to double-jump)<br>
+          <b>Attack</b> — J or Z<br>
+          <b>Special</b> — K or X (uses MP)<br>
+          <b>Heart ❤</b> — L or C or E</p>
+        </div>
+        <div>
+          <h3>📱 Touch</h3>
+          <p>Left side — joystick.<br>Right side — Jump, ⚔ Attack, ✦ Special, 💗 Heart buttons.</p>
+        </div>
+      </div>
+      <h3>💞 The Heart Button</h3>
+      <p>Stand close to each other, then…<br>
+      <b>Tap ❤</b> — hold hands: faster, protected, hearts everywhere.<br>
+      <b>Hold ❤</b> — hug: heals you both.<br>
+      <b>Full Love Meter + ❤</b> — KISS! A love burst clears the screen and fully heals you.<br>
+      If one of you falls, the other can revive with a hug (hold ❤ next to them).</p>
+      <p class="dim">Fill the Love Meter by fighting together, staying close, and collecting hearts.
+      Joku 🌊 shoots water phoenixes and dashes on wings. Jolie 🌸 fires petals and blooms a healing field.</p>
+      <button id="helpClose" class="mbtn">Got it! 💕</button>
+    </div>
+  </div>
+
+  <!-- ============ CONNECT ============ -->
+  <div id="connect" class="overlay hidden">
+    <div class="panel">
+      <h2 id="connTitle">Host Game</h2>
+      <div id="hostBox" class="hidden">
+        <p>Tell Jolie this room code:</p>
+        <div id="codeBig">····</div>
+        <p id="hostStatus" class="dim">Setting up the magic portal…</p>
+      </div>
+      <div id="joinBox" class="hidden">
+        <p>Enter the room code from Joku:</p>
+        <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="CODE">
+        <button id="btnConnGo" class="mbtn join">💗 Join Joku</button>
+        <p id="joinStatus" class="dim"></p>
+      </div>
+      <button id="btnConnCancel" class="mbtn ghost">Back</button>
+    </div>
+  </div>
+
+  <!-- ============ PAUSE ============ -->
+  <button id="pauseBtn" class="hidden">⚙</button>
+  <div id="pausePanel" class="overlay hidden">
+    <div class="panel">
+      <h2>Paused 💤</h2>
+      <button id="btnResume" class="mbtn host">▶ Continue</button>
+      <button id="btnSound2" class="mbtn ghost">🔊 Sound</button>
+      <button id="btnQuit" class="mbtn ghost">🚪 Quit to Menu</button>
+    </div>
+  </div>
+
+  <!-- ============ TOUCH CONTROLS ============ -->
+  <div id="touchUI" class="hidden">
+    <div id="stickZone"><div id="stickBase"><div id="stickKnob"></div></div></div>
+    <div id="btns">
+      <button class="tbtn" id="tHeart">💗</button>
+      <button class="tbtn" id="tSp">🌊</button>
+      <button class="tbtn" id="tAtk">⚔️</button>
+      <button class="tbtn big" id="tJump">⬆️</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="rotateHint" class="hidden"><div>📱↻<br>Rotate your phone sideways<br>for the best adventure!</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/particles.js"></script>
+<script src="js/art.js"></script>
+<script src="js/input.js"></script>
+<script src="js/world.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/story.js"></script>
+<script src="js/net.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
