@@ -15,7 +15,7 @@ const G = {
   stats: { orbs: 0, flowers: 0, hearts: 0, hugs: 0, kisses: 0, kills: 0, startT: 0 },
   checkpoint: { x: 140, y: 400 },
   paused: false, bossActive: false, netLost: false, ended: false,
-  netT: { p: 0, w: 0 }, mateNet: null, _dropId: 0, _comboToastT: 0,
+  netT: { p: 0, w: 0, seq: 0, wseq: 0 }, mateNet: null, mateBuf: [], lastMateSeq: 0, lastWorldSeq: 0, _dropId: 0, _comboToastT: 0,
   demo: null,
 };
 
@@ -55,6 +55,7 @@ const Game = {
     const jolie = myChar === 'jolie' ? G.me : G.mate;
     G.pets = [Ent.makePet('dog', joku), Ent.makePet('panda', jolie)];
     G.love = 0; G.handHold = false; G.kissCin = 0; G.ended = false; G.netLost = false;
+    this.resetNetSmoothing();
     G.stats = { orbs: 0, flowers: 0, hearts: 0, hugs: 0, kisses: 0, kills: 0, startT: performance.now() / 1000 };
     G.state = 'play'; G.paused = false; G.demo = null;
     this.loadLevel(startLevel);
@@ -272,21 +273,20 @@ const Game = {
     // ----- network heartbeat -----
     if (G.mode !== 'solo' && NET.connected) {
       G.netT.p -= dt;
-      if (G.netT.p <= 0) { G.netT.p = .05; this.sendState(); }
+      if (G.netT.p <= 0) { G.netT.p = .033; this.sendState(); }
       if (G.mode === 'host') {
         G.netT.w -= dt;
-        if (G.netT.w <= 0) { G.netT.w = .1; this.sendWorld(); }
+        if (G.netT.w <= 0) { G.netT.w = .08; this.sendWorld(); }
       }
     }
   },
 
   /* ================= remote partner smoothing ================= */
   updateRemoteMate(dt) {
-    const m = G.mate, s = G.mateNet;
+    const m = G.mate, s = this.sampleMateState();
     if (!s) return;
     if (!G.cut && G.kissCin <= 0) {
-      s.x += s.vx * dt; s.y += s.vy * dt; // dead-reckon between packets
-      const k = Math.min(1, 12 * dt);
+      const k = Math.min(1, 18 * dt);
       m.x += (s.x - m.x) * k;
       m.y += (s.y - m.y) * k;
       if (Math.abs(s.x - m.x) > 200 || Math.abs(s.y - m.y) > 260) { m.x = s.x; m.y = s.y; }
@@ -923,6 +923,51 @@ const Game = {
   toastMsg(txt) { Main.toast(txt); },
 
   /* ================= networking ================= */
+  resetNetSmoothing() {
+    G.netT = { p: 0, w: 0, seq: 0, wseq: 0 };
+    G.mateNet = null;
+    G.mateBuf = [];
+    G.lastMateSeq = 0;
+    G.lastWorldSeq = 0;
+  },
+  queueMateState(s) {
+    if (s.q && G.lastMateSeq && s.q <= G.lastMateSeq) return;
+    if (s.q) G.lastMateSeq = s.q;
+    const snap = Object.assign({}, s, { rx: performance.now() / 1000 });
+    G.mateNet = snap;
+    G.mateBuf.push(snap);
+    while (G.mateBuf.length > 8) G.mateBuf.shift();
+  },
+  sampleMateState() {
+    const buf = G.mateBuf;
+    if (!buf.length) return G.mateNet;
+    const now = performance.now() / 1000;
+    const viewT = now - 0.09;
+    while (buf.length > 2 && buf[1].rx < viewT - 0.18) buf.shift();
+
+    let a = null, b = null;
+    for (let i = 0; i < buf.length - 1; i++) {
+      if (buf[i].rx <= viewT && buf[i + 1].rx >= viewT) {
+        a = buf[i]; b = buf[i + 1]; break;
+      }
+    }
+    if (a && b && b.rx > a.rx) {
+      const t = U.clamp((viewT - a.rx) / (b.rx - a.rx), 0, 1);
+      return Object.assign({}, b, {
+        x: U.lerp(a.x, b.x, t),
+        y: U.lerp(a.y, b.y, t),
+        vx: U.lerp(a.vx, b.vx, t),
+        vy: U.lerp(a.vy, b.vy, t)
+      });
+    }
+
+    const latest = buf[buf.length - 1];
+    const age = U.clamp(now - latest.rx - 0.09, 0, 0.16);
+    return Object.assign({}, latest, {
+      x: latest.x + latest.vx * age,
+      y: latest.y + latest.vy * age
+    });
+  },
   emit(k, data) {
     if (G.mode === 'solo') return;
     NET.send({ t: 'ev', k, d: data });
@@ -934,11 +979,11 @@ const Game = {
   sendState() {
     const p = G.me;
     NET.send({
-      t: 'p', x: Math.round(p.x), y: Math.round(p.y), vx: Math.round(p.vx), vy: Math.round(p.vy),
+      t: 'p', q: ++G.netT.seq, x: Math.round(p.x), y: Math.round(p.y), vx: Math.round(p.vx), vy: Math.round(p.vy),
       dir: p.dir, hp: Math.round(p.hp), mp: Math.round(p.mp),
       gl: p.glide, hh: p.holding, dn: p.down, wg: p.wing > .3, at: p.atkT < .15, og: p.onGround,
       ht: p.hurtT > .05, ch: p.cheerT > .05
-    });
+    }, { volatile: true, maxBuffered: 24576 });
   },
 
   sendWorld() {
@@ -948,9 +993,9 @@ const Game = {
     }
     const b = G.level.boss;
     NET.send({
-      t: 'w', love: Math.round(G.love), foes,
+      t: 'w', q: ++G.netT.wseq, love: Math.round(G.love), foes,
       boss: b ? [Math.round(b.x), Math.round(b.y), Math.round(b.hp), b.dying > 0 ? 1 : 0] : null
-    });
+    }, { volatile: true, maxBuffered: 32768 });
   },
 
   onNet(m) {
@@ -960,11 +1005,13 @@ const Game = {
     switch (m.t) {
       case 'hello': // guest arrived — send them the world
         if (NET.mode === 'host') {
+          this.resetNetSmoothing();
           NET.send({ t: 'init', lvl: G.levelIndex, started: G.state === 'play' });
         }
         break;
       case 'init':
         if (NET.mode === 'guest') {
+          this.resetNetSmoothing();
           if (G.state !== 'play') {
             Main.hideOverlays();
             this.startGame('guest', m.lvl);
@@ -973,9 +1020,11 @@ const Game = {
           }
         }
         break;
-      case 'p': G.mateNet = m; break;
+      case 'p': this.queueMateState(m); break;
       case 'w': {
         if (G.mode !== 'guest') break;
+        if (m.q && G.lastWorldSeq && m.q <= G.lastWorldSeq) break;
+        if (m.q) G.lastWorldSeq = m.q;
         G.love = m.love;
         for (const f of m.foes) {
           const e = G.level.foes.find(x => x.id === f[0]);

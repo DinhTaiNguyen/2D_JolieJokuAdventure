@@ -15,7 +15,21 @@ const NET = {
     for (let i = 0; i < 4; i++) c += this.ALPHA[Math.random() * this.ALPHA.length | 0];
     return c;
   },
-  _id(code) { return 'joku-jolie-love-' + code.toLowerCase(); },
+  normalizeCode(raw) {
+    let text = String(raw || '').trim();
+    try {
+      const url = new URL(text, location.href);
+      text = url.searchParams.get('join') || text;
+    } catch (e) {
+      const m = text.match(/[?&]join=([^&#]+)/i);
+      if (m) text = decodeURIComponent(m[1]);
+    }
+    return text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  },
+  validCode(code) {
+    return code.length === 4 && [...code].every(ch => this.ALPHA.includes(ch));
+  },
+  _id(code) { return 'joku-jolie-love-' + this.normalizeCode(code).toLowerCase(); },
 
   available() { return typeof Peer !== 'undefined'; },
 
@@ -42,15 +56,20 @@ const NET = {
     if (!this.available()) { this._status('err', 'No internet — online play needs a connection.'); return; }
     this.close();
     this.mode = 'guest';
-    this.code = code.toUpperCase().trim();
+    this.code = this.normalizeCode(code);
+    if (!this.validCode(this.code)) {
+      this._status('err', 'Enter the 4-character room code from Joku.');
+      return;
+    }
+    const attempt = (this._joinAttempt = (this._joinAttempt || 0) + 1);
     this._status('info', 'Finding Joku…');
     this.peer = new Peer({ debug: 0 });
     this.peer.on('open', () => {
-      const conn = this.peer.connect(this._id(this.code), { reliable: true });
+      const conn = this.peer.connect(this._id(this.code), { reliable: true, serialization: 'json' });
       this.conn = conn;
       this._wire(conn);
       setTimeout(() => {
-        if (!this.connected && this.mode === 'guest') this._status('err', 'Could not find that room. Check the code!');
+        if (attempt === this._joinAttempt && !this.connected && this.mode === 'guest') this._status('err', 'Could not find that room. Check the code!');
       }, 12000);
     });
     this.peer.on('error', err => {
@@ -76,13 +95,16 @@ const NET = {
     });
   },
 
-  send(obj) {
+  send(obj, opt = {}) {
     if (this.connected && this.conn && this.conn.open) {
+      const dc = this.conn.dataChannel || this.conn._dc;
+      if (opt.volatile && dc && dc.bufferedAmount > (opt.maxBuffered || 32768)) return false;
       try { this.conn.send(obj); } catch (e) { /* transient */ }
     }
   },
 
   close() {
+    this._joinAttempt = (this._joinAttempt || 0) + 1;
     this.connected = false;
     if (this.conn) { try { this.conn.close(); } catch (e) {} this.conn = null; }
     if (this.peer) { try { this.peer.destroy(); } catch (e) {} this.peer = null; }

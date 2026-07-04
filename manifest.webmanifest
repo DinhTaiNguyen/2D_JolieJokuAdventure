@@ -1,0 +1,9 @@
+{
+  "name": "Joku & Jolie Adventure",
+  "short_name": "Joku Jolie",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a222c",
+  "theme_color": "#0e2f3c"
+}

@@ -6,12 +6,14 @@ const Main = {
 
   init() {
     const $ = id => this.el(id);
+    this.preventMobileZoom();
 
     /* ---- menu buttons ---- */
-    $('btnSolo').onclick = () => { SND.unlock(); SND.sfx('ui'); NET.mode = 'solo'; Game.startGame('solo'); };
+    $('btnSolo').onclick = () => { SND.unlock(); SND.sfx('ui'); this.preparePhonePlay(); NET.mode = 'solo'; Game.startGame('solo'); };
     $('btnHost').onclick = () => {
       SND.unlock(); SND.sfx('ui');
       if (!NET.available()) { this.toast('🌐 Online play needs internet — try Practice Solo!'); return; }
+      this.preparePhonePlay();
       this.showConnect('host');
       NET.host();
     };
@@ -22,11 +24,18 @@ const Main = {
     };
     $('btnConnGo').onclick = () => {
       SND.unlock(); SND.sfx('ui');
-      const code = $('codeInput').value.trim();
+      const code = this.cleanCodeInput();
       if (code.length < 4) { $('joinStatus').textContent = 'Enter the 4-letter code 💕'; return; }
       $('joinStatus').textContent = 'Connecting…';
+      this.preparePhonePlay();
       NET.join(code);
     };
+    $('codeInput').addEventListener('input', () => this.cleanCodeInput());
+    $('codeInput').addEventListener('paste', e => {
+      e.preventDefault();
+      const clip = e.clipboardData || window.clipboardData;
+      $('codeInput').value = NET.normalizeCode(clip ? clip.getData('text') : '');
+    });
     $('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnConnGo').click(); });
     $('btnConnCancel').onclick = () => { SND.sfx('ui'); NET.close(); this.showMenu(); };
 
@@ -41,6 +50,8 @@ const Main = {
     $('btnSound').onclick = () => { SND.unlock(); SND.setEnabled(!SND.enabled); updSound(); };
     $('btnSound2').onclick = () => { SND.unlock(); SND.setEnabled(!SND.enabled); updSound(); };
     $('btnFull').onclick = () => { SND.unlock(); this.goFullscreen(); };
+    $('gameFullBtn').onclick = () => { SND.unlock(); this.goFullscreen(); };
+    $('rotateFullBtn').onclick = e => { e.stopPropagation(); SND.unlock(); this.goFullscreen(); };
 
     /* ---- pause ---- */
     $('pauseBtn').onclick = () => { SND.sfx('ui'); this.togglePause(); };
@@ -79,6 +90,9 @@ const Main = {
     /* ---- rotate hint (dismissible) ---- */
     this.el('rotateHint').onclick = () => { this._rotDismissed = true; this.checkRotate(); };
     addEventListener('resize', () => this.checkRotate());
+    addEventListener('orientationchange', () => setTimeout(() => this.checkRotate(), 250));
+    document.addEventListener('fullscreenchange', () => this.checkRotate());
+    document.addEventListener('webkitfullscreenchange', () => this.checkRotate());
     this.checkRotate();
 
     /* ---- copy invite link (host) ---- */
@@ -95,10 +109,11 @@ const Main = {
     /* ---- deep links: ?join=CODE auto-joins; ?solo&lvl=N for quick play/testing ---- */
     const q = new URLSearchParams(location.search);
     if (q.get('join')) {
+      const joinCode = NET.normalizeCode(q.get('join'));
       this.showConnect('join');
-      $('codeInput').value = q.get('join').toUpperCase();
+      $('codeInput').value = joinCode;
       $('joinStatus').textContent = 'Connecting…';
-      NET.join(q.get('join'));
+      NET.join(joinCode);
     } else if (q.has('solo')) {
       if (q.has('touch')) Input.touchMode = true;
       const lvl = U.clamp(parseInt(q.get('lvl') || '0', 10) || 0, 0, World.LEVELS.length - 1);
@@ -141,19 +156,57 @@ const Main = {
     }
   },
 
+  cleanCodeInput() {
+    const input = this.el('codeInput');
+    const code = NET.normalizeCode(input.value);
+    if (input.value !== code) input.value = code;
+    return code;
+  },
+
+  preventMobileZoom() {
+    const editable = el => el && el.closest && el.closest('input, textarea, select, [contenteditable="true"]');
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', e => {
+      const now = Date.now();
+      if (now - lastTouchEnd < 330 && !editable(e.target)) e.preventDefault();
+      lastTouchEnd = now;
+    }, { passive: false });
+    document.addEventListener('dblclick', e => {
+      if (!editable(e.target)) e.preventDefault();
+    }, { passive: false });
+    for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+      document.addEventListener(type, e => e.preventDefault(), { passive: false });
+    }
+  },
+
+  preparePhonePlay() {
+    if (matchMedia('(pointer: coarse)').matches) this.goFullscreen({ quiet: true });
+  },
+
   checkRotate() {
     const portrait = innerHeight > innerWidth;
     const show = portrait && matchMedia('(pointer: coarse)').matches && !this._rotDismissed;
     this.el('rotateHint').classList.toggle('hidden', !show);
   },
 
-  goFullscreen() {
+  goFullscreen(opt = {}) {
     const de = document.documentElement;
-    const fs = de.requestFullscreen || de.webkitRequestFullscreen;
-    if (fs) fs.call(de).catch(() => {});
-    if (screen.orientation && screen.orientation.lock) {
-      screen.orientation.lock('landscape').catch(() => {});
+    const fs = de.requestFullscreen || de.webkitRequestFullscreen || de.msRequestFullscreen;
+    const fullscreenEl = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+    let request = Promise.resolve(!!fullscreenEl);
+    if (!fullscreenEl && fs) {
+      try { request = Promise.resolve(fs.call(de)).then(() => true, () => false); } catch (e) { request = Promise.resolve(false); }
     }
+    request.then(ok => {
+      let lock = Promise.resolve(false);
+      if (screen.orientation && screen.orientation.lock) {
+        try { lock = screen.orientation.lock('landscape').then(() => true, () => false); } catch (e) {}
+      }
+      lock.then(locked => {
+        this.checkRotate();
+        if (!opt.quiet && !ok && !locked) this.toast('Rotate sideways; this browser limits fullscreen.');
+      });
+    });
   },
 
   showMenu() {
@@ -161,6 +214,7 @@ const Main = {
     this.el('connect').classList.add('hidden');
     this.el('helpPanel').classList.add('hidden');
     this.el('pausePanel').classList.add('hidden');
+    this.el('gameFullBtn').classList.add('hidden');
     this.el('pauseBtn').classList.add('hidden');
     this.el('touchUI').classList.add('hidden');
     const ep = this.el('endPanel');
@@ -186,6 +240,7 @@ const Main = {
 
   showGameUI(myChar) {
     this.hideOverlays();
+    this.el('gameFullBtn').classList.remove('hidden');
     this.el('pauseBtn').classList.remove('hidden');
     if (Input.touchMode) {
       this.el('touchUI').classList.remove('hidden');
