@@ -18,6 +18,8 @@ const Story = {
       ['panda', 'Bao bao! (A Heart Shrine! It\'s waking up!)'],
       ['jolie', 'It remembers us… Joku, hold my hand when we\'re close — tap the ❤ button!'],
       ['joku', 'And if you\'re hurt, come here. Hold ❤ and I\'ll hug you back to full bloom.'],
+      ['dog', 'Woof woof! (And I\'ll BITE anything that dares touch you two!)'],
+      ['panda', 'Bao~ (I\'ll toss healing hearts when someone is hurt. Momo\'s got you!)'],
       ['jolie', 'When our Love Meter is full… maybe something magical happens? 💕'],
     ],
     gate0: [

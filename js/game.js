@@ -220,7 +220,7 @@ const Game = {
     // ----- downed logic -----
     if (G.me.down) {
       G.me.downT += dt;
-      if (G.me.downT > 12) this.respawnMe(.55);
+      if (G.me.downT > 20) this.respawnMe(.45);
       // in solo mode the bot partner hugs you back up
       if (G.mate.bot && !G.mate.down && U.dist(G.me.x, G.me.y, G.mate.x, G.mate.y) < 70) {
         G.reviveT += dt;
@@ -299,6 +299,8 @@ const Game = {
     if (!s.dn && m.down) { m.down = false; m.pose = null; }
     if (s.wg) m.wing = 1;
     m.wing = Math.max(0, m.wing - dt * 1.6);
+    m.hurtT = s.ht ? .2 : 0;
+    m.cheerT = s.ch ? .2 : 0;
     if (s.at) { if (m.atkT > .3) m.atkT = 0; } // mirror attack pose
     m.atkT += dt;
     m.animT += dt * Math.min(1.4, Math.abs(m.vx) / 300 + .0001);
@@ -336,8 +338,9 @@ const Game = {
           G.reviveT = 0;
           this.emit('revive', {});
           SND.sfx('revive');
+          this.loveAdd(10);
           Ptc.burst('heart', mate.x, mate.y - 40, 12, { sp: 140, r: 7, life: 1.2 });
-          if (mate.bot) { mate.down = false; mate.pose = null; mate.hp = mate.maxHp * .6; }
+          if (mate.bot) { mate.down = false; mate.pose = null; mate.hp = mate.maxHp * .6; mate.cheerT = 1; }
         }
       } else G.reviveT = 0;
       return;
@@ -436,7 +439,7 @@ const Game = {
       if (G.mode !== 'guest') { // host applies the damage
         for (const e of this.enemiesAll()) {
           if (e.dead || e.dying > 0) continue;
-          if (Math.abs(e.x - G.kissX) < 700) this.hitEnemy(e, 85, 'love');
+          if (Math.abs(e.x - G.kissX) < 700) this.hitEnemy(e, 110, 'love');
         }
       }
     }
@@ -475,7 +478,7 @@ const Game = {
     G.projs.push(o);
     if (!fromNet) {
       if (o.mine) this.emit('shoot', { kind: o.kind, x: o.x, y: o.y, vx: o.vx, vy: o.vy, life: o.life, g: o.g });
-      else if (o.host && G.mode === 'host') this.emit('shoot', { kind: o.kind, x: o.x, y: o.y, vx: o.vx, vy: o.vy, life: o.life, g: o.g, foe: true });
+      else if (o.host && G.mode === 'host') this.emit('shoot', { kind: o.kind, x: o.x, y: o.y, vx: o.vx, vy: o.vy, life: o.life, g: o.g, foe: true, dmg: o.dmg });
     }
   },
 
@@ -540,15 +543,18 @@ const Game = {
     }
     if (e.hp <= 0) {
       if (e.type === 'boss') this.bossDefeated();
-      else this.killEnemy(e);
+      else this.killEnemy(e, by);
     }
   },
 
-  killEnemy(e) {
+  killEnemy(e, by) {
     e.dead = true;
     G.stats.kills++;
     this.loveAdd(3);
     SND.sfx('ekill');
+    // victory cheer for the local hero who landed it
+    if (by === G.me.char) G.me.cheerT = .9;
+    else if (G.mate.bot && by === G.mate.char) G.mate.cheerT = .9;
     Ptc.burst('dot', e.x, e.y - 14, 10, { color: '#b28fe8', sp: 160, r: 7, life: .6 });
     Ptc.burst('spark', e.x, e.y - 14, 6, { sp: 190, g: 500, r: 4, life: .6 });
     if (G.mode !== 'guest') {
@@ -573,6 +579,7 @@ const Game = {
     if (G.handHold && d < 150) dmg *= .7; // held hands protect
     me.hp -= dmg;
     me.invuln = 1; me.hurtCd = .8;
+    me.hurtT = .6; me.cheerT = 0;
     me.vx = Math.sign(me.x - fromX) * 300 || 300;
     me.vy = -260;
     SND.sfx('hit');
@@ -601,9 +608,12 @@ const Game = {
   reviveMe() {
     if (!G.me.down) return;
     G.me.down = false; G.me.pose = null; G.me.downT = 0;
-    G.me.hp = G.me.maxHp * .6; G.me.invuln = 2;
+    G.me.hp = G.me.maxHp * .6; G.me.invuln = 2.5;
+    G.me.cheerT = 1;
+    this.loveAdd(10);
     SND.sfx('revive');
     Ptc.burst('heart', G.me.x, G.me.y - 40, 12, { sp: 140, r: 7, life: 1.2 });
+    this.toastMsg('💞 Love Surge! Revived by love.');
   },
 
   respawnMe(hpFrac) {
@@ -667,17 +677,21 @@ const Game = {
     Ptc.burst('dot', x, 500, 14, { color: '#9e5eff', sp: 260, r: 9, life: .6 });
     Ptc.add({ kind: 'ring', x, y: 500, vx: 0, vy: 0, r: 160, life: .5, color: 'rgba(158,94,255,.8)' });
     for (const dir of [-1, 1]) {
-      this.addProj({ kind: 'shock', x: x + dir * 60, y: 520, vx: dir * 330, vy: 0, dmg: 16, life: 2.4, mine: false, foe: true, host: true });
+      this.addProj({ kind: 'shock', x: x + dir * 60, y: 520, vx: dir * 330, vy: 0, dmg: 18, life: 2.4, mine: false, foe: true, host: true });
     }
   },
-  bossSummon() {
+  bossSummon(n = 2) {
     const b = G.level.boss;
+    // don't flood the arena — the couple needs room to love AND fight
+    const alive = G.level.foes.filter(f => !f.dead).length;
+    n = Math.min(n, Math.max(0, 3 - alive));
+    if (n <= 0) return;
     SND.sfx('boss');
     const pl = G.level.plats[0];
-    for (const off of [-140, 140]) {
+    for (const off of [-140, 140, -260, 260].slice(0, n)) {
       const f = {
         id: 'bs' + (G._dropId++), type: 'slime', x: U.clamp(b.x + off, pl.x + 40, pl.x + pl.w - 40), y: pl.y, homeX: b.x + off, plat: pl,
-        vx: 0, vy: 0, dir: 1, hp: 40, maxHp: 40, dmg: 10, t: 0, atkT: .6, hopY: 0, flash: 0, hurtShow: 0, dead: false
+        vx: 0, vy: 0, dir: 1, hp: 55, maxHp: 55, dmg: 13, t: 0, atkT: .6, hopY: 0, flash: 0, hurtShow: 0, dead: false
       };
       G.level.foes.push(f);
       this.emit('spawn', { id: f.id, x: f.x, y: f.y });
@@ -897,6 +911,13 @@ const Game = {
         color: Math.random() < .5 ? '#ffb3d6' : '#9fe0ff', spin: Math.random()
       });
     }
+    // collectibles twinkle
+    if (Math.random() < dt * 2.5 && G.level.items.length) {
+      const it = G.level.items[(Math.random() * G.level.items.length) | 0];
+      if (it && !it.taken && Math.abs(it.x - G.cam.x) < this.cssW / this.scale / 2) {
+        Ptc.add({ kind: 'star', x: it.x + (Math.random() - .5) * 12, y: it.y - 6 - Math.random() * 10, vx: 0, vy: -14, r: 4, life: .6, color: it.kind === 'orb' ? '#bfeaff' : '#ffd7ec' });
+      }
+    }
   },
 
   toastMsg(txt) { Main.toast(txt); },
@@ -915,7 +936,8 @@ const Game = {
     NET.send({
       t: 'p', x: Math.round(p.x), y: Math.round(p.y), vx: Math.round(p.vx), vy: Math.round(p.vy),
       dir: p.dir, hp: Math.round(p.hp), mp: Math.round(p.mp),
-      gl: p.glide, hh: p.holding, dn: p.down, wg: p.wing > .3, at: p.atkT < .15, og: p.onGround
+      gl: p.glide, hh: p.holding, dn: p.down, wg: p.wing > .3, at: p.atkT < .15, og: p.onGround,
+      ht: p.hurtT > .05, ch: p.cheerT > .05
     });
   },
 
@@ -973,7 +995,7 @@ const Game = {
   applyEvent(k, d) {
     switch (k) {
       case 'shoot':
-        this.addProj({ kind: d.kind, x: d.x, y: d.y, vx: d.vx, vy: d.vy, dmg: d.foe ? (d.kind === 'shock' ? 16 : 12) : 0, life: d.life, g: d.g, mine: false, foe: !!d.foe }, true);
+        this.addProj({ kind: d.kind, x: d.x, y: d.y, vx: d.vx, vy: d.vy, dmg: d.foe ? (d.dmg || 14) : 0, life: d.life, g: d.g, mine: false, foe: !!d.foe }, true);
         if (d.kind === 'phoenix') SND.sfx('shootJ');
         else if (d.kind === 'petal') SND.sfx('shootP');
         break;
@@ -999,7 +1021,7 @@ const Game = {
         const pl = G.level.plats[0];
         G.level.foes.push({
           id: d.id, type: 'slime', x: d.x, y: d.y, homeX: d.x, plat: pl, tx: d.x, ty: d.y,
-          vx: 0, vy: 0, dir: 1, hp: 40, maxHp: 40, dmg: 10, t: 0, atkT: 1, hopY: 0, flash: 0, hurtShow: 0, dead: false
+          vx: 0, vy: 0, dir: 1, hp: 55, maxHp: 55, dmg: 13, t: 0, atkT: 1, hopY: 0, flash: 0, hurtShow: 0, dead: false
         });
         break;
       }
@@ -1301,7 +1323,7 @@ const Game = {
       ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 8;
       ctx.fillText('💔 You need a hug…', W / 2, H * .3);
       ctx.font = `600 ${small ? 13 : 15}px Fredoka, sans-serif`;
-      ctx.fillText(`${Story.NAMES[G.mate.char]} can revive you — or respawn in ${Math.ceil(12 - G.me.downT)}s`, W / 2, H * .3 + 30);
+      ctx.fillText(`${Story.NAMES[G.mate.char]} can revive you (hold ❤ close) — or respawn in ${Math.ceil(20 - G.me.downT)}s`, W / 2, H * .3 + 30);
       ctx.shadowBlur = 0;
     }
   },

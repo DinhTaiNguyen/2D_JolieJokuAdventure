@@ -42,8 +42,15 @@ Love Meter is full) kissing to unleash a screen-clearing **Love Burst**. 💥�
 **Character powers:** Joku's special is a phoenix water-dash (invulnerable, damages
 everything in the way). Jolie's special blooms a healing flower field, and holding jump
 lets her glide on petals. Hitting the same enemy within a second of each other triggers a
-**Combo of Love** for bonus meter. Pets fetch nearby pickups for you. Jump over the boss's
-purple shockwaves!
+**Combo of Love** for bonus meter.
+
+**Your supporters fight too:** 🐶 Kai dashes in and BITES enemies that get close to you.
+🐼 Momo lobs healing hearts at whoever is hurting. They also fetch nearby pickups.
+
+**The devils:** grinning slimes, spiky thorns, ghostly wisps that snipe from above, and
+dive-bombing imps — plus the Gloomheart itself, whose shockwaves you must jump and whose
+eyes catch fire as it rages. It's a real fight: heal each other, hold hands for protection,
+revive with hugs (a revive grants a Love Surge), and finish big moments with a kiss.
 
 ## Deploying (pick any — all free)
 

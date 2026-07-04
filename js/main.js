@@ -117,6 +117,18 @@ const Main = {
       if (q.has('kiss')) { G.love = 100; Game.applyLove('kiss', (G.me.x + G.mate.x) / 2); }
       if (q.has('bloom')) Game.addAura(G.me.x + 80, G.me.y, false);
       if (q.has('phx')) Game.addProj({ kind: 'phoenix', x: G.me.x + 130, y: G.me.y - 70, vx: 8, vy: 0, dmg: 0, life: 300, mine: false }, true);
+      if (q.has('zoo')) { // test hook: one of each devil, lined up
+        ['slime', 'thorn', 'wisp', 'imp'].forEach((type, i) => {
+          const fx = G.me.x + 170 + i * 115;
+          const gy = World.topAt(G.level, fx) || 520;
+          const air = type === 'wisp' ? 150 : type === 'imp' ? 170 : 0;
+          const pl = G.level.plats.find(p => fx >= p.x && fx <= p.x + p.w && p.type === 'ground') || G.level.plats[0];
+          G.level.foes.push({
+            id: 'zoo' + i, type, x: fx, y: gy - air, homeX: fx, homeY: gy - air, plat: pl,
+            vx: 0, vy: 0, dir: -1, hp: 55, maxHp: 55, dmg: 13, t: i * 1.3, atkT: 2 + i, hopY: 0, flash: 0, hurtShow: 0, dead: false
+          });
+        });
+      }
       if (q.has('sim')) { // test hook: fast-forward the simulation
         const n = ((+q.get('sim') || 5) * 60) | 0;
         const fire = q.has('fire');

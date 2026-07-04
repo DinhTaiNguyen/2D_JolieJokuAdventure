@@ -87,6 +87,8 @@ const SND = {
                       this.noise({ d: .5, v: .15, f: 300 }); break;
       case 'slam':    this.noise({ d: .3, v: .25, f: 250 });
                       this.tone({ f: 100, f2: 40, type: 'sawtooth', d: .3, v: .16 }); break;
+      case 'bark':    this.tone({ f: 520, f2: 340, type: 'square', d: .08, v: .11 });
+                      this.tone({ f: 480, f2: 300, type: 'square', d: .09, v: .11, delay: .09 }); break;
     }
   },
 

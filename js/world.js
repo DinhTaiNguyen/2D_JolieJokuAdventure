@@ -46,12 +46,15 @@ const World = {
     const row = (x, y, n, kind) => {
       for (let i = 0; i < n; i++) items.push({ id: 'i' + (itemId++), kind, x: x + i * 52, y, taken: false });
     };
+    const DEFS = {
+      slime: { hp: 55, dmg: 13 }, thorn: { hp: 85, dmg: 17 },
+      wisp: { hp: 45, dmg: 11 }, imp: { hp: 45, dmg: 13 },
+    };
     const foe = (type, x, pl) => {
-      const def = {
-        slime: { hp: 40, dmg: 10 }, thorn: { hp: 60, dmg: 14 }, wisp: { hp: 30, dmg: 8 },
-      }[type];
+      const def = DEFS[type];
+      const air = type === 'wisp' ? U.range(r, 120, 190) : type === 'imp' ? U.range(r, 150, 200) : 0;
       foes.push({
-        id: 'e' + (foeId++), type, x, y: pl.y, homeX: x, plat: pl,
+        id: 'e' + (foeId++), type, x, y: pl.y - air, homeX: x, homeY: pl.y - air, plat: pl,
         vx: 0, vy: 0, dir: 1, hp: def.hp, maxHp: def.hp, dmg: def.dmg,
         t: r() * 10, atkT: r() * 2, hopY: 0, flash: 0, hurtShow: 0, dead: false
       });
@@ -66,7 +69,7 @@ const World = {
       return this._pack(cfg, idx, plats, items, foes, {
         shrineX: null, gateX: null,
         startX: 260, checkpoints: [{ x: 260, y: 520 }],
-        boss: { id: 'boss', type: 'boss', x: cfg.width * .62, y: 375, homeX: cfg.width * .62, homeY: 375, vx: 0, vy: 0, dir: -1, hp: 950, maxHp: 950, dmg: 18, t: 0, atkT: 3, phase: 0, mode: 'idle', modeT: 2.5, flash: 0, hurtShow: 0, dying: 0, dead: false }
+        boss: { id: 'boss', type: 'boss', x: cfg.width * .62, y: 395, homeX: cfg.width * .62, homeY: 395, vx: 0, vy: 0, dir: -1, hp: 1100, maxHp: 1100, dmg: 20, t: 0, atkT: 3, phase: 0, mode: 'idle', modeT: 2.5, flash: 0, hurtShow: 0, dying: 0, dead: false }
       });
     }
 
@@ -107,17 +110,15 @@ const World = {
       if (r() < .25) items.push({ id: 'i' + (itemId++), kind: 'heartDrop', x: x + w * .5, y: y - 120, taken: false });
 
       // enemies
-      const foeCount = Math.min(3, 1 + (r() * cfg.density * 2 | 0));
+      const foeCount = Math.min(4, 1 + (r() * cfg.density * 2.4 | 0));
       for (let i = 0; i < foeCount; i++) {
         if (x + w < 1200) break; // keep the start peaceful
         const t = r();
         const fx = x + 90 + r() * (w - 180);
-        if (t < .42) foe('slime', fx, pl);
-        else if (t < .72) foe('thorn', fx, pl);
-        else foes.push({
-          id: 'e' + (foeId++), type: 'wisp', x: fx, y: y - U.range(r, 120, 190), homeX: fx, homeY: y - 150, plat: pl,
-          vx: 0, vy: 0, dir: 1, hp: 30, maxHp: 30, dmg: 8, t: r() * 10, atkT: r() * 2, hopY: 0, flash: 0, hurtShow: 0, dead: false
-        });
+        if (t < .34) foe('slime', fx, pl);
+        else if (t < .6) foe('thorn', fx, pl);
+        else if (t < .82) foe('wisp', fx, pl);
+        else foe('imp', fx, pl);
       }
       // shrine at ~50%
       if (shrineX === null && x > shrineTarget) {

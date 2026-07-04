@@ -17,7 +17,7 @@ const Ent = {
   },
 
   makePet(kind, owner) {
-    return { kind, owner, x: owner.x - 50, y: owner.y, vx: 0, dir: 1, animT: 0, emoteT: 4 };
+    return { kind, owner, x: owner.x - 50, y: owner.y, vx: 0, dir: 1, animT: 0, emoteT: 4, skillCd: 4, mode: 'follow', modeT: 0, targetE: null, healFx: null };
   },
 
   localInput() {
@@ -56,7 +56,7 @@ const Ent = {
           if (e.dead || e.dying > 0) continue;
           if (Math.abs(e.x - p.x) < 34 && Math.abs((e.y - 14) - (p.y - 26)) < 44 && (!e._dashCd || e._dashCd <= 0)) {
             e._dashCd = .5;
-            Game.hitEnemy(e, 45, p.char);
+            Game.hitEnemy(e, 50, p.char);
           }
         }
       }
@@ -100,11 +100,11 @@ const Ent = {
       p.atkT = 0;
       if (p.char === 'joku') {
         SND.sfx('shootJ');
-        Game.addProj({ kind: 'phoenix', x: p.x + p.dir * 16, y: p.y - 36, vx: p.dir * 620, vy: 0, dmg: 26, life: 1.1, mine: !p.remote, owner: p.char });
+        Game.addProj({ kind: 'phoenix', x: p.x + p.dir * 16, y: p.y - 36, vx: p.dir * 620, vy: 0, dmg: 28, life: 1.1, mine: !p.remote, owner: p.char });
       } else {
         SND.sfx('shootP');
         for (const sp of [-.22, 0, .22]) {
-          Game.addProj({ kind: 'petal', x: p.x + p.dir * 14, y: p.y - 36, vx: p.dir * 540 * Math.cos(sp), vy: 540 * Math.sin(sp), dmg: 11, life: .9, mine: !p.remote, owner: p.char });
+          Game.addProj({ kind: 'petal', x: p.x + p.dir * 14, y: p.y - 36, vx: p.dir * 540 * Math.cos(sp), vy: 540 * Math.sin(sp), dmg: 12, life: .9, mine: !p.remote, owner: p.char });
         }
       }
     }
@@ -137,6 +137,8 @@ const Ent = {
     p.squash *= (1 - 9 * dt);
     p.coyote -= dt;
     p.blinkT -= dt; p.blink -= dt;
+    p.hurtT = Math.max(0, (p.hurtT || 0) - dt);
+    p.cheerT = Math.max(0, (p.cheerT || 0) - dt);
     if (p.blinkT <= 0) { p.blink = .13; p.blinkT = 2 + Math.random() * 3; }
     p.animT += dt * Math.min(1.4, Math.abs(p.vx) / 300 + .0001);
     if (p.poseT > 0) { p.poseT -= dt; if (p.poseT <= 0 && !G.cut) p.pose = null; }
@@ -198,7 +200,7 @@ const Ent = {
     for (const e of Game.enemiesAll()) {
       if (e.dead || e.dying > 0) continue;
       const d = Math.abs(e.x - bot.x);
-      const dyLim = e.type === 'boss' ? 320 : 140;
+      const dyLim = (e.type === 'boss' || e.type === 'imp') ? 320 : 140;
       if (d < fd && Math.abs(e.y - bot.y) < dyLim) { fd = d; foe = e; }
     }
     if (foe && bot.atkCd <= 0) {
@@ -206,6 +208,8 @@ const Ent = {
       inp.attack = true;
       if (foe.y < bot.y - 110 && bot.onGround) inp.jump = true; // hop to reach floaters
       if (fd > 120) inp.ax = bot.dir * .5;
+      // Jolie bot blooms a healing field when the couple is hurting
+      if (bot.spCd <= 0 && bot.mp >= 35 && (bot.hp < bot.maxHp * .6 || me.hp < me.maxHp * .6)) inp.special = true;
       return inp;
     }
     // follow the player
@@ -227,9 +231,44 @@ const Ent = {
     return inp;
   },
 
-  /* ---------------- pets ---------------- */
+  /* ---------------- pets (supporters with skills!) ---------------- */
   updatePet(pet, dt) {
     const o = pet.owner, L = G.level;
+    pet.skillCd -= dt;
+    pet.animT += dt * Math.min(1.4, Math.abs(pet.vx) / 300 + .0001);
+
+    // --- Kai's Tide Bite: dash at an enemy, chomp, splash ---
+    if (pet.mode === 'dash') {
+      const e = pet.targetE;
+      pet.modeT += dt;
+      if (!e || e.dead || e.dying > 0 || pet.modeT > 1.2) { pet.mode = 'return'; return; }
+      const tx2 = e.x, ty2 = e.y - 12;
+      const d = Math.max(1, U.dist(pet.x, pet.y, tx2, ty2));
+      pet.dir = tx2 > pet.x ? 1 : -1;
+      pet.vx = 620 * pet.dir;
+      pet.x += (tx2 - pet.x) / d * 620 * dt;
+      pet.y += (ty2 - pet.y) / d * 620 * dt;
+      if (Math.random() < dt * 20) Ptc.burst('drop', pet.x, pet.y - 10, 1, { sp: 80, g: 500, r: 4, life: .4 });
+      if (d < 28) {
+        if (!o.remote) Game.hitEnemy(e, 10, o.char);
+        SND.sfx('bark');
+        Ptc.burst('drop', e.x, e.y - 14, 8, { sp: 180, up: 80, g: 600, r: 5, life: .5 });
+        Ptc.add({ kind: 'ring', x: e.x, y: e.y - 14, vx: 0, vy: 0, r: 40, life: .4, color: 'rgba(140,210,255,.9)' });
+        pet.mode = 'return';
+      }
+      return;
+    }
+    if (pet.mode === 'return') {
+      const tx2 = o.x - o.dir * 44;
+      const d = Math.max(1, U.dist(pet.x, pet.y, tx2, o.y));
+      pet.dir = tx2 > pet.x ? 1 : -1;
+      pet.vx = 500 * pet.dir;
+      if (d < 30) pet.mode = 'follow';
+      else { pet.x += (tx2 - pet.x) / d * 500 * dt; pet.y += (o.y - pet.y) / d * 500 * dt; }
+      return;
+    }
+
+    // --- follow the owner ---
     const tx = o.x - o.dir * 44;
     const dx = tx - pet.x;
     pet.vx = U.clamp(dx * 4.5, -460, 460);
@@ -242,7 +281,6 @@ const Ent = {
     const ty = (top !== null) ? top : o.y;
     pet.y += (ty - pet.y) * Math.min(1, 12 * dt);
     if (Math.abs(pet.x - o.x) > 700) { pet.x = o.x - o.dir * 44; pet.y = o.y; }
-    pet.animT += dt * Math.min(1.4, Math.abs(pet.vx) / 300 + .0001);
 
     // pets attract nearby goodies toward their owner
     for (const it of G.level.items) {
@@ -258,6 +296,49 @@ const Ent = {
     if (pet.emoteT <= 0) {
       pet.emoteT = 5 + Math.random() * 6;
       Ptc.add({ kind: 'heart', x: pet.x, y: pet.y - 34, vx: 0, vy: -30, r: 5, life: 1, color: pet.kind === 'dog' ? '#8fc8ff' : '#ffb3d6' });
+    }
+
+    // --- skill triggers ---
+    if (G.cut || G.kissCin > 0) return;
+    if (pet.kind === 'dog' && pet.skillCd <= 0 && !o.down) {
+      let best = null, bd = 250;
+      for (const e of Game.enemiesAll()) {
+        if (e.dead || e.dying > 0) continue;
+        const d = U.dist(e.x, e.y, o.x, o.y);
+        if (d < bd) { bd = d; best = e; }
+      }
+      if (best) { pet.mode = 'dash'; pet.modeT = 0; pet.targetE = best; pet.skillCd = 6; }
+    }
+    // --- Momo's Heart Toss: lob a healing heart to whoever hurts most ---
+    if (pet.kind === 'panda' && pet.skillCd <= 0 && !pet.healFx) {
+      const cands = [G.me];
+      if (G.mate.bot) cands.push(G.mate);
+      let best = null, worst = .8;
+      for (const p of cands) {
+        if (p.down) continue;
+        const frac = p.hp / p.maxHp;
+        if (frac < worst && U.dist(pet.x, pet.y, p.x, p.y) < 320) { worst = frac; best = p; }
+      }
+      if (best) {
+        pet.skillCd = 9;
+        pet.healFx = { t: 0, sx: pet.x, sy: pet.y - 26, target: best };
+        SND.sfx('heart');
+      }
+    }
+    if (pet.healFx) {
+      const fx = pet.healFx;
+      fx.t += dt * 2;
+      const k = Math.min(1, fx.t);
+      const hx = U.lerp(fx.sx, fx.target.x, k);
+      const hy = U.lerp(fx.sy, fx.target.y - 34, k) - Math.sin(k * Math.PI) * 44;
+      Ptc.add({ kind: 'heart', x: hx, y: hy, vx: 0, vy: 0, r: 6, life: .22, color: '#ff9fce' });
+      if (k >= 1) {
+        fx.target.hp = Math.min(fx.target.maxHp, fx.target.hp + 14);
+        SND.sfx('heal');
+        Ptc.burst('heart', fx.target.x, fx.target.y - 40, 6, { sp: 90, r: 5, life: .8 });
+        Ptc.add({ kind: 'ring', x: fx.target.x, y: fx.target.y - 30, vx: 0, vy: 0, r: 50, life: .5, color: 'rgba(255,180,215,.9)' });
+        pet.healFx = null;
+      }
     }
   },
 
@@ -308,6 +389,39 @@ const Ent = {
           }
           break;
         }
+        case 'imp': { // little devil: hovers, then dive-bombs
+          if (!e.mode) e.mode = 'hover';
+          if (e.mode === 'hover') {
+            e.x = e.homeX + Math.sin(e.t * .9) * 70;
+            e.y = e.homeY + Math.sin(e.t * 1.7) * 16;
+            if (tgt) e.dir = tgt.x > e.x ? 1 : -1;
+            if (e.atkT <= 0 && tgt && Math.abs(tgt.x - e.x) < 420 && tgt.y > e.y + 60) {
+              e.mode = 'dive'; e.dvT = 0;
+              e.sx = e.x; e.sy = e.y;
+              e.txx = tgt.x + tgt.vx * .25; e.tyy = tgt.y - 20;
+            }
+          } else if (e.mode === 'dive') {
+            e.dvT += dt * 1.4;
+            const k = Math.min(1, e.dvT);
+            const cx2 = (e.sx + e.txx) / 2, cy2 = Math.max(e.sy, e.tyy) + 70;
+            const a1x = U.lerp(e.sx, cx2, k), a1y = U.lerp(e.sy, cy2, k);
+            const a2x = U.lerp(cx2, e.txx, k), a2y = U.lerp(cy2, e.tyy, k);
+            const nx = U.lerp(a1x, a2x, k), ny = U.lerp(a1y, a2y, k);
+            e.dir = nx >= e.x ? 1 : -1;
+            e.x = nx; e.y = ny;
+            if (Math.random() < dt * 12) Ptc.burst('dot', e.x, e.y - 10, 1, { color: '#b06aff', sp: 40, r: 6, life: .35 });
+            if (k >= 1) e.mode = 'climb';
+          } else { // climb home
+            const kk = Math.min(1, 2 * dt);
+            e.x += (e.homeX - e.x) * kk;
+            e.y += (e.homeY - e.y) * kk;
+            e.dir = e.homeX >= e.x ? 1 : -1;
+            if (Math.abs(e.x - e.homeX) < 14 && Math.abs(e.y - e.homeY) < 14) {
+              e.mode = 'hover'; e.atkT = 3.2;
+            }
+          }
+          break;
+        }
       }
     }
   },
@@ -328,7 +442,7 @@ const Ent = {
       case 'idle': {
         b.x += U.clamp(mid - b.x, -90, 90) * dt * .8;
         b.x = U.clamp(b.x, 320, G.level.width - 320);
-        b.y = b.homeY + Math.sin(b.t * 1.4) * 26;
+        b.y = b.homeY + Math.sin(b.t * 1.4) * 55; // deep bob — dips into attack range rhythmically
         if (b.modeT <= 0) {
           b._cycle = ((b._cycle || 0) + 1) % 3;
           b.mode = ['slam', 'volley', 'summon'][b._cycle];
@@ -358,7 +472,7 @@ const Ent = {
           const n = 6 + b.phase * 2;
           for (let i = 0; i < n; i++) {
             const a = Math.PI * .25 + (i / (n - 1)) * Math.PI * .5;
-            Game.addProj({ kind: 'darkball', x: b.x, y: b.y - 10, vx: Math.cos(Math.PI - a) * 270, vy: -Math.sin(a) * 270 + 120, dmg: 14, life: 4, mine: false, foe: true, host: true, g: 260 });
+            Game.addProj({ kind: 'darkball', x: b.x, y: b.y - 10, vx: Math.cos(Math.PI - a) * 270, vy: -Math.sin(a) * 270 + 120, dmg: 16, life: 4, mine: false, foe: true, host: true, g: 260 });
           }
           SND.sfx('boss');
           b.mode = 'recover'; b.modeT = 1.4;
@@ -367,7 +481,7 @@ const Ent = {
       }
       case 'summon': {
         if (b.modeT <= 0) {
-          Game.bossSummon();
+          Game.bossSummon(2 + b.phase);
           b.mode = 'recover'; b.modeT = 1.6;
         }
         break;

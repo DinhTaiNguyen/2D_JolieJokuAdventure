@@ -84,8 +84,10 @@ const Art = {
     }
 
     const armSw = run ? -swing : 0;
+    const cheer = p.cheerT > 0 && !hug && !atk;
     // ---- back arm (behind torso) ----
-    if (hug) this.limb(ctx, -6, -37 - bounce, 8, -44 - bounce, 5.5, '#24509e');
+    if (cheer) this.limb(ctx, -6, -37 - bounce, -11, -50 - bounce, 5.5, '#24509e');
+    else if (hug) this.limb(ctx, -6, -37 - bounce, 8, -44 - bounce, 5.5, '#24509e');
     else if (atk) this.limb(ctx, -6, -37 - bounce, -10, -27 - bounce, 5.5, '#24509e');
     else this.limb(ctx, -6, -37 - bounce, -7 + armSw * 7, -25 + Math.abs(armSw) * 3 - bounce, 5.5, '#24509e');
 
@@ -179,7 +181,13 @@ const Art = {
     ctx.beginPath(); ctx.moveTo(-4.2, -10.5); ctx.lineTo(-3.6, -13.5); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(2.2, -11); ctx.lineTo(2.4, -14.5); ctx.stroke();
     // eyes
-    if (p.pose === 'kiss' || (p.blink > 0)) {
+    if (p.hurtT > 0) { // ouch! >_<
+      ctx.strokeStyle = '#1a2340'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+      for (const ex of [3.9, 9.5]) {
+        ctx.beginPath(); ctx.moveTo(ex - 1.8, -2.7); ctx.lineTo(ex + 1.4, -.9); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ex - 1.8, .9); ctx.lineTo(ex + 1.4, -.9); ctx.stroke();
+      }
+    } else if (p.pose === 'kiss' || (p.blink > 0)) {
       ctx.strokeStyle = '#1a2340'; ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.moveTo(1.8, -.8); ctx.quadraticCurveTo(3.8, .8, 5.8, -.8); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(7.8, -.8); ctx.quadraticCurveTo(9.5, .8, 11, -.8); ctx.stroke();
@@ -211,6 +219,9 @@ const Art = {
     if (p.pose === 'kiss') {
       ctx.fillStyle = '#d87a5a';
       ctx.beginPath(); ctx.arc(10.6, 3.4, 1.5, 0, U.TAU); ctx.fill();
+    } else if (p.hurtT > 0) {
+      ctx.fillStyle = '#8a3c2c';
+      ctx.beginPath(); ctx.ellipse(7.4, 4.6, 1.7, 2.1, 0, 0, U.TAU); ctx.fill();
     } else {
       ctx.strokeStyle = '#b85c40'; ctx.lineWidth = 1.3;
       ctx.beginPath(); ctx.moveTo(5, 4.8); ctx.quadraticCurveTo(7.5, 6.6, 10, 4.6); ctx.stroke();
@@ -218,7 +229,10 @@ const Art = {
     ctx.restore();
 
     // ---- front arm (with visible hand) ----
-    if (hug) {
+    if (cheer) {
+      this.limb(ctx, 6, -37, 12, -51, 5.5, '#3878e0');
+      ctx.fillStyle = '#ffd9b8'; ctx.beginPath(); ctx.arc(12.5, -51.5, 2.6, 0, U.TAU); ctx.fill();
+    } else if (hug) {
       this.limb(ctx, 6, -37, 13, -44, 5.5, '#3878e0');
       ctx.fillStyle = '#ffd9b8'; ctx.beginPath(); ctx.arc(13.5, -44.5, 2.6, 0, U.TAU); ctx.fill();
     } else if (atk) {
@@ -322,7 +336,9 @@ const Art = {
 
     // ---- back arm ----
     const armSw = run ? -swing : 0;
-    if (hug) this.limb(ctx, -5, -37 - bounce, 8, -43 - bounce, 5, '#f0a0c2');
+    const cheer = p.cheerT > 0 && !hug && !atk;
+    if (cheer) this.limb(ctx, -5, -37 - bounce, -10, -49 - bounce, 5, '#f0a0c2');
+    else if (hug) this.limb(ctx, -5, -37 - bounce, 8, -43 - bounce, 5, '#f0a0c2');
     else if (atk) this.limb(ctx, -5, -37 - bounce, -9, -27 - bounce, 5, '#f0a0c2');
     else this.limb(ctx, -5, -37 - bounce, -6 + armSw * 6, -25 + Math.abs(armSw) * 3 - bounce, 5, '#f0a0c2');
 
@@ -410,7 +426,13 @@ const Art = {
       ctx.restore();
     }
     // eyes
-    if (p.pose === 'kiss' || (p.blink > 0)) {
+    if (p.hurtT > 0) { // ouch! >_<
+      ctx.strokeStyle = '#5e3a20'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+      for (const ex of [3.7, 9.5]) {
+        ctx.beginPath(); ctx.moveTo(ex - 1.8, -2.5); ctx.lineTo(ex + 1.4, -.7); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ex - 1.8, 1.1); ctx.lineTo(ex + 1.4, -.7); ctx.stroke();
+      }
+    } else if (p.pose === 'kiss' || (p.blink > 0)) {
       ctx.strokeStyle = '#5e3a20'; ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.moveTo(1.4, -.4); ctx.quadraticCurveTo(3.6, 1.2, 5.8, -.4); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(7.4, -.4); ctx.quadraticCurveTo(9.2, 1.2, 10.8, -.4); ctx.stroke();
@@ -443,6 +465,9 @@ const Art = {
     if (p.pose === 'kiss') {
       ctx.fillStyle = '#e06a6a';
       ctx.beginPath(); ctx.arc(10.6, 3.2, 1.5, 0, U.TAU); ctx.fill();
+    } else if (p.hurtT > 0) {
+      ctx.fillStyle = '#a04438';
+      ctx.beginPath(); ctx.ellipse(7.2, 4.4, 1.7, 2.1, 0, 0, U.TAU); ctx.fill();
     } else {
       ctx.strokeStyle = '#c05a50'; ctx.lineWidth = 1.3;
       ctx.beginPath(); ctx.moveTo(4.8, 4.6); ctx.quadraticCurveTo(7, 6.4, 9.2, 4.4); ctx.stroke();
@@ -450,7 +475,10 @@ const Art = {
     ctx.restore();
 
     // ---- front arm (with hand) ----
-    if (hug) {
+    if (cheer) {
+      this.limb(ctx, 5, -37, 11, -50, 5, '#ffc2da');
+      ctx.fillStyle = '#ffe0c4'; ctx.beginPath(); ctx.arc(11.6, -50.5, 2.4, 0, U.TAU); ctx.fill();
+    } else if (hug) {
       this.limb(ctx, 5, -37, 12, -32, 5, '#ffc2da');
       ctx.fillStyle = '#ffe0c4'; ctx.beginPath(); ctx.arc(12.6, -31.6, 2.4, 0, U.TAU); ctx.fill();
     } else if (atk) {
@@ -631,7 +659,7 @@ const Art = {
     ctx.restore();
   },
 
-  /* ================= ENEMIES ================= */
+  /* ================= ENEMIES — the little devils ================= */
   drawEnemy(ctx, e, t) {
     ctx.save();
     ctx.translate(e.x, e.y);
@@ -640,28 +668,62 @@ const Art = {
       case 'slime': {
         const squish = 1 + Math.sin(e.t * 6) * .08 - (e.hopY > 1 ? .15 : 0);
         ctx.scale(e.dir, 1);
+        // inner core glow
         ctx.globalCompositeOperation = 'lighter';
-        this.glow(ctx, 0, -10, 22, '#6e3ad8', .25);
+        this.glow(ctx, 0, -11, 24, '#8a4ae8', .3 + Math.sin(t * 3 + e.homeX) * .08);
         ctx.globalCompositeOperation = 'source-over';
-        const g = ctx.createLinearGradient(0, -26, 0, 0);
-        g.addColorStop(0, flash ? '#cfaaff' : '#5e3596'); g.addColorStop(1, flash ? '#9e7ad8' : '#2a1544');
+        // jelly body
+        const g = ctx.createRadialGradient(-3, -16, 2, 0, -10, 17);
+        g.addColorStop(0, flash ? '#e0ccff' : '#7a4ac2');
+        g.addColorStop(.55, flash ? '#b490ee' : '#4a2a86');
+        g.addColorStop(1, flash ? '#8a6ac0' : '#241040');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.ellipse(0, -11, 15 / squish, 12 * squish, 0, 0, U.TAU); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,.25)';
-        ctx.beginPath(); ctx.ellipse(-5, -16, 4, 2.5, -.5, 0, U.TAU); ctx.fill();
+        // dark core
+        ctx.fillStyle = 'rgba(20,8,40,.55)';
+        ctx.beginPath(); ctx.ellipse(-1, -9, 6, 5, 0, 0, U.TAU); ctx.fill();
+        // rim light
+        ctx.strokeStyle = 'rgba(220,190,255,.5)'; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.ellipse(0, -11, 13.5 / squish, 10.5 * squish, 0, -2.6, -1.2); ctx.stroke();
+        // horn nubs
+        ctx.fillStyle = '#2a1544';
+        ctx.beginPath(); ctx.moveTo(-6, -21 * squish); ctx.lineTo(-4.5, -26.5 * squish); ctx.lineTo(-2.5, -21.5 * squish); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(3, -21.5 * squish); ctx.lineTo(5, -26.5 * squish); ctx.lineTo(6.5, -21 * squish); ctx.fill();
+        // slanted glowing eyes
+        ctx.globalCompositeOperation = 'lighter';
         ctx.fillStyle = '#ff5e8f';
-        ctx.beginPath(); ctx.arc(3, -13, 2.5, 0, U.TAU); ctx.fill();
-        ctx.beginPath(); ctx.arc(9, -13, 2.2, 0, U.TAU); ctx.fill();
+        ctx.save(); ctx.translate(2.5, -13.5); ctx.rotate(.3);
+        ctx.beginPath(); ctx.ellipse(0, 0, 2.9, 1.7, 0, 0, U.TAU); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(9, -13.5); ctx.rotate(-.3);
+        ctx.beginPath(); ctx.ellipse(0, 0, 2.6, 1.6, 0, 0, U.TAU); ctx.fill(); ctx.restore();
+        ctx.globalCompositeOperation = 'source-over';
+        // grin with fangs
         ctx.strokeStyle = '#1a0e2a'; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(3, -7); ctx.quadraticCurveTo(6, -5.5, 9, -7); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(2, -7); ctx.quadraticCurveTo(6, -4.6, 10, -7.2); ctx.stroke();
+        ctx.fillStyle = '#efe6ff';
+        ctx.beginPath(); ctx.moveTo(3.4, -6.4); ctx.lineTo(4.4, -4.4); ctx.lineTo(5.4, -6.1); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(7, -6.2); ctx.lineTo(8, -4.2); ctx.lineTo(9, -6.3); ctx.fill();
         break;
       }
       case 'wisp': {
         const fl = Math.sin(e.t * 11) * 3;
+        // ghostly after-images
+        ctx.fillStyle = '#8a5ad8';
+        for (let i = 1; i <= 2; i++) {
+          ctx.globalAlpha = .16 / i;
+          ctx.beginPath();
+          ctx.ellipse(-Math.cos(e.t * .8) * i * 7, -15, 8, 12, 0, 0, U.TAU);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'lighter';
-        this.glow(ctx, 0, -14, 26, '#9e5eff', .5);
+        this.glow(ctx, 0, -14, 28, '#9e5eff', .5);
         ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = flash ? 'rgba(230,210,255,.95)' : 'rgba(110,70,190,.85)';
+        // flame body
+        const wg = ctx.createLinearGradient(0, -30, 0, 0);
+        wg.addColorStop(0, flash ? '#eee0ff' : '#a97ae8');
+        wg.addColorStop(1, flash ? '#c0aaee' : '#553296');
+        ctx.fillStyle = wg;
         ctx.beginPath();
         ctx.moveTo(0, -30 - fl);
         ctx.quadraticCurveTo(11, -22, 9, -10);
@@ -669,15 +731,37 @@ const Art = {
         ctx.quadraticCurveTo(-6, -2, -9, -10);
         ctx.quadraticCurveTo(-11, -22, 0, -30 - fl);
         ctx.fill();
-        ctx.fillStyle = '#e8d9ff';
-        ctx.beginPath(); ctx.ellipse(-3, -16, 2, 3.5, 0, 0, U.TAU); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(4, -16, 2, 3.5, 0, 0, U.TAU); ctx.fill();
+        // crown flame
+        ctx.globalCompositeOperation = 'lighter';
+        this.glow(ctx, 0, -32 - fl, 8, '#c9a0ff', .8);
+        ctx.globalCompositeOperation = 'source-over';
+        // hollow eyes with glowing pupils
+        ctx.fillStyle = '#2a1358';
+        ctx.beginPath(); ctx.ellipse(-3.5, -17, 2.3, 3.4, 0, 0, U.TAU); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(3.5, -17, 2.3, 3.4, 0, 0, U.TAU); ctx.fill();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = '#d8c4ff';
+        ctx.beginPath(); ctx.arc(-3.5, -16.4, 1, 0, U.TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(3.5, -16.4, 1, 0, U.TAU); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        // wavy spooky mouth
+        ctx.strokeStyle = '#2a1358'; ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(-3.5, -9.5);
+        ctx.quadraticCurveTo(-1.7, -11, 0, -9.5);
+        ctx.quadraticCurveTo(1.7, -8, 3.5, -9.5);
+        ctx.stroke();
+        // stub arms
+        ctx.fillStyle = 'rgba(130,90,210,.8)';
+        ctx.beginPath(); ctx.ellipse(-9.5, -13, 2.4, 4, .5, 0, U.TAU); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(9.5, -13, 2.4, 4, -.5, 0, U.TAU); ctx.fill();
         break;
       }
       case 'thorn': {
         ctx.scale(e.dir, 1);
         const wob = Math.sin(e.t * 10) * .08;
         ctx.rotate(wob);
+        // rotating spikes
         ctx.fillStyle = flash ? '#b09ad0' : '#2f1f45';
         for (let i = 0; i < 9; i++) {
           const a = i / 9 * U.TAU + e.t * .6;
@@ -687,20 +771,111 @@ const Art = {
           ctx.lineTo(Math.cos(a + .36) * 12, -14 + Math.sin(a + .36) * 12);
           ctx.fill();
         }
-        const g = ctx.createRadialGradient(0, -16, 2, 0, -14, 14);
-        g.addColorStop(0, flash ? '#cfbaea' : '#503468'); g.addColorStop(1, flash ? '#9a86bc' : '#241538');
+        // body
+        const g = ctx.createRadialGradient(-3, -18, 2, 0, -14, 14);
+        g.addColorStop(0, flash ? '#cfbaea' : '#5a3a76');
+        g.addColorStop(1, flash ? '#9a86bc' : '#20122f');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(0, -14, 13, 0, U.TAU); ctx.fill();
+        // angry glowing eyes + brows
+        ctx.globalCompositeOperation = 'lighter';
         ctx.fillStyle = '#ff4a4a';
-        ctx.beginPath(); ctx.arc(4, -16, 2.6, 0, U.TAU); ctx.fill();
-        ctx.beginPath(); ctx.arc(9, -15, 2.2, 0, U.TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(3.5, -16, 2.6, 0, U.TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(9, -15, 2.1, 0, U.TAU); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = '#14091f'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(.5, -20); ctx.lineTo(5.5, -18.4); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(11.5, -18.6); ctx.lineTo(7, -17.4); ctx.stroke();
+        // jagged mouth
+        ctx.fillStyle = '#14091f';
+        ctx.beginPath(); ctx.roundRect(2, -10.5, 8.5, 3.6, 1.6); ctx.fill();
+        ctx.fillStyle = '#e8ddf5';
+        ctx.beginPath(); ctx.moveTo(3, -10.2); ctx.lineTo(4.2, -8.4); ctx.lineTo(5.4, -10.2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(6.4, -10.2); ctx.lineTo(7.6, -8.4); ctx.lineTo(8.8, -10.2); ctx.fill();
+        break;
+      }
+      case 'imp': { // dive-bombing little devil
+        ctx.scale(e.dir, 1);
+        const dive = e.mode === 'dive';
+        const flap = Math.sin(e.t * (dive ? 26 : 13)) * (dive ? .3 : .55);
+        // curly tail
+        ctx.strokeStyle = '#5e2044'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-8, -10);
+        ctx.quadraticCurveTo(-15, -8 + Math.sin(e.t * 5) * 3, -16, -15 + Math.sin(e.t * 4) * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#5e2044';
+        ctx.beginPath();
+        ctx.moveTo(-18.5, -17); ctx.lineTo(-13.8, -15.5); ctx.lineTo(-16.5, -12);
+        ctx.fill();
+        // far wing (behind the body)
+        ctx.save();
+        ctx.globalAlpha = .75;
+        ctx.translate(-5, -17);
+        ctx.rotate(flap * .6 - .3);
+        ctx.fillStyle = '#3f1a4a';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(-9, -13, -20, -11);
+        ctx.lineTo(-15.5, -6.5);
+        ctx.lineTo(-19, -3);
+        ctx.lineTo(-13, -1);
+        ctx.quadraticCurveTo(-6, 2, 0, 0);
+        ctx.fill();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+        // body
+        const g = ctx.createRadialGradient(-2, -17, 2, 0, -13, 12);
+        g.addColorStop(0, flash ? '#f0c4da' : '#a04a78');
+        g.addColorStop(1, flash ? '#c090ac' : '#4a1030');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.ellipse(0, -13, 10, 9.5, 0, 0, U.TAU); ctx.fill();
+        // belly
+        ctx.fillStyle = 'rgba(255,190,215,.28)';
+        ctx.beginPath(); ctx.ellipse(2, -10, 5.5, 4.5, 0, 0, U.TAU); ctx.fill();
+        // dangling feet
+        this.limb(ctx, -3, -5, -4, 0, 2.6, '#5e2044');
+        this.limb(ctx, 3, -5, 3.5, .5, 2.6, '#5e2044');
+        // horns
+        ctx.fillStyle = '#f0dcc4';
+        ctx.beginPath(); ctx.moveTo(-5.5, -20); ctx.lineTo(-6.5, -26.5); ctx.lineTo(-2.8, -21.5); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(3, -21.5); ctx.lineTo(5.5, -27); ctx.lineTo(6.5, -20.5); ctx.fill();
+        // glowing yellow eyes
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = '#ffd75e';
+        ctx.save(); ctx.translate(2.4, -15.5); ctx.rotate(.25);
+        ctx.beginPath(); ctx.ellipse(0, 0, 2.4, 1.5, 0, 0, U.TAU); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(7.6, -15); ctx.rotate(-.25);
+        ctx.beginPath(); ctx.ellipse(0, 0, 2.1, 1.4, 0, 0, U.TAU); ctx.fill(); ctx.restore();
+        ctx.globalCompositeOperation = 'source-over';
+        // fanged grin
+        ctx.strokeStyle = '#2a0a1c'; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(2, -9.5); ctx.quadraticCurveTo(5.5, -7.2, 9, -9.8); ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.moveTo(3.2, -9); ctx.lineTo(4.2, -7.2); ctx.lineTo(5.2, -8.8); ctx.fill();
+        // near wing (in front)
+        ctx.save();
+        ctx.translate(2, -18);
+        ctx.rotate(flap - .15);
+        ctx.fillStyle = '#6e3276';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(-8, -14, -18, -12.5);
+        ctx.lineTo(-14, -7.5);
+        ctx.lineTo(-17.5, -4);
+        ctx.lineTo(-11.5, -2);
+        ctx.quadraticCurveTo(-5, 1.5, 0, 0);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(20,5,25,.4)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(-2, -1.5); ctx.lineTo(-14, -8); ctx.stroke();
+        ctx.restore();
         break;
       }
     }
     ctx.restore();
     // hp bar when recently hurt
     if (e.hurtShow > 0 && e.hp > 0) {
-      const w = 30, hy = e.y - (e.type === 'wisp' ? 40 : 34);
+      const w = 30, hy = e.y - (e.type === 'wisp' ? 40 : e.type === 'imp' ? 46 : 34);
       ctx.fillStyle = 'rgba(0,0,0,.5)';
       ctx.fillRect(e.x - w / 2, hy, w, 4);
       ctx.fillStyle = '#ff5e7a';
@@ -719,6 +894,23 @@ const Art = {
     ctx.globalCompositeOperation = 'lighter';
     this.glow(ctx, 0, -10, 120, dying > 0 ? '#ff9fce' : '#6e3ad8', .4 + Math.sin(t * 2) * .1);
     ctx.globalCompositeOperation = 'source-over';
+    // orbiting dark shards
+    for (let i = 0; i < 3; i++) {
+      const an = t * 1.2 + i * 2.094;
+      const sxs = Math.cos(an) * 118, sys = -8 + Math.sin(an) * 48;
+      ctx.save();
+      ctx.translate(sxs, sys);
+      ctx.globalCompositeOperation = 'lighter';
+      this.glow(ctx, 0, 0, 14, dying > 0 ? '#ffb9d5' : '#9e5eff', .5);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.rotate(an * 2);
+      ctx.fillStyle = dying > 0 ? '#ff9fce' : '#2a1548';
+      ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(7.5, 6.5); ctx.lineTo(-7.5, 6.5); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = dying > 0 ? 'rgba(255,235,245,.7)' : 'rgba(180,130,255,.6)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+    }
     // heart body
     const s = 85;
     const g = ctx.createLinearGradient(0, -s, 0, s * .5);
@@ -741,7 +933,7 @@ const Art = {
         ctx.beginPath(); ctx.moveTo(c[0], c[1]); ctx.lineTo(c[2], c[3]); ctx.lineTo(c[4], c[5]); ctx.stroke();
       }
     }
-    // thorn crown
+    // thorn crown with gem
     if (dying === 0) {
       ctx.fillStyle = '#241538';
       for (let i = -2; i <= 2; i++) {
@@ -751,6 +943,23 @@ const Art = {
         ctx.lineTo(i * 18 + 7, -s * .62);
         ctx.fill();
       }
+      ctx.globalCompositeOperation = 'lighter';
+      this.glow(ctx, 0, -s * .62 - 10, 10, '#ff4a6a', .8);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#c42450';
+      ctx.beginPath(); ctx.arc(0, -s * .62 - 10, 4.5, 0, U.TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.65)';
+      ctx.beginPath(); ctx.arc(-1.4, -s * .62 - 11.5, 1.4, 0, U.TAU); ctx.fill();
+    }
+    // enraged: eye flames from phase 1, stronger in phase 2 (derived from hp so it syncs everywhere)
+    const rage = e.hp < e.maxHp / 3 ? 2 : e.hp < e.maxHp * 2 / 3 ? 1 : 0;
+    if (dying === 0 && rage >= 1) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (const ex of [-22, 22]) {
+        const fh = 10 + (rage >= 2 ? 8 : 0) + Math.sin(t * 12 + ex) * 3;
+        this.glow(ctx, ex, -34 - fh * .4, 9 + fh * .4, '#ff5e7a', .7);
+      }
+      ctx.globalCompositeOperation = 'source-over';
     }
     // face
     if (dying > 0) { // purified — happy at last
