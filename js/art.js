@@ -1044,6 +1044,62 @@ const Art = {
     ctx.restore();
   },
 
+  drawWeaponGlyph(ctx, weapon, x, y, size = 24, t = 0) {
+    const def = Weapons[weapon] || Weapons.tideSpear;
+    const s = size / 24;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = def.color;
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = '#f7fbff';
+    ctx.fillStyle = def.color;
+    if (weapon === 'tideSpear') {
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(0, -11); ctx.stroke();
+      ctx.fillStyle = def.color;
+      ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(8, -7); ctx.lineTo(0, -11); ctx.lineTo(-8, -7); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#bff4ff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(-7, 3, 7, -.9, .9); ctx.stroke();
+      ctx.beginPath(); ctx.arc(7, 3, 7, Math.PI - .9, Math.PI + .9); ctx.stroke();
+    } else if (weapon === 'roseScepter') {
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0, 15); ctx.lineTo(0, -8); ctx.stroke();
+      for (let i = 0; i < 5; i++) {
+        const a = t * .8 + i * U.TAU / 5;
+        ctx.beginPath(); ctx.ellipse(Math.cos(a) * 5, -14 + Math.sin(a) * 4, 4, 7, a, 0, U.TAU); ctx.fill();
+      }
+      ctx.fillStyle = '#ffe28f';
+      ctx.beginPath(); ctx.arc(0, -14, 4, 0, U.TAU); ctx.fill();
+      ctx.strokeStyle = '#a8ffd2'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(8, 2, 7, 8); ctx.stroke();
+    } else if (weapon === 'starBlade') {
+      ctx.rotate(-.65);
+      ctx.fillStyle = '#eef8ff';
+      ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(6, 7); ctx.lineTo(0, 15); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = def.color;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const rr = i % 2 ? 4 : 9;
+        const a = -Math.PI / 2 + i * Math.PI / 5;
+        ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, -20 + Math.sin(a) * rr);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = def.color; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(-8, 8); ctx.lineTo(8, 8); ctx.stroke();
+    } else {
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0, 16); ctx.lineTo(0, -10); ctx.stroke();
+      this.heart(ctx, 0, -15, 9, def.color);
+      ctx.strokeStyle = '#ffe8f3'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 2, 7, .25, Math.PI - .25); ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  },
+
   /* ================= ITEMS ================= */
   drawItem(ctx, it, t) {
     const bob = Math.sin(t * 2.6 + it.x * .05) * 4;
@@ -1103,19 +1159,27 @@ const Art = {
         break;
       case 'weapon': {
         const def = Weapons[it.weapon] || Weapons.tideSpear;
+        const pulse = 1 + Math.sin(t * 5 + it.x) * .08;
         ctx.globalCompositeOperation = 'lighter';
-        this.glow(ctx, it.x, y, 22, def.color, .55);
+        this.glow(ctx, it.x, y, 38, def.color, .6);
+        this.glow(ctx, it.x, y, 16, '#ffffff', .35);
         ctx.globalCompositeOperation = 'source-over';
-        ctx.save(); ctx.translate(it.x, y); ctx.rotate(Math.sin(t * 2 + it.x) * .25);
-        ctx.strokeStyle = '#f7fbff'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(0, 12); ctx.lineTo(0, -12); ctx.stroke();
-        ctx.fillStyle = def.color;
-        ctx.beginPath();
-        ctx.moveTo(0, -18); ctx.lineTo(8, -6); ctx.lineTo(0, -10); ctx.lineTo(-8, -6);
-        ctx.fill();
-        ctx.strokeStyle = def.color; ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.moveTo(-9, 4); ctx.lineTo(9, 4); ctx.stroke();
+        ctx.save(); ctx.translate(it.x, y); ctx.scale(pulse, pulse);
+        ctx.strokeStyle = def.color + 'aa'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, 24 + Math.sin(t * 3) * 2, 0, U.TAU); ctx.stroke();
+        for (let i = 0; i < 4; i++) {
+          const a = t * 1.8 + i * U.TAU / 4;
+          ctx.fillStyle = i % 2 ? '#ffffff' : def.color;
+          ctx.beginPath(); ctx.arc(Math.cos(a) * 28, Math.sin(a) * 18, 2.5, 0, U.TAU); ctx.fill();
+        }
+        this.drawWeaponGlyph(ctx, it.weapon, 0, 0, 32, t);
         ctx.restore();
+        ctx.font = '600 10px Fredoka, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#f4fbff';
+        ctx.shadowColor = def.color; ctx.shadowBlur = 6;
+        ctx.fillText(def.name, it.x, y + 35);
+        ctx.shadowBlur = 0;
         break;
       }
     }

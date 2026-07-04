@@ -15,7 +15,7 @@ const Main = {
       if (!NET.available()) { this.toast('🌐 Online play needs internet — try Practice Solo!'); return; }
       this.preparePhonePlay();
       this.showConnect('host');
-      NET.host();
+      this.hostFromInput();
     };
     $('btnJoin').onclick = () => {
       SND.unlock(); SND.sfx('ui');
@@ -24,19 +24,26 @@ const Main = {
     };
     $('btnConnGo').onclick = () => {
       SND.unlock(); SND.sfx('ui');
-      const code = this.cleanCodeInput();
+      const code = this.cleanCodeInput('codeInput');
       if (code.length < 4) { $('joinStatus').textContent = 'Enter the 4-letter code 💕'; return; }
       $('joinStatus').textContent = 'Connecting…';
       this.preparePhonePlay();
       NET.join(code);
     };
-    $('codeInput').addEventListener('input', () => this.cleanCodeInput());
-    $('codeInput').addEventListener('paste', e => {
-      e.preventDefault();
-      const clip = e.clipboardData || window.clipboardData;
-      $('codeInput').value = NET.normalizeCode(clip ? clip.getData('text') : '');
-    });
+    $('btnHostGo').onclick = () => { SND.unlock(); SND.sfx('ui'); this.hostFromInput(); };
+    for (const id of ['codeInput', 'hostCodeInput', 'settingsCodeInput']) {
+      $(id).addEventListener('input', () => this.cleanCodeInput(id));
+      $(id).addEventListener('paste', e => {
+        e.preventDefault();
+        const clip = e.clipboardData || window.clipboardData;
+        $(id).value = NET.normalizeCode(clip ? clip.getData('text') : '');
+      });
+    }
+    $('hostCodeInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnHostGo').click(); });
     $('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnConnGo').click(); });
+    $('settingsCodeInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') (G.mode === 'guest' ? $('btnReconnectJoin') : $('btnReconnectHost')).click();
+    });
     $('btnConnCancel').onclick = () => { SND.sfx('ui'); NET.close(); this.showMenu(); };
 
     $('btnHelp').onclick = () => { SND.unlock(); SND.sfx('ui'); $('helpPanel').classList.remove('hidden'); };
@@ -59,12 +66,16 @@ const Main = {
     $('difficultySelect').onchange = () => { Game.setDifficulty($('difficultySelect').value); };
     $('btnGoChapter').onclick = () => { SND.sfx('ui'); Game.gotoChapter(+$('chapterSelect').value); };
     $('btnDropWeapon').onclick = () => { SND.sfx('ui'); Game.dropMyWeapon(); };
+    $('btnReconnectHost').onclick = () => { SND.unlock(); SND.sfx('ui'); this.reconnectAsHost(); };
+    $('btnReconnectJoin').onclick = () => { SND.unlock(); SND.sfx('ui'); this.reconnectAsJoin(); };
     $('btnQuit').onclick = () => { SND.sfx('ui'); this.hidePause(); Game.quitToMenu(); };
 
     /* ---- network status wiring ---- */
     NET.onStatus = (kind, msg) => {
       if (NET.mode === 'host') {
-        if (kind === 'code') { $('codeBig').textContent = msg; $('hostStatus').textContent = 'Waiting for Jolie to join… 💗'; }
+        if (kind === 'code') {
+          $('codeBig').textContent = msg; $('hostCodeInput').value = msg; $('hostStatus').textContent = 'Waiting for Jolie to join… 💗';
+        } else if (kind === 'ok') $('hostStatus').textContent = 'Connected! 💞';
         else if (kind === 'err') $('hostStatus').textContent = msg;
         else if (kind === 'info') $('hostStatus').textContent = msg;
       } else {
@@ -75,6 +86,7 @@ const Main = {
           NET.send({ t: 'hello' });
         }
       }
+      this.syncConnectionSettings(kind, msg);
     };
     NET.onPeerJoin = () => {
       if (G.state !== 'play') {
@@ -88,6 +100,7 @@ const Main = {
     NET.onDrop = () => {
       this.toast('💔 Connection lost… ' + (NET.mode === 'host' ? 'Jolie can rejoin with the same code.' : 'Rejoin from the menu with the same code.'));
       if (NET.mode === 'guest' && G.state === 'play' && !G.paused) this.togglePause();
+      this.syncConnectionSettings();
     };
 
     /* ---- rotate hint (dismissible) ---- */
@@ -100,7 +113,8 @@ const Main = {
 
     /* ---- copy invite link (host) ---- */
     $('btnCopyLink').onclick = () => {
-      const url = location.origin + location.pathname + '?join=' + NET.code;
+      const code = NET.code || this.cleanCodeInput('hostCodeInput') || '1234';
+      const url = location.origin + location.pathname + '?join=' + code;
       (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(
         () => this.toast('💌 Invite link copied — send it to Jolie!'),
         () => this.toast(url)
@@ -177,13 +191,63 @@ const Main = {
     const diff = this.el('difficultySelect');
     if (ch) ch.value = String(G.levelIndex || 0);
     if (diff) diff.value = G.difficulty || 'normal';
+    this.syncConnectionSettings();
+    this.syncWeaponUI();
   },
 
-  cleanCodeInput() {
-    const input = this.el('codeInput');
+  syncConnectionSettings(kind, msg) {
+    const input = this.el('settingsCodeInput');
+    if (!input) return;
+    const code = NET.code || input.value || this.el('hostCodeInput')?.value || this.el('codeInput')?.value || '1234';
+    input.value = NET.normalizeCode(code) || '1234';
+    const mode = NET.mode || G.mode || 'solo';
+    const connected = NET.connected ? 'connected' : (NET.peer ? 'waiting' : 'offline');
+    const modeLabel = mode === 'host' ? 'Host as Joku' : mode === 'guest' ? 'Join as Jolie' : 'Solo';
+    this.el('settingsConnMode').textContent = 'Connection: ' + modeLabel + ' / ' + connected;
+    const status = this.el('settingsConnStatus');
+    if (status && kind === 'code') status.textContent = 'Hosting room ' + msg + '.';
+    else if (status && kind === 'ok') status.textContent = 'Connected with room ' + (NET.code || input.value) + '.';
+    else if (status && msg) status.textContent = msg;
+    else if (status && !NET.connected && mode !== 'solo') status.textContent = 'Use the same code to reconnect and continue.';
+    else if (status && NET.connected) status.textContent = 'Connected with room ' + (NET.code || input.value) + '.';
+  },
+
+  cleanCodeInput(id = 'codeInput') {
+    const input = this.el(id);
     const code = NET.normalizeCode(input.value);
     if (input.value !== code) input.value = code;
     return code;
+  },
+
+  hostFromInput() {
+    const code = this.cleanCodeInput('hostCodeInput') || '1234';
+    this.el('hostCodeInput').value = code;
+    if (!NET.validCode(code)) { this.el('hostStatus').textContent = 'Enter a 4-character room code.'; return; }
+    this.el('hostStatus').textContent = 'Opening the magic portal...';
+    this.el('codeBig').textContent = code;
+    this.el('settingsCodeInput').value = code;
+    NET.host(code);
+    this.syncConnectionSettings();
+  },
+
+  reconnectAsHost() {
+    if (G.state === 'play' && G.mode === 'guest') { this.toast('Jolie should use Join/Rejoin. Joku hosts the room.'); return; }
+    if (G.state === 'play' && G.mode === 'solo') { this.toast('Start from Host as Joku to play online.'); return; }
+    const code = this.cleanCodeInput('settingsCodeInput') || '1234';
+    if (!NET.validCode(code)) { this.el('settingsConnStatus').textContent = 'Enter a 4-character room code.'; return; }
+    NET.host(code);
+    this.el('settingsConnStatus').textContent = 'Hosting room ' + code + '...';
+    this.syncConnectionSettings();
+  },
+
+  reconnectAsJoin() {
+    if (G.state === 'play' && G.mode === 'host') { this.toast('Joku should keep hosting. Jolie joins this code.'); return; }
+    if (G.state === 'play' && G.mode === 'solo') { this.toast('Start from Join as Jolie to play online.'); return; }
+    const code = this.cleanCodeInput('settingsCodeInput') || '1234';
+    if (!NET.validCode(code)) { this.el('settingsConnStatus').textContent = 'Enter a 4-character room code.'; return; }
+    NET.join(code);
+    this.el('settingsConnStatus').textContent = 'Joining room ' + code + '...';
+    this.syncConnectionSettings();
   },
 
   preventMobileZoom() {
@@ -289,7 +353,14 @@ const Main = {
     this.el('hostBox').classList.toggle('hidden', mode !== 'host');
     this.el('joinBox').classList.toggle('hidden', mode !== 'join');
     this.el('connTitle').textContent = mode === 'host' ? '💙 Hosting as Joku' : '💗 Joining as Jolie';
-    if (mode === 'host') { this.el('codeBig').textContent = '····'; this.el('hostStatus').textContent = 'Opening the magic portal…'; }
+    if (mode === 'host') {
+      const code = NET.normalizeCode(NET.code || this.el('hostCodeInput').value || '1234') || '1234';
+      this.el('hostCodeInput').value = code;
+      this.el('codeBig').textContent = code;
+      this.el('hostStatus').textContent = 'Opening the magic portal…';
+      this.el('settingsCodeInput').value = code;
+      setTimeout(() => this.el('hostCodeInput').focus(), 100);
+    }
     else { this.el('joinStatus').textContent = ''; this.el('codeInput').value = '1234'; setTimeout(() => this.el('codeInput').focus(), 100); }
   },
 
@@ -308,10 +379,27 @@ const Main = {
       this.el('touchUI').classList.remove('hidden');
       this.el('tSp').textContent = myChar === 'joku' ? '🌊' : '🌸';
     }
+    this.syncWeaponUI();
     // keep the screen awake on phones
     if (navigator.wakeLock && !this._wl) {
       navigator.wakeLock.request('screen').then(wl => { this._wl = wl; }).catch(() => {});
     }
+  },
+
+  syncWeaponUI() {
+    if (!G.me) return;
+    const w = G.me.weapon && Weapons[G.me.weapon] ? Weapons[G.me.weapon] : null;
+    const base = G.me.char === 'joku' ? '🌊' : '🌸';
+    const sp = this.el('tSp');
+    if (sp) {
+      sp.textContent = w ? w.skillIcon : base;
+      sp.title = w ? w.name + ': ' + w.skill : (G.me.char === 'joku' ? 'Water phoenix' : 'Healing bloom');
+      sp.setAttribute('aria-label', sp.title);
+      sp.style.borderColor = w ? w.color : '';
+      sp.style.boxShadow = w ? '0 0 18px ' + w.color + '88, 0 4px 14px rgba(0,0,0,.4)' : '';
+    }
+    const drop = this.el('btnDropWeapon');
+    if (drop) drop.textContent = w ? 'Drop ' + w.name : 'Drop Weapon';
   },
 
   togglePause() {

@@ -84,11 +84,15 @@ input, textarea {
   font-size:56px; font-weight:700; letter-spacing:14px; padding:8px 0 8px 14px;
   color:#aef0ff; text-shadow:0 0 24px rgba(120,220,255,.8);
 }
-#codeInput {
+#codeInput, #hostCodeInput, #settingsCodeInput {
   font-family:inherit; font-size:34px; font-weight:700; letter-spacing:10px; text-align:center;
   width:220px; padding:10px 0 10px 10px; margin:8px 0; color:#ffd7ec; text-transform:uppercase;
   background:rgba(0,0,0,.35); border:2px solid rgba(255,150,200,.5); border-radius:16px; outline:none;
   caret-color:#ffd7ec;
+}
+#settingsCodeInput {
+  width:100%; font-size:18px; letter-spacing:5px; padding:8px 0 8px 8px; margin:4px 0 0;
+  border-radius:10px;
 }
 #connect .mbtn { margin-top:10px; }
 
@@ -101,6 +105,7 @@ input, textarea {
 #gameFullBtn { right:calc(24% + 48px); font-size:21px; }
 #pauseBtn:active, .cornerBtn:active { transform:scale(.92); }
 #pausePanel .mbtn { width:min(70vw,280px); margin-top:8px; }
+#pausePanel .panel { overflow-x:hidden; }
 .settingsGrid {
   display:grid; grid-template-columns:1fr 1fr; gap:8px; width:min(78vw,360px);
   margin:10px auto 2px; text-align:left;
@@ -111,7 +116,16 @@ input, textarea {
   border:1px solid rgba(255,255,255,.2); background:rgba(0,0,0,.35); color:#e8f7ff;
   font-family:inherit; font-weight:600;
 }
-.settingsGrid .mbtn { grid-column:span 1; width:100%; font-size:14px; padding:10px 8px; }
+#pausePanel .settingsGrid .mbtn { grid-column:span 1; width:100%; min-width:0; font-size:14px; padding:10px 8px; }
+.connectionSettings {
+  width:min(78vw,360px); margin:10px auto 2px; padding:10px 12px;
+  border:1px solid rgba(255,255,255,.14); border-radius:14px;
+  background:rgba(0,0,0,.16); text-align:left;
+}
+.connectionSettings label { color:#cfeaf7; font-size:12px; font-weight:600; display:block; margin-top:6px; }
+.connBtns { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+#pausePanel .connBtns .mbtn { width:100%; min-width:0; font-size:13px; padding:9px 6px; margin-top:0; }
+#settingsConnStatus { min-height:17px; margin-bottom:0; }
 
 /* ============ Touch controls ============ */
 #touchUI { position:absolute; inset:0; z-index:10; pointer-events:none; }

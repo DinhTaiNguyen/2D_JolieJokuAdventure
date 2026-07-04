@@ -14,6 +14,7 @@ const G = {
   announce: null,
   stats: { orbs: 0, flowers: 0, hearts: 0, hugs: 0, kisses: 0, kills: 0, startT: 0 },
   checkpoint: { x: 140, y: 400 },
+  loadout: { joku: null, jolie: null },
   paused: false, bossActive: false, netLost: false, ended: false, nextLevelT: 0,
   netT: { p: 0, w: 0, seq: 0, wseq: 0 }, mateNet: null, mateBuf: [], lastMateSeq: 0, lastWorldSeq: 0, _dropId: 0, _comboToastT: 0,
   demo: null,
@@ -43,8 +44,9 @@ const Game = {
   },
 
   /* ================= game lifecycle ================= */
-  startGame(mode, startLevel = 0) {
+  startGame(mode, startLevel = 0, opt = {}) {
     G.mode = mode;
+    G.loadout = opt.loadout ? Object.assign({ joku: null, jolie: null }, opt.loadout) : { joku: null, jolie: null };
     const myChar = (mode === 'guest') ? 'jolie' : 'joku';
     const otherChar = myChar === 'joku' ? 'jolie' : 'joku';
     G.me = Ent.makePlayer(myChar);
@@ -54,6 +56,7 @@ const Game = {
     const joku = myChar === 'joku' ? G.me : G.mate;
     const jolie = myChar === 'jolie' ? G.me : G.mate;
     G.pets = [Ent.makePet('dog', joku), Ent.makePet('panda', jolie)];
+    this.applyLoadout();
     G.love = 0; G.handHold = false; G.kissCin = 0; G.ended = false; G.netLost = false;
     this.resetNetSmoothing();
     G.stats = { orbs: 0, flowers: 0, hearts: 0, hugs: 0, kisses: 0, kills: 0, startT: performance.now() / 1000 };
@@ -86,6 +89,7 @@ const Game = {
       p.vx = p.vy = 0; p.down = false; p.pose = null; p.hp = p.maxHp; p.mp = p.maxMp;
       p.invuln = 2; p._fell = false; p.safeX = p.x; p.safeY = p.y;
     }
+    this.applyLoadout();
     for (const pet of G.pets) { pet.x = pet.owner.x - 40; pet.y = pet.owner.y; }
     G.checkpoint = { x: G.level.checkpoints[0].x, y: gy };
     G.handHold = false;
@@ -105,6 +109,7 @@ const Game = {
     if (n === 0) this.cutStart('intro', true);
     else this.cutStart('lvl', true);
     if (Main.syncSettings) Main.syncSettings();
+    if (Main.syncWeaponUI) Main.syncWeaponUI();
   },
 
   nextLevel() {
@@ -163,6 +168,27 @@ const Game = {
   },
 
   byChar(c) { return G.me.char === c ? G.me : G.mate; },
+  applyLoadout() {
+    if (!G.me || !G.mate) return;
+    for (const c of ['joku', 'jolie']) {
+      const p = this.byChar(c);
+      p.weapon = G.loadout && G.loadout[c] && Weapons[G.loadout[c]] ? G.loadout[c] : null;
+    }
+  },
+  setWeapon(char, weapon) {
+    const p = this.byChar(char);
+    const next = weapon && Weapons[weapon] ? weapon : null;
+    p.weapon = next;
+    G.loadout[char] = next;
+    if (char === G.me.char && Main.syncWeaponUI) Main.syncWeaponUI();
+  },
+  currentLoadout() {
+    if (!G.me || !G.mate) return Object.assign({ joku: null, jolie: null }, G.loadout || {});
+    return {
+      joku: this.byChar('joku')?.weapon || G.loadout.joku || null,
+      jolie: this.byChar('jolie')?.weapon || G.loadout.jolie || null
+    };
+  },
   enemiesAll() {
     const b = G.level && G.level.boss;
     return (b && !b.dead && (G.bossActive || b.dying > 0)) ? G.level.foes.concat([b]) : (G.level ? G.level.foes : []);
@@ -349,6 +375,7 @@ const Game = {
     }
     m.hp = s.hp; m.mp = s.mp;
     m.weapon = s.wp || null;
+    G.loadout[m.char] = m.weapon;
     m.glide = s.gl; m.holding = s.hh;
     m.onGround = s.og;
     if (s.dn && !m.down) { m.down = true; m.pose = 'down'; }
@@ -783,11 +810,11 @@ const Game = {
         Ptc.burst('dot', it.x, it.y, 4, { color: '#5ee8ff', sp: 70, r: 5, life: .4 });
         break;
       case 'weapon': {
-        const p = this.byChar(by);
-        p.weapon = it.weapon || 'tideSpear';
-        if (forMe) this.toastMsg('Equipped ' + (Weapons[p.weapon] ? Weapons[p.weapon].name : 'weapon') + '. Press Q or ⇩ to drop it.');
-        if (!fromNet) SND.sfx('heart');
-        Ptc.burst('star', it.x, it.y, 10, { color: (Weapons[p.weapon] || Weapons.tideSpear).color, sp: 130, r: 6, life: .8 });
+        const weapon = Weapons[it.weapon] ? it.weapon : 'tideSpear';
+        this.setWeapon(by, weapon);
+        if (forMe) this.toastMsg('Equipped ' + Weapons[weapon].name + '. Press Q or ⇩ to drop it.');
+        if (!fromNet) SND.sfx('weaponPickup');
+        this.weaponBurst(it.x, it.y, weapon, 1.15);
         break;
       }
     }
@@ -798,12 +825,21 @@ const Game = {
     return Weapons.IDS[(Math.random() * Weapons.IDS.length) | 0];
   },
 
+  weaponBurst(x, y, weapon, power = 1) {
+    const def = Weapons[weapon] || Weapons.tideSpear;
+    Ptc.add({ kind: 'ring', x, y, vx: 0, vy: 0, r: 42 * power, life: .55, color: def.color + 'cc' });
+    Ptc.burst('star', x, y, Math.round(12 * power), { color: def.color, sp: 145 * power, r: 6, life: .9 });
+    Ptc.burst('dot', x, y - 8, Math.round(8 * power), { color: '#ffffff', sp: 90 * power, r: 3, life: .55 });
+  },
+
   dropWeapons(x, y, n = 2) {
     if (G.mode === 'guest') return;
+    SND.sfx('weaponDrop');
     for (let i = 0; i < n; i++) {
       const weapon = this.randomWeapon();
       const it = { id: 'w' + (G._dropId++), kind: 'weapon', weapon, x: x + (i ? 38 : -38), y: y - 52, taken: false };
       G.level.items.push(it);
+      this.weaponBurst(it.x, it.y, weapon, .9);
       this.emit('drop', { id: it.id, kind: it.kind, weapon, x: it.x, y: it.y });
     }
   },
@@ -812,11 +848,12 @@ const Game = {
     const p = G.me;
     if (!p || !p.weapon || G.state !== 'play') { this.toastMsg('No weapon equipped.'); return; }
     const weapon = p.weapon;
-    p.weapon = null;
+    this.setWeapon(p.char, null);
     const it = { id: 'w' + (G._dropId++), kind: 'weapon', weapon, x: p.x + p.dir * 34, y: p.y - 46, taken: false };
     G.level.items.push(it);
     this.emit('drop', { id: it.id, kind: it.kind, weapon, x: it.x, y: it.y });
-    SND.sfx('orb');
+    SND.sfx('weaponDrop');
+    this.weaponBurst(it.x, it.y, weapon, .9);
     this.toastMsg('Dropped ' + (Weapons[weapon] ? Weapons[weapon].name : 'weapon') + '.');
   },
 
@@ -1178,17 +1215,22 @@ const Game = {
       case 'hello': // guest arrived — send them the world
         if (NET.mode === 'host') {
           this.resetNetSmoothing();
-          NET.send({ t: 'init', lvl: G.levelIndex, started: G.state === 'play' });
+          NET.send({ t: 'init', lvl: G.levelIndex, started: G.state === 'play', weapons: this.currentLoadout(), diff: G.difficulty });
         }
         break;
       case 'init':
         if (NET.mode === 'guest') {
           this.resetNetSmoothing();
+          if (m.weapons) G.loadout = Object.assign({ joku: null, jolie: null }, m.weapons);
+          if (m.diff) G.difficulty = m.diff;
           if (G.state !== 'play') {
             Main.hideOverlays();
-            this.startGame('guest', m.lvl);
+            this.startGame('guest', m.lvl, { loadout: G.loadout });
           } else if (G.levelIndex !== m.lvl) {
             this.loadLevel(m.lvl); // reconnected mid-adventure
+          } else {
+            if (m.diff) this.applyDifficulty(G.level);
+            this.applyLoadout();
           }
         }
         break;
@@ -1227,6 +1269,7 @@ const Game = {
       }
       case 'drop':
         G.level.items.push({ id: d.id, kind: d.kind, weapon: d.weapon, x: d.x, y: d.y, taken: false });
+        if (d.kind === 'weapon') { SND.sfx('weaponDrop'); this.weaponBurst(d.x, d.y, d.weapon, .85); }
         break;
       case 'hit': {
         const e = this.enemiesAll().find(x => x.id === d.id);
@@ -1533,9 +1576,12 @@ const Game = {
       ctx.fillText('💋 KISS READY — press ❤ together!', W / 2, ly + 24);
     }
     if (G.me.weapon && Weapons[G.me.weapon]) {
+      const def = Weapons[G.me.weapon];
+      const wy = ly + (full ? 42 : 27);
+      Art.drawWeaponGlyph(ctx, G.me.weapon, W / 2 - (small ? 62 : 76), wy - 6, small ? 18 : 22, G.time);
       ctx.font = `600 ${small ? 10 : 12}px Fredoka, sans-serif`;
-      ctx.fillStyle = Weapons[G.me.weapon].color;
-      ctx.fillText(Weapons[G.me.weapon].name, W / 2, ly + (full ? 40 : 25));
+      ctx.fillStyle = def.color;
+      ctx.fillText(def.name + ' - ' + def.skill, W / 2 + 8, wy);
     }
 
     // offscreen partner arrow

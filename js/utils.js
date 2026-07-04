@@ -23,10 +23,10 @@ const U = {
 };
 
 const Weapons = {
-  tideSpear: { name: 'Tide Spear', color: '#7fd8ff', dmg: 1.25, range: .22 },
-  roseScepter: { name: 'Rose Scepter', color: '#ff86b8', dmg: 1.18, bloom: true },
-  starBlade: { name: 'Star Blade', color: '#fff3a8', dmg: 1.1, star: true },
-  heartStaff: { name: 'Heart Staff', color: '#ffc4dc', dmg: 1.0, mpSave: true, heal: true }
+  tideSpear: { name: 'Tide Spear', color: '#7fd8ff', icon: '🔱', skillIcon: '🌊', skill: 'longer phoenix', dmg: 1.25, range: .22 },
+  roseScepter: { name: 'Rose Scepter', color: '#ff86b8', icon: '🌹', skillIcon: '🌸', skill: 'stronger bloom', dmg: 1.18, bloom: true },
+  starBlade: { name: 'Star Blade', color: '#fff3a8', icon: '✦', skillIcon: '✨', skill: 'star shot', dmg: 1.1, star: true },
+  heartStaff: { name: 'Heart Staff', color: '#ffc4dc', icon: '♥', skillIcon: '💖', skill: 'healing staff', dmg: 1.0, mpSave: true, heal: true }
 };
 Weapons.IDS = Object.keys(Weapons);
 

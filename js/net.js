@@ -33,11 +33,16 @@ const NET = {
 
   available() { return typeof Peer !== 'undefined'; },
 
-  host(preferDefault = true) {
+  host(code = '1234') {
     if (!this.available()) { this._status('err', 'No internet — online play needs a connection.'); return; }
+    const desired = this.normalizeCode(code || '1234');
+    if (!this.validCode(desired)) {
+      this._status('err', 'Enter a 4-character room code.');
+      return;
+    }
     this.close();
     this.mode = 'host';
-    this.code = preferDefault ? '1234' : this._newCode();
+    this.code = desired;
     this._status('info', 'Opening the magic portal…');
     this.peer = new Peer(this._id(this.code), { debug: 0 });
     this.peer.on('open', () => this._status('code', this.code));
@@ -47,7 +52,7 @@ const NET = {
       this._wire(conn);
     });
     this.peer.on('error', err => {
-      if (err.type === 'unavailable-id') { this.host(false); return; } // default/random code clash - reroll
+      if (err.type === 'unavailable-id') { this._status('err', 'Room code ' + this.code + ' is already in use. Change the code and host again.'); return; }
       this._status('err', 'Portal error: ' + err.type + '. Try again.');
     });
   },

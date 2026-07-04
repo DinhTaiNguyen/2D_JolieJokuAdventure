@@ -71,6 +71,12 @@ const SND = {
                       this.noise({ d: .18, v: .12, f: 600 }); break;
       case 'orb':     this.tone({ f: 900, f2: 1350, d: .1, v: .1 });
                       this.tone({ f: 1350, f2: 1800, d: .12, v: .08, delay: .06 }); break;
+      case 'weaponDrop':
+                      this.tone({ f: 330, f2: 520, type: 'triangle', d: .16, v: .12 });
+                      this.noise({ d: .16, v: .08, f: 1800, delay: .03 }); break;
+      case 'weaponPickup':
+                      [523, 784, 1175].forEach((f, i) => this.tone({ f, d: .18, v: .09, delay: i * .055 }));
+                      this.tone({ f: 1568, f2: 2093, d: .18, v: .07, delay: .16 }); break;
       case 'flower':  this.tone({ f: 1100, f2: 1500, d: .09, v: .09 });
                       this.tone({ f: 1650, d: .1, v: .06, delay: .05 }); break;
       case 'heart':   this.tone({ f: 660, d: .1, v: .1 }); this.tone({ f: 990, d: .14, v: .1, delay: .07 }); break;

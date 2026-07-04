@@ -80,7 +80,10 @@
     <div class="panel">
       <h2 id="connTitle">Host Game</h2>
       <div id="hostBox" class="hidden">
-        <p>Tell Jolie this room code:</p>
+        <p>Choose the room code for Jolie:</p>
+        <input id="hostCodeInput" maxlength="64" autocomplete="one-time-code" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text" enterkeyhint="go" placeholder="1234" aria-label="Host room code">
+        <button id="btnHostGo" class="mbtn host">Host Room</button>
+        <p class="dim">Current room code:</p>
         <div id="codeBig">····</div>
         <button id="btnCopyLink" class="mbtn ghost">💌 Copy invite link</button>
         <p id="hostStatus" class="dim">Setting up the magic portal…</p>
@@ -115,6 +118,17 @@
         </label>
         <button id="btnGoChapter" class="mbtn ghost">Go to Chapter</button>
         <button id="btnDropWeapon" class="mbtn ghost">Drop Weapon</button>
+      </div>
+      <div class="connectionSettings">
+        <div id="settingsConnMode" class="dim">Connection: offline</div>
+        <label>Room Code
+          <input id="settingsCodeInput" maxlength="64" autocomplete="one-time-code" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text" enterkeyhint="go" placeholder="1234" aria-label="Connection room code">
+        </label>
+        <div class="connBtns">
+          <button id="btnReconnectHost" class="mbtn host">Host/Reopen</button>
+          <button id="btnReconnectJoin" class="mbtn join">Join/Rejoin</button>
+        </div>
+        <p id="settingsConnStatus" class="dim"></p>
       </div>
       <button id="btnSound2" class="mbtn ghost">🔊 Sound</button>
       <button id="btnQuit" class="mbtn ghost">🚪 Quit to Menu</button>
