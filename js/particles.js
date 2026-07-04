@@ -37,6 +37,10 @@ const Ptc = {
       p.t += dt;
       if (p.t >= p.life) { L.splice(i, 1); continue; }
       p.vy += (p.g || 0) * dt;
+      if (p.kind === 'butterfly') { // wandering flutter
+        p.vx = Math.sin(p.t * 1.8 + p.spin * 9) * 40;
+        p.vy = Math.sin(p.t * 2.6 + p.spin * 5) * 22 - 5;
+      }
       p.x += p.vx * dt; p.y += p.vy * dt;
       if (p.kind === 'petal' || p.kind === 'heart') { p.vx *= (1 - 1.6 * dt); p.vy *= (1 - 1.2 * dt); }
     }
@@ -86,6 +90,21 @@ const Ptc = {
             ctx.rotate(Math.PI / 2);
             ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(p.r, 0); ctx.lineTo(p.r * .3, p.r * .3); ctx.fill();
           }
+          ctx.restore();
+          break;
+        }
+        case 'butterfly': {
+          ctx.save(); ctx.translate(p.x, p.y);
+          ctx.scale(p.vx >= 0 ? 1 : -1, 1);
+          const fl = Math.sin(p.t * 26) * .9;
+          ctx.fillStyle = p.color || '#ffb3d6';
+          for (const s of [-1, 1]) {
+            ctx.save(); ctx.rotate(s * fl * .8);
+            ctx.beginPath(); ctx.ellipse(0, s * -1, 4.5, 2.6, s * .7, 0, U.TAU); ctx.fill();
+            ctx.restore();
+          }
+          ctx.fillStyle = 'rgba(60,40,50,.9)';
+          ctx.fillRect(-.7, -2.5, 1.4, 5);
           ctx.restore();
           break;
         }

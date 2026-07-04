@@ -33,7 +33,7 @@ const Ent = {
   /* ---------------- player ---------------- */
   updatePlayer(p, dt, inp) {
     const L = G.level;
-    if (p.down) { // knocked out — just settle on the ground
+    if (p.down) { // knocked out - just settle on the ground
       p.vx *= (1 - 6 * dt); p.vy += this.GRAV * dt;
       this._movePlayer(p, dt);
       p.animT += dt;
@@ -52,7 +52,7 @@ const Ent = {
       if (Math.random() < .4) Ptc.burst('drop', p.x, p.y - 20, 1, { sp: 140, up: 60, g: 700, r: 5, life: .5 });
       // dash damages enemies (owner side authoritative)
       if (!p.remote) {
-        for (const e of G.enemiesAll()) {
+        for (const e of Game.enemiesAll()) {
           if (e.dead || e.dying > 0) continue;
           if (Math.abs(e.x - p.x) < 34 && Math.abs((e.y - 14) - (p.y - 26)) < 44 && (!e._dashCd || e._dashCd <= 0)) {
             e._dashCd = .5;
@@ -181,7 +181,7 @@ const Ent = {
     if (G.cut || G.dialog) return inp;
     bot._thinkT = (bot._thinkT || 0) - dt;
 
-    // stuck / far behind → magic catch-up
+    // stuck / far behind: magic catch-up
     if (Math.abs(me.x - bot.x) > 950 || bot.y > World.DEATH_Y - 60) {
       bot.x = me.x - 60 * me.dir; bot.y = me.y - 10; bot.vx = 0; bot.vy = 0;
       Ptc.burst('heart', bot.x, bot.y - 30, 6, { sp: 80, r: 6, life: .8 });
@@ -194,15 +194,17 @@ const Ent = {
       return inp;
     }
     // pick a fight if an enemy is close
-    let foe = null, fd = 260;
-    for (const e of G.enemiesAll()) {
+    let foe = null, fd = 300;
+    for (const e of Game.enemiesAll()) {
       if (e.dead || e.dying > 0) continue;
       const d = Math.abs(e.x - bot.x);
-      if (d < fd && Math.abs(e.y - bot.y) < 140) { fd = d; foe = e; }
+      const dyLim = e.type === 'boss' ? 320 : 140;
+      if (d < fd && Math.abs(e.y - bot.y) < dyLim) { fd = d; foe = e; }
     }
     if (foe && bot.atkCd <= 0) {
       bot.dir = foe.x > bot.x ? 1 : -1;
       inp.attack = true;
+      if (foe.y < bot.y - 110 && bot.onGround) inp.jump = true; // hop to reach floaters
       if (fd > 120) inp.ax = bot.dir * .5;
       return inp;
     }
@@ -356,7 +358,7 @@ const Ent = {
           const n = 6 + b.phase * 2;
           for (let i = 0; i < n; i++) {
             const a = Math.PI * .25 + (i / (n - 1)) * Math.PI * .5;
-            Game.addProj({ kind: 'darkball', x: b.x, y: b.y - 10, vx: Math.cos(a) * -0 + Math.cos(Math.PI - a) * 270, vy: Math.sin(a) * 270 * -1 + 120, dmg: 14, life: 4, mine: false, foe: true, host: true, g: 260 });
+            Game.addProj({ kind: 'darkball', x: b.x, y: b.y - 10, vx: Math.cos(Math.PI - a) * 270, vy: -Math.sin(a) * 270 + 120, dmg: 14, life: 4, mine: false, foe: true, host: true, g: 260 });
           }
           SND.sfx('boss');
           b.mode = 'recover'; b.modeT = 1.4;
@@ -402,7 +404,7 @@ const Ent = {
 
       // my shots hurt enemies (authoritative on the shooter's device)
       if (!dead && pr.mine && !pr.foe) {
-        for (const e of G.enemiesAll()) {
+        for (const e of Game.enemiesAll()) {
           if (e.dead || (e.dying && e.dying > 0)) continue;
           const er = e.type === 'boss' ? 74 : 22;
           const ey = e.type === 'boss' ? e.y - 20 : e.y - 16;

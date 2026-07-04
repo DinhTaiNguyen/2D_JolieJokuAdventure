@@ -22,6 +22,20 @@ const U = {
   fmtTime(s) { s |= 0; return (s / 60 | 0) + ':' + String(s % 60).padStart(2, '0'); }
 };
 
+// surface uncaught errors on screen (helps debugging on phones too)
+addEventListener('error', e => {
+  let el = document.getElementById('errbox');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'errbox';
+    el.style.cssText = 'position:fixed;left:0;top:0;z-index:999;background:rgba(70,0,10,.92);color:#ffd7d7;font:11px/1.5 monospace;padding:6px 10px;max-width:100vw;white-space:pre-wrap;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  if (el.textContent.length < 900) {
+    el.textContent += e.message + ' @ ' + (e.filename || '').split('/').pop() + ':' + e.lineno + '\n';
+  }
+});
+
 // roundRect fallback for older browsers
 if (!CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {

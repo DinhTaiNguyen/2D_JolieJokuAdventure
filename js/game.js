@@ -39,7 +39,7 @@ const Game = {
     this.cssW = innerWidth; this.cssH = innerHeight;
     this.canvas.width = Math.round(this.cssW * this.dpr);
     this.canvas.height = Math.round(this.cssH * this.dpr);
-    this.scale = this.cssH / 540;
+    this.scale = this.cssH / 500;
   },
 
   /* ================= game lifecycle ================= */
@@ -99,9 +99,10 @@ const Game = {
     G.announce = { txt: G.level.name, sub: G.level.cfg.boss ? '💔 Final Battle' : 'Chapter ' + (n + 1), t: 3.2 };
     SND.startMusic(n);
 
-    if (n === 0) this.cutStart('intro');
-    else if (G.level.cfg.boss) this.cutStart('bossIntro');
-    else this.cutStart('lvl');
+    // level-start scenes run locally on BOTH devices (deterministic), no network needed
+    if (n === 0) this.cutStart('intro', true);
+    else if (G.level.cfg.boss) this.cutStart('bossIntro', true);
+    else this.cutStart('lvl', true);
   },
 
   nextLevel() {
@@ -152,8 +153,11 @@ const Game = {
     // ----- dialog handling (consumes input) -----
     if (G.dialog) {
       G.dialog.chars += dt * 42;
+      const lineLen = G.dialog.lines[G.dialog.i] ? G.dialog.lines[G.dialog.i][1].length : 0;
       if (Input.take('tap') || Input.take('confirm') || Input.take('jump') || Input.take('attack') || Input.take('heart')) {
         this.dlgAdvance(false);
+      } else if (G.autoDlg && G.dialog.chars > lineLen + 40) {
+        this.dlgAdvance(false); // test mode: hands-free story
       }
     }
     if (Input.take('pause')) Main.togglePause();
@@ -217,6 +221,12 @@ const Game = {
     if (G.me.down) {
       G.me.downT += dt;
       if (G.me.downT > 12) this.respawnMe(.55);
+      // in solo mode the bot partner hugs you back up
+      if (G.mate.bot && !G.mate.down && U.dist(G.me.x, G.me.y, G.mate.x, G.mate.y) < 70) {
+        G.reviveT += dt;
+        G.mate.pose = 'hug'; G.mate.poseT = .2;
+        if (G.reviveT >= 1.6) { G.reviveT = 0; this.reviveMe(); }
+      }
     }
     if (G.mode !== 'guest' && G.me.down && G.mate.down && !G._wiping) {
       G._wiping = true;
@@ -588,6 +598,14 @@ const Game = {
     p.invuln = 1.5; p._fell = false;
   },
 
+  reviveMe() {
+    if (!G.me.down) return;
+    G.me.down = false; G.me.pose = null; G.me.downT = 0;
+    G.me.hp = G.me.maxHp * .6; G.me.invuln = 2;
+    SND.sfx('revive');
+    Ptc.burst('heart', G.me.x, G.me.y - 40, 12, { sp: 140, r: 7, life: 1.2 });
+  },
+
   respawnMe(hpFrac) {
     const me = G.me;
     me.down = false; me.pose = null; me.downT = 0;
@@ -759,6 +777,24 @@ const Game = {
         }
         break;
       }
+      case 'move2': { // both walk at once
+        let done = true;
+        for (const [who, txx] of [['joku', st.jx], ['jolie', st.lx]]) {
+          const p = this.byChar(who);
+          const dx = txx - p.x;
+          if (Math.abs(dx) > 8) {
+            done = false;
+            p.dir = Math.sign(dx);
+            p.vx = p.dir * 240;
+            p.x += p.vx * dt;
+            p.animT += dt;
+            const top = World.topAt(G.level, p.x);
+            if (top !== null) p.y += (top - p.y) * Math.min(1, 14 * dt);
+          } else p.vx = 0;
+        }
+        if (done || c.t > 4.5) this.cutNext();
+        break;
+      }
       case 'dlg':
         if (!G.dialog) this.cutNext();
         break;
@@ -819,7 +855,7 @@ const Game = {
   /* ================= camera & ambient ================= */
   updateCamera(dt) {
     const L = G.level;
-    let tx, ty, targetZoom = 0;
+    let tx, ty, targetZoom = G.devZoom || 0;
     if (G.kissCin > 0) {
       tx = G.kissX; ty = G.me.y - 70; targetZoom = .35;
     } else if (G.cut) {
@@ -852,6 +888,14 @@ const Game = {
       if (th === 'blossom') Ptc.add({ kind: 'petal', x, y: G.cam.y - 300, vx: 20 + Math.random() * 30, vy: 40 + Math.random() * 30, r: 4, life: 6, spin: 1 });
       else if (th === 'shadow') Ptc.add({ kind: 'dot', x, y: G.cam.y + 260, vx: (Math.random() - .5) * 20, vy: -30, r: 5, life: 4, color: '#9e5eff' });
       else Ptc.add({ kind: 'dot', x, y: G.cam.y - 280, vx: (Math.random() - .5) * 16, vy: 22, r: 4, life: 6, color: th === 'falls' ? '#9fd8ff' : '#aef2d8' });
+    }
+    // butterflies drift through the sunny woods
+    if ((th === 'forest' || th === 'blossom') && Math.random() < dt * .5 && Ptc.list.length < Ptc.MAX - 60) {
+      Ptc.add({
+        kind: 'butterfly', x: G.cam.x + (Math.random() - .5) * this.cssW / this.scale,
+        y: G.cam.y + Math.random() * 180 - 30, vx: 0, vy: 0, r: 4, life: 9,
+        color: Math.random() < .5 ? '#ffb3d6' : '#9fe0ff', spin: Math.random()
+      });
     }
   },
 
@@ -889,16 +933,22 @@ const Game = {
 
   onNet(m) {
     if (!m || !m.t) return;
+    // world messages are only meaningful once we're in the game
+    if (m.t !== 'hello' && m.t !== 'init' && (G.state !== 'play' || !G.level)) return;
     switch (m.t) {
       case 'hello': // guest arrived — send them the world
-        if (G.mode === 'host') {
+        if (NET.mode === 'host') {
           NET.send({ t: 'init', lvl: G.levelIndex, started: G.state === 'play' });
         }
         break;
       case 'init':
-        if (G.mode === 'guest' && G.state !== 'play') {
-          Main.hideOverlays();
-          this.startGame('guest', m.lvl);
+        if (NET.mode === 'guest') {
+          if (G.state !== 'play') {
+            Main.hideOverlays();
+            this.startGame('guest', m.lvl);
+          } else if (G.levelIndex !== m.lvl) {
+            this.loadLevel(m.lvl); // reconnected mid-adventure
+          }
         }
         break;
       case 'p': G.mateNet = m; break;
@@ -958,14 +1008,7 @@ const Game = {
         SND.sfx('down');
         this.toastMsg(G.mate.char === 'joku' ? '💔 Joku is down! Hug him back up!' : '💔 Jolie is down! Hug her back up!');
         break;
-      case 'revive':
-        if (G.me.down) {
-          G.me.down = false; G.me.pose = null; G.me.downT = 0;
-          G.me.hp = G.me.maxHp * .6; G.me.invuln = 2;
-          SND.sfx('revive');
-          Ptc.burst('heart', G.me.x, G.me.y - 40, 12, { sp: 140, r: 7, life: 1.2 });
-        }
-        break;
+      case 'revive': this.reviveMe(); break;
       case 'wipe': this.applyWipe(); break;
       case 'dlg': this.applyDlg(d); break;
       case 'dlgReq': if (G.mode === 'host') this.dlgAdvance(true); break;
@@ -1026,6 +1069,25 @@ const Game = {
     if (L.shrineX) Art.drawShrine(ctx, L.shrineX, L.shrineY, t, L.shrineDone);
     if (L.gateX) Art.drawGate(ctx, L.gateX, L.gateY, t, L.gateOpen || (Math.abs(G.me.x - L.gateX) < 160 && Math.abs(G.mate.x - L.gateX) < 160));
 
+    // contact shadows (grounding!)
+    for (const e of [G.me, G.mate]) {
+      const gy2 = World.topAt(L, e.x, e.y - 50);
+      if (gy2 !== null) Art.shadow(ctx, e.x, gy2, 15, Math.max(0, gy2 - e.y));
+    }
+    for (const pet of G.pets) {
+      const gy2 = World.topAt(L, pet.x, pet.y - 50);
+      if (gy2 !== null) Art.shadow(ctx, pet.x, gy2, 12, Math.max(0, gy2 - pet.y));
+    }
+    for (const e of L.foes) {
+      if (e.dead || e.type === 'wisp' || e.x < viewL || e.x > viewR) continue;
+      const gy2 = World.topAt(L, e.x, e.y - 30);
+      if (gy2 !== null) Art.shadow(ctx, e.x, gy2, 14, Math.max(0, gy2 - e.y));
+    }
+    if (L.boss && !L.boss.dead) {
+      const gy2 = World.topAt(L, L.boss.x);
+      if (gy2 !== null) Art.shadow(ctx, L.boss.x, gy2, 60, Math.max(0, gy2 - L.boss.y));
+    }
+
     // items
     for (const it of L.items) {
       if (it.taken || it.x < viewL || it.x > viewR) continue;
@@ -1033,17 +1095,7 @@ const Game = {
     }
 
     // bloom auras
-    for (const a of G.auras) {
-      const alpha = Math.min(1, a.t);
-      ctx.globalAlpha = alpha * .8;
-      ctx.globalCompositeOperation = 'lighter';
-      Art.glow(ctx, a.x, a.y - 20, 145, '#ff9fce', .25);
-      ctx.strokeStyle = 'rgba(255,170,210,.7)';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.arc(a.x, a.y - 20, 135 + Math.sin(t * 4) * 6, 0, U.TAU); ctx.stroke();
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1;
-    }
+    for (const a of G.auras) Art.drawAura(ctx, a, t);
 
     // enemies
     for (const e of L.foes) {
@@ -1070,7 +1122,7 @@ const Game = {
     }
 
     // pets & players (draw partner first, then me on top)
-    for (const pet of G.pets) (pet.kind === 'dog' ? Art.drawDog : Art.drawPanda)(ctx, pet, t);
+    for (const pet of G.pets) (pet.kind === 'dog' ? Art.drawDog : Art.drawPanda).call(Art, ctx, pet, t);
     const drawP = p => (p.char === 'joku' ? Art.drawJoku : Art.drawJolie).call(Art, ctx, p, t);
     drawP(G.mate); drawP(G.me);
 
@@ -1103,6 +1155,21 @@ const Game = {
     ctx.fillRect(viewL, 640, viewR - viewL, 260);
 
     ctx.restore();
+
+    // ---- screen-space: soft animated light shaft ----
+    if (L.theme !== 'shadow') {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.translate(W * .58 + Math.sin(G.time * .1) * 50, 0);
+      ctx.rotate(.36);
+      const shg = ctx.createLinearGradient(-70, 0, 90, 0);
+      shg.addColorStop(0, 'rgba(255,250,230,0)');
+      shg.addColorStop(.5, 'rgba(255,250,230,.055)');
+      shg.addColorStop(1, 'rgba(255,250,230,0)');
+      ctx.fillStyle = shg;
+      ctx.fillRect(-70, -120, 160, H * 1.7);
+      ctx.restore();
+    }
 
     // ---- screen-space: drifting fog bands ----
     ctx.fillStyle = pal.mist;
@@ -1407,7 +1474,7 @@ const Game = {
       if (it.taken || it.x < viewL || it.x > viewR) continue;
       Art.drawItem(ctx, it, G.time);
     }
-    for (const pet of D.pets) (pet.kind === 'dog' ? Art.drawDog : Art.drawPanda)(ctx, pet, G.time);
+    for (const pet of D.pets) (pet.kind === 'dog' ? Art.drawDog : Art.drawPanda).call(Art, ctx, pet, G.time);
     Art.drawJoku(ctx, D.j, G.time);
     Art.drawJolie(ctx, D.l, G.time);
     Ptc.draw(ctx);

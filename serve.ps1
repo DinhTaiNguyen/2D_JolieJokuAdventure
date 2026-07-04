@@ -10,6 +10,16 @@ while ($listener.IsListening) {
   try {
     $ctx = $listener.GetContext()
     $path = [uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath)
+    if ($ctx.Request.HttpMethod -eq 'POST' -and $path -eq '/shot') {
+      # dev helper: page POSTs a canvas dataURL, we save it as shot.png
+      $reader = New-Object IO.StreamReader($ctx.Request.InputStream, $ctx.Request.ContentEncoding)
+      $body = $reader.ReadToEnd()
+      $b64 = $body -replace '^data:image/\w+;base64,', ''
+      [IO.File]::WriteAllBytes((Join-Path $root 'shot.png'), [Convert]::FromBase64String($b64))
+      $ctx.Response.StatusCode = 200
+      $ctx.Response.Close()
+      continue
+    }
     if ($path -eq '/') { $path = '/index.html' }
     $file = Join-Path $root ($path.TrimStart('/') -replace '/', '\')
     if ((Test-Path $file -PathType Leaf) -and ([IO.Path]::GetFullPath($file)).StartsWith($root)) {

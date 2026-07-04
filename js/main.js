@@ -73,6 +73,7 @@ const Main = {
     };
     NET.onDrop = () => {
       this.toast('💔 Connection lost… ' + (NET.mode === 'host' ? 'Jolie can rejoin with the same code.' : 'Rejoin from the menu with the same code.'));
+      if (NET.mode === 'guest' && G.state === 'play' && !G.paused) this.togglePause();
     };
 
     /* ---- rotate hint (dismissible) ---- */
@@ -80,7 +81,52 @@ const Main = {
     addEventListener('resize', () => this.checkRotate());
     this.checkRotate();
 
+    /* ---- copy invite link (host) ---- */
+    $('btnCopyLink').onclick = () => {
+      const url = location.origin + location.pathname + '?join=' + NET.code;
+      (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(
+        () => this.toast('💌 Invite link copied — send it to Jolie!'),
+        () => this.toast(url)
+      );
+    };
+
     this.showMenu();
+
+    /* ---- deep links: ?join=CODE auto-joins; ?solo&lvl=N for quick play/testing ---- */
+    const q = new URLSearchParams(location.search);
+    if (q.get('join')) {
+      this.showConnect('join');
+      $('codeInput').value = q.get('join').toUpperCase();
+      $('joinStatus').textContent = 'Connecting…';
+      NET.join(q.get('join'));
+    } else if (q.has('solo')) {
+      if (q.has('touch')) Input.touchMode = true;
+      const lvl = U.clamp(parseInt(q.get('lvl') || '0', 10) || 0, 0, World.LEVELS.length - 1);
+      Game.startGame('solo', lvl);
+      if (q.has('skip')) { G.cut = null; G.dialog = null; G.fade = 0; G.fadeDir = -1; }
+      if (q.has('x')) {
+        const xx = q.get('x') === 'gate' ? G.level.gateX - 100 : +q.get('x');
+        G.me.x = xx; G.mate.x = xx + 46;
+        const ty = World.topAt(G.level, xx);
+        if (ty !== null) { G.me.y = ty; G.mate.y = ty; }
+        G.cam.x = xx;
+      }
+      if (q.has('boss')) G.bossActive = true;
+      if (q.has('zoom')) G.devZoom = +q.get('zoom') || 1;
+      if (q.has('auto')) G.autoDlg = true;
+      if (q.has('kiss')) { G.love = 100; Game.applyLove('kiss', (G.me.x + G.mate.x) / 2); }
+      if (q.has('bloom')) Game.addAura(G.me.x + 80, G.me.y, false);
+      if (q.has('phx')) Game.addProj({ kind: 'phoenix', x: G.me.x + 130, y: G.me.y - 70, vx: 8, vy: 0, dmg: 0, life: 300, mine: false }, true);
+      if (q.has('sim')) { // test hook: fast-forward the simulation
+        const n = ((+q.get('sim') || 5) * 60) | 0;
+        const fire = q.has('fire');
+        for (let i = 0; i < n; i++) {
+          if (fire) { Input.keys.attack = true; if (i % 100 === 50) Input.edges.special = true; }
+          Game.update(1 / 60);
+        }
+        Input.keys.attack = false;
+      }
+    }
   },
 
   checkRotate() {

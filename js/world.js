@@ -2,9 +2,9 @@
 /* ============ level definitions & deterministic generation ============ */
 const World = {
   LEVELS: [
-    { name: 'Enchanted Forest', theme: 'forest', width: 5200, seed: 101, density: 1.0 },
-    { name: 'Crystal Falls', theme: 'falls', width: 5800, seed: 202, density: 1.2 },
-    { name: 'Blossom Glade', theme: 'blossom', width: 6400, seed: 303, density: 1.4 },
+    { name: 'Enchanted Forest', theme: 'forest', width: 5900, seed: 101, density: 1.0 },
+    { name: 'Crystal Falls', theme: 'falls', width: 6500, seed: 202, density: 1.2 },
+    { name: 'Blossom Glade', theme: 'blossom', width: 7100, seed: 303, density: 1.4 },
     { name: 'Gloomheart Hollow', theme: 'shadow', width: 2200, seed: 404, boss: true },
   ],
 
@@ -66,7 +66,7 @@ const World = {
       return this._pack(cfg, idx, plats, items, foes, {
         shrineX: null, gateX: null,
         startX: 260, checkpoints: [{ x: 260, y: 520 }],
-        boss: { id: 'boss', type: 'boss', x: cfg.width * .62, y: 330, homeX: cfg.width * .62, homeY: 330, vx: 0, vy: 0, dir: -1, hp: 950, maxHp: 950, dmg: 18, t: 0, atkT: 3, phase: 0, mode: 'idle', modeT: 2.5, flash: 0, hurtShow: 0, dying: 0, dead: false }
+        boss: { id: 'boss', type: 'boss', x: cfg.width * .62, y: 375, homeX: cfg.width * .62, homeY: 375, vx: 0, vy: 0, dir: -1, hp: 950, maxHp: 950, dmg: 18, t: 0, atkT: 3, phase: 0, mode: 'idle', modeT: 2.5, flash: 0, hurtShow: 0, dying: 0, dead: false }
       });
     }
 
@@ -78,7 +78,7 @@ const World = {
     const shrineTarget = cfg.width * .5;
     let shrineX = null;
 
-    while (x < cfg.width - 900) {
+    while (x < cfg.width - 1500) {
       // gap with mushroom stepping stones
       const gap = U.range(r, 130, 230) + cfg.density * 20;
       if (r() < .65) {
@@ -107,9 +107,9 @@ const World = {
       if (r() < .25) items.push({ id: 'i' + (itemId++), kind: 'heartDrop', x: x + w * .5, y: y - 120, taken: false });
 
       // enemies
-      const foeCount = Math.min(3, 1 + (r() * cfg.density * 1.6 | 0));
+      const foeCount = Math.min(3, 1 + (r() * cfg.density * 2 | 0));
       for (let i = 0; i < foeCount; i++) {
-        if (x + w < 1400) break; // keep the start peaceful
+        if (x + w < 1200) break; // keep the start peaceful
         const t = r();
         const fx = x + 90 + r() * (w - 180);
         if (t < .42) foe('slime', fx, pl);
@@ -131,7 +131,7 @@ const World = {
     const endW = 800;
     y = U.clamp(lastGroundY, 460, 560);
     ground(x, y, endW + 400);
-    const gateX = x + endW * .62;
+    const gateX = Math.min(x + endW * .62, cfg.width - 220);
     row(x + 80, y - 50, 4, 'heartDrop');
 
     return this._pack(cfg, idx, plats, items, foes, {

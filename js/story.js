@@ -80,7 +80,7 @@ const Story = {
       case 'shrine': {
         const sx = L.shrineX;
         return [
-          { a: 'move', who: 'joku', x: sx - 46 }, { a: 'move', who: 'jolie', x: sx + 46 },
+          { a: 'move2', jx: sx - 46, lx: sx + 46 },
           { a: 'face' },
           { a: 'fn', f: () => { L.shrineDone = true; SND.sfx('heal'); Game.shake(4); Ptc.burst('heart', sx, (L.shrineY || 500) - 70, 14, { sp: 130, r: 7, life: 1.2 }); Game.toastMsg('💖 Heart Shrine restored — checkpoint!'); } },
           { a: 'dlg', key: 'shrine' + Math.min(L.idx, 2) },
@@ -90,7 +90,7 @@ const Story = {
       case 'gate': {
         const gx = L.gateX;
         return [
-          { a: 'move', who: 'joku', x: gx - 26 }, { a: 'move', who: 'jolie', x: gx + 26 },
+          { a: 'move2', jx: gx - 26, lx: gx + 26 },
           { a: 'face' },
           { a: 'dlg', key: 'gate' + Math.min(L.idx, 2) },
           { a: 'pose', pose: 'hug', t: 2.2 },
@@ -111,7 +111,7 @@ const Story = {
         return [
           { a: 'wait', t: 1.2 },
           { a: 'dlg', key: 'ending' },
-          { a: 'move', who: 'joku', x: bx - 200 - 24 }, { a: 'move', who: 'jolie', x: bx - 200 + 24 },
+          { a: 'move2', jx: bx - 200 - 24, lx: bx - 200 + 24 },
           { a: 'face' },
           { a: 'pose', pose: 'hug', t: 1.4 },
           { a: 'pose', pose: 'kiss', t: 3 },
