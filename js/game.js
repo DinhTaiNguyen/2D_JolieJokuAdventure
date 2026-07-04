@@ -1,7 +1,7 @@
 'use strict';
 /* ============ game core: loop, co-op logic, love mechanics, rendering ============ */
 const G = {
-  state: 'menu', mode: 'solo',
+  state: 'menu', mode: 'solo', difficulty: 'normal',
   time: 0, me: null, mate: null, pets: [],
   levelIndex: 0, level: null,
   projs: [], auras: [], fireflies: [],
@@ -14,7 +14,7 @@ const G = {
   announce: null,
   stats: { orbs: 0, flowers: 0, hearts: 0, hugs: 0, kisses: 0, kills: 0, startT: 0 },
   checkpoint: { x: 140, y: 400 },
-  paused: false, bossActive: false, netLost: false, ended: false,
+  paused: false, bossActive: false, netLost: false, ended: false, nextLevelT: 0,
   netT: { p: 0, w: 0, seq: 0, wseq: 0 }, mateNet: null, mateBuf: [], lastMateSeq: 0, lastWorldSeq: 0, _dropId: 0, _comboToastT: 0,
   demo: null,
 };
@@ -72,9 +72,10 @@ const Game = {
   loadLevel(n) {
     G.levelIndex = n;
     G.level = World.gen(n);
+    this.applyDifficulty(G.level);
     G.level.bg = Art.makeBackground(G.level.theme, G.level.cfg.seed);
     G.projs = []; G.auras = []; G.cut = null; G.dialog = null;
-    G.bossActive = false;
+    G.bossActive = false; G.nextLevelT = 0; G.activeMiniBoss = null;
     Ptc.list.length = 0;
 
     const joku = this.byChar('joku'), jolie = this.byChar('jolie');
@@ -97,13 +98,13 @@ const Game = {
     }
 
     G.fade = 1; G.fadeDir = -1;
-    G.announce = { txt: G.level.name, sub: G.level.cfg.boss ? '💔 Final Battle' : 'Chapter ' + (n + 1), t: 3.2 };
+    G.announce = { txt: G.level.name, sub: 'Chapter ' + (n + 1) + ' of ' + World.LEVELS.length, t: 3.2 };
     SND.startMusic(n);
 
     // level-start scenes run locally on BOTH devices (deterministic), no network needed
     if (n === 0) this.cutStart('intro', true);
-    else if (G.level.cfg.boss) this.cutStart('bossIntro', true);
     else this.cutStart('lvl', true);
+    if (Main.syncSettings) Main.syncSettings();
   },
 
   nextLevel() {
@@ -114,10 +115,57 @@ const Game = {
     this.loadLevel(n);
   },
 
+  setDifficulty(diff) {
+    if (!this.DIFF[diff]) diff = 'normal';
+    G.difficulty = diff;
+    if (G.level) this.applyDifficulty(G.level);
+    if (Main.syncSettings) Main.syncSettings();
+    Main.toast('Difficulty: ' + diff);
+  },
+
+  gotoChapter(n) {
+    n = U.clamp(n | 0, 0, World.LEVELS.length - 1);
+    if (G.mode === 'guest') { Main.toast('Only the host can change chapters online.'); return; }
+    if (G.state !== 'play') { this.startGame(G.mode || 'solo', n); return; }
+    this.hidePauseIfOpen();
+    this.emit('lvl', { n });
+    this.loadLevel(n);
+  },
+
+  hidePauseIfOpen() {
+    if (G.paused) Main.hidePause();
+  },
+
+  DIFF: {
+    easy: { hp: .75, dmg: .75 },
+    normal: { hp: 1, dmg: 1 },
+    hard: { hp: 1.35, dmg: 1.25 }
+  },
+
+  applyDifficulty(level) {
+    const diff = G.difficulty || 'normal';
+    const mod = this.DIFF[diff] || this.DIFF.normal;
+    const old = this.DIFF[level._difficultyApplied || 'normal'] || this.DIFF.normal;
+    const hpScale = mod.hp / old.hp;
+    const dmgScale = mod.dmg / old.dmg;
+    for (const e of level.foes) this.scaleThreat(e, hpScale, dmgScale);
+    if (level.boss) {
+      this.scaleThreat(level.boss, hpScale, dmgScale);
+    }
+    level._difficultyApplied = diff;
+  },
+
+  scaleThreat(e, hpScale, dmgScale) {
+    const hpFrac = e.maxHp > 0 ? e.hp / e.maxHp : 1;
+    e.maxHp = Math.max(1, Math.round(e.maxHp * hpScale));
+    e.hp = e.dead ? 0 : Math.max(0, Math.min(e.maxHp, Math.round(e.maxHp * hpFrac)));
+    e.dmg = Math.max(1, Math.round(e.dmg * dmgScale));
+  },
+
   byChar(c) { return G.me.char === c ? G.me : G.mate; },
   enemiesAll() {
     const b = G.level && G.level.boss;
-    return (b && !b.dead) ? G.level.foes.concat([b]) : (G.level ? G.level.foes : []);
+    return (b && !b.dead && (G.bossActive || b.dying > 0)) ? G.level.foes.concat([b]) : (G.level ? G.level.foes : []);
   },
   nearestPlayer(x, y) {
     let best = null, bd = 1e9;
@@ -182,6 +230,7 @@ const Game = {
 
     // ----- heart button: love actions -----
     if (G.kissCin <= 0 && !G.cut && !G.dialog && !G.paused) this.updateLoveActions(dt);
+    if (G.kissCin <= 0 && !G.cut && !G.dialog && !G.paused && Input.take('drop')) this.dropMyWeapon();
 
     // ----- pets, enemies, projectiles, auras -----
     for (const pet of G.pets) Ent.updatePet(pet, dt);
@@ -198,13 +247,14 @@ const Game = {
     if (!G.me.down && G.me.invuln <= 0 && G.kissCin <= 0 && !G.cut) {
       for (const e of this.enemiesAll()) {
         if (e.dead || e.dying > 0) continue;
-        const r = e.type === 'boss' ? 78 : 26;
+        const r = e.type === 'boss' ? 78 : (e.bossTier ? 46 : 26);
         if (Math.abs(e.x - G.me.x) < r && Math.abs((e.y - 14) - (G.me.y - 26)) < r + 14) {
           this.damageMe(e.dmg, e.x);
           break;
         }
       }
     }
+    if (G.kissCin <= 0 && !G.cut) this.updatePetDamage(dt);
 
     // ----- pickups -----
     for (const it of L.items) {
@@ -250,6 +300,7 @@ const Game = {
 
     // ----- camera -----
     this.updateCamera(dt);
+    this.updateBossCues(dt);
 
     // ----- ambient & fx -----
     Ptc.update(dt);
@@ -258,6 +309,10 @@ const Game = {
     G.shakeT -= dt;
     if (G.announce) { G.announce.t -= dt; if (G.announce.t <= 0) G.announce = null; }
     if (G._comboToastT > 0) G._comboToastT -= dt;
+    if (G.nextLevelT > 0 && G.mode !== 'guest') {
+      G.nextLevelT -= dt;
+      if (G.nextLevelT <= 0) this.nextLevel();
+    }
 
     // idle sweetness: hearts drift between the two when close & calm
     if (!G.cut && Math.random() < dt * .5) {
@@ -293,6 +348,7 @@ const Game = {
       m.vx = s.vx; m.vy = s.vy; m.dir = s.dir;
     }
     m.hp = s.hp; m.mp = s.mp;
+    m.weapon = s.wp || null;
     m.glide = s.gl; m.holding = s.hh;
     m.onGround = s.og;
     if (s.dn && !m.down) { m.down = true; m.pose = 'down'; }
@@ -318,6 +374,66 @@ const Game = {
         if (Math.abs(e.tx - e.x) > 300) { e.x = e.tx; e.y = e.ty; }
       }
       if (e.type === 'slime') e.hopY = Math.max(0, (e.plat ? e.plat.y : e.y) - e.y);
+    }
+  },
+
+  currentBossThreat() {
+    if (!G.level) return null;
+    const b = G.level.boss;
+    if (b && !b.dead && (G.bossActive || b.dying > 0)) return b;
+    let best = null, bd = 1e9;
+    for (const e of G.level.foes) {
+      if (!e.bossTier || e.dead || e.dying > 0) continue;
+      const d = Math.min(Math.abs(e.x - G.me.x), Math.abs(e.x - G.mate.x));
+      if (d < bd) { bd = d; best = e; }
+    }
+    return best && bd < 720 ? best : null;
+  },
+
+  updateBossCues(dt) {
+    const threat = this.currentBossThreat();
+    if (threat && threat.bossTier) {
+      if (!threat.announced) {
+        threat.announced = true;
+        G.announce = { txt: threat.bossName || 'Strong Boss', sub: 'get ready together', t: 2.8 };
+        SND.sfx('boss');
+      }
+      if (G.activeMiniBoss !== threat.id) {
+        G.activeMiniBoss = threat.id;
+        SND.startMusic(G.levelIndex, true);
+      }
+    }
+    if (!threat && G.activeMiniBoss && !G.bossActive) {
+      G.activeMiniBoss = null;
+      SND.startMusic(G.levelIndex, false);
+    }
+  },
+
+  updatePetDamage(dt) {
+    if (!G.level) return;
+    for (const pet of G.pets) {
+      if (pet.hp <= 0 || pet.hurtCd > 0) continue;
+      for (const e of this.enemiesAll()) {
+        if (e.dead || e.dying > 0) continue;
+        const r = e.type === 'boss' ? 86 : (e.bossTier ? 54 : 30);
+        if (Math.abs(e.x - pet.x) < r && Math.abs((e.y - 14) - (pet.y - 18)) < r) {
+          this.damagePet(pet, Math.max(4, e.dmg * .45), e.x);
+          break;
+        }
+      }
+    }
+  },
+
+  damagePet(pet, dmg, fromX) {
+    pet.hp = Math.max(0, pet.hp - dmg);
+    pet.hurtCd = 1.2;
+    pet.vx = Math.sign(pet.x - fromX) * 180 || 180;
+    SND.sfx('hit');
+    Ptc.burst('spark', pet.x, pet.y - 22, 5, { color: pet.kind === 'dog' ? '#9fd8ff' : '#ffc4dc', sp: 120, g: 350, r: 4, life: .45 });
+    if (pet.hp <= 0) {
+      pet.mode = 'follow';
+      pet.downT = 0;
+      this.toastMsg(Story.NAMES[pet.kind] + ' needs a moment to recover!');
     }
   },
 
@@ -558,6 +674,11 @@ const Game = {
     Ptc.burst('dot', e.x, e.y - 14, 10, { color: '#b28fe8', sp: 160, r: 7, life: .6 });
     Ptc.burst('spark', e.x, e.y - 14, 6, { sp: 190, g: 500, r: 4, life: .6 });
     if (G.mode !== 'guest') {
+      if (e.bossTier) {
+        this.dropWeapons(e.x, e.y, 2);
+        G.announce = { txt: 'Strong Boss Defeated!', sub: 'two weapons dropped', t: 2.8 };
+        SND.startMusic(G.levelIndex, false);
+      }
       // loot
       const r = Math.random();
       let kind = null;
@@ -661,23 +782,60 @@ const Game = {
         if (!fromNet) SND.sfx('orb');
         Ptc.burst('dot', it.x, it.y, 4, { color: '#5ee8ff', sp: 70, r: 5, life: .4 });
         break;
+      case 'weapon': {
+        const p = this.byChar(by);
+        p.weapon = it.weapon || 'tideSpear';
+        if (forMe) this.toastMsg('Equipped ' + (Weapons[p.weapon] ? Weapons[p.weapon].name : 'weapon') + '. Press Q or ⇩ to drop it.');
+        if (!fromNet) SND.sfx('heart');
+        Ptc.burst('star', it.x, it.y, 10, { color: (Weapons[p.weapon] || Weapons.tideSpear).color, sp: 130, r: 6, life: .8 });
+        break;
+      }
     }
     if (!fromNet) this.emit('pick', { id: it.id, by });
+  },
+
+  randomWeapon() {
+    return Weapons.IDS[(Math.random() * Weapons.IDS.length) | 0];
+  },
+
+  dropWeapons(x, y, n = 2) {
+    if (G.mode === 'guest') return;
+    for (let i = 0; i < n; i++) {
+      const weapon = this.randomWeapon();
+      const it = { id: 'w' + (G._dropId++), kind: 'weapon', weapon, x: x + (i ? 38 : -38), y: y - 52, taken: false };
+      G.level.items.push(it);
+      this.emit('drop', { id: it.id, kind: it.kind, weapon, x: it.x, y: it.y });
+    }
+  },
+
+  dropMyWeapon() {
+    const p = G.me;
+    if (!p || !p.weapon || G.state !== 'play') { this.toastMsg('No weapon equipped.'); return; }
+    const weapon = p.weapon;
+    p.weapon = null;
+    const it = { id: 'w' + (G._dropId++), kind: 'weapon', weapon, x: p.x + p.dir * 34, y: p.y - 46, taken: false };
+    G.level.items.push(it);
+    this.emit('drop', { id: it.id, kind: it.kind, weapon, x: it.x, y: it.y });
+    SND.sfx('orb');
+    this.toastMsg('Dropped ' + (Weapons[weapon] ? Weapons[weapon].name : 'weapon') + '.');
   },
 
   /* ================= boss ================= */
   bossWake() {
     G.bossActive = true;
+    const b = G.level.boss;
+    if (b) G.announce = { txt: b.bossName || 'Chapter Boss', sub: 'final boss fight', t: 3 };
+    SND.startMusic(G.levelIndex, true);
     SND.sfx('boss');
     this.shake(8);
   },
-  bossSlam(x) {
+  bossSlam(x, dmg = 18) {
     SND.sfx('slam');
     this.shake(11);
     Ptc.burst('dot', x, 500, 14, { color: '#9e5eff', sp: 260, r: 9, life: .6 });
     Ptc.add({ kind: 'ring', x, y: 500, vx: 0, vy: 0, r: 160, life: .5, color: 'rgba(158,94,255,.8)' });
     for (const dir of [-1, 1]) {
-      this.addProj({ kind: 'shock', x: x + dir * 60, y: 520, vx: dir * 330, vy: 0, dmg: 18, life: 2.4, mine: false, foe: true, host: true });
+      this.addProj({ kind: 'shock', x: x + dir * 60, y: 520, vx: dir * 330, vy: 0, dmg, life: 2.4, mine: false, foe: true, host: true });
     }
   },
   bossSummon(n = 2) {
@@ -687,14 +845,20 @@ const Game = {
     n = Math.min(n, Math.max(0, 3 - alive));
     if (n <= 0) return;
     SND.sfx('boss');
-    const pl = G.level.plats[0];
+    const pl = G.level.plats.find(p => p.type === 'ground' && b.x >= p.x && b.x <= p.x + p.w) || G.level.plats[G.level.plats.length - 1];
+    const summonTypes = G.level.theme === 'ember' ? ['golem', 'imp', 'bat'] :
+      G.level.theme === 'star' ? ['bat', 'wisp', 'golem'] :
+      G.level.theme === 'shadow' ? ['wisp', 'bat', 'thorn'] : ['slime', 'thorn', 'wisp'];
     for (const off of [-140, 140, -260, 260].slice(0, n)) {
+      const type = summonTypes[(Math.random() * summonTypes.length) | 0];
+      const hp = type === 'golem' ? 145 : type === 'thorn' ? 85 : type === 'slime' ? 55 : 58;
       const f = {
-        id: 'bs' + (G._dropId++), type: 'slime', x: U.clamp(b.x + off, pl.x + 40, pl.x + pl.w - 40), y: pl.y, homeX: b.x + off, plat: pl,
-        vx: 0, vy: 0, dir: 1, hp: 55, maxHp: 55, dmg: 13, t: 0, atkT: .6, hopY: 0, flash: 0, hurtShow: 0, dead: false
+        id: 'bs' + (G._dropId++), type, x: U.clamp(b.x + off, pl.x + 40, pl.x + pl.w - 40), y: pl.y, homeX: b.x + off, homeY: pl.y - (type === 'bat' || type === 'wisp' ? 170 : 0), plat: pl,
+        vx: 0, vy: 0, dir: 1, hp, maxHp: hp, dmg: type === 'golem' ? 22 : 13, t: 0, atkT: .6, hopY: 0, flash: 0, hurtShow: 0, dead: false
       };
+      if (type === 'bat' || type === 'wisp') f.y = f.homeY;
       G.level.foes.push(f);
-      this.emit('spawn', { id: f.id, x: f.x, y: f.y });
+      this.emit('spawn', { id: f.id, type: f.type, x: f.x, y: f.y, hp: f.hp, dmg: f.dmg });
       Ptc.burst('dot', f.x, f.y - 14, 8, { color: '#9e5eff', sp: 140, r: 7, life: .5 });
     }
   },
@@ -706,8 +870,15 @@ const Game = {
     this.shake(14);
     Ptc.add({ kind: 'ring', x: b.x, y: b.y, vx: 0, vy: 0, r: 400, life: 1.2, color: 'rgba(255,170,210,.9)' });
     Ptc.burst('heart', b.x, b.y, 20, { sp: 260, r: 8, life: 1.6 });
+    this.dropWeapons(b.x, b.y, 2);
     this.emit('bossdead', {});
-    this.cutStart('ending');
+    SND.startMusic(G.levelIndex, false);
+    if (G.levelIndex >= World.LEVELS.length - 1) {
+      this.cutStart('ending');
+    } else {
+      G.announce = { txt: 'Chapter Clear!', sub: 'next adventure opening...', t: 3.2 };
+      G.nextLevelT = 4.2;
+    }
   },
 
   /* ================= level flow helpers (called from Story) ================= */
@@ -833,8 +1004,9 @@ const Game = {
 
   /* ================= dialog ================= */
   dlgOpen(key) {
-    const lines = Story.DLG[key];
-    if (!lines) { return; }
+    const src = Story.DLG[key];
+    if (!src) { return; }
+    const lines = src.map(line => [line[0], typeof line[1] === 'function' ? line[1]() : line[1]]);
     G.dialog = { key, lines, i: 0, chars: 0 };
   },
 
@@ -982,7 +1154,7 @@ const Game = {
       t: 'p', q: ++G.netT.seq, x: Math.round(p.x), y: Math.round(p.y), vx: Math.round(p.vx), vy: Math.round(p.vy),
       dir: p.dir, hp: Math.round(p.hp), mp: Math.round(p.mp),
       gl: p.glide, hh: p.holding, dn: p.down, wg: p.wing > .3, at: p.atkT < .15, og: p.onGround,
-      ht: p.hurtT > .05, ch: p.cheerT > .05
+      ht: p.hurtT > .05, ch: p.cheerT > .05, wp: p.weapon || ''
     }, { volatile: true, maxBuffered: 24576 });
   },
 
@@ -1054,7 +1226,7 @@ const Game = {
         break;
       }
       case 'drop':
-        G.level.items.push({ id: d.id, kind: d.kind, x: d.x, y: d.y, taken: false });
+        G.level.items.push({ id: d.id, kind: d.kind, weapon: d.weapon, x: d.x, y: d.y, taken: false });
         break;
       case 'hit': {
         const e = this.enemiesAll().find(x => x.id === d.id);
@@ -1067,10 +1239,12 @@ const Game = {
         break;
       }
       case 'spawn': {
-        const pl = G.level.plats[0];
+        const pl = G.level.plats.find(p => p.type === 'ground' && d.x >= p.x && d.x <= p.x + p.w) || G.level.plats[G.level.plats.length - 1];
+        const type = d.type || 'slime';
+        const hp = d.hp || (type === 'golem' ? 145 : type === 'thorn' ? 85 : type === 'slime' ? 55 : 58);
         G.level.foes.push({
-          id: d.id, type: 'slime', x: d.x, y: d.y, homeX: d.x, plat: pl, tx: d.x, ty: d.y,
-          vx: 0, vy: 0, dir: 1, hp: 55, maxHp: 55, dmg: 13, t: 0, atkT: 1, hopY: 0, flash: 0, hurtShow: 0, dead: false
+          id: d.id, type, x: d.x, y: d.y, homeX: d.x, homeY: d.y, plat: pl, tx: d.x, ty: d.y,
+          vx: 0, vy: 0, dir: 1, hp, maxHp: hp, dmg: d.dmg || 13, t: 0, atkT: 1, hopY: 0, flash: 0, hurtShow: 0, dead: false
         });
         break;
       }
@@ -1154,7 +1328,7 @@ const Game = {
       const gy2 = World.topAt(L, e.x, e.y - 30);
       if (gy2 !== null) Art.shadow(ctx, e.x, gy2, 14, Math.max(0, gy2 - e.y));
     }
-    if (L.boss && !L.boss.dead) {
+    if (L.boss && !L.boss.dead && (G.bossActive || L.boss.dying > 0)) {
       const gy2 = World.topAt(L, L.boss.x);
       if (gy2 !== null) Art.shadow(ctx, L.boss.x, gy2, 60, Math.max(0, gy2 - L.boss.y));
     }
@@ -1173,7 +1347,7 @@ const Game = {
       if (e.dead || e.x < viewL || e.x > viewR) continue;
       Art.drawEnemy(ctx, e, t);
     }
-    if (L.boss && !L.boss.dead) Art.drawBoss(ctx, L.boss, t);
+    if (L.boss && !L.boss.dead && (G.bossActive || L.boss.dying > 0)) Art.drawBoss(ctx, L.boss, t);
 
     // hand-hold link
     if (G.handHold) {
@@ -1272,6 +1446,9 @@ const Game = {
     const joku = this.byChar('joku'), jolie = this.byChar('jolie');
     this.drawCard(ctx, 10, 8, cw, ch, 'joku', joku, small);
     this.drawCard(ctx, W - cw - 10, 8, cw, ch, 'jolie', jolie, small);
+    const dog = G.pets.find(p => p.kind === 'dog'), panda = G.pets.find(p => p.kind === 'panda');
+    if (dog) this.drawPetCard(ctx, 10, ch + 14, small ? 116 : 142, small ? 30 : 34, dog, small);
+    if (panda) this.drawPetCard(ctx, W - (small ? 116 : 142) - 10, ch + 14, small ? 116 : 142, small ? 30 : 34, panda, small);
 
     // center: level name + progress
     const L = G.level;
@@ -1284,7 +1461,8 @@ const Game = {
     ctx.fillText(L.name, W / 2, py + 10);
     ctx.shadowBlur = 0;
 
-    if (L.boss) {
+    const miniBoss = this.currentBossThreat();
+    if (L.boss && (G.bossActive || L.boss.dying > 0)) {
       // boss hp bar
       const b = L.boss;
       if (G.bossActive || b.dying > 0) {
@@ -1298,8 +1476,18 @@ const Game = {
         if (frac > 0) { ctx.beginPath(); ctx.roundRect(W / 2 - bw / 2 + 1.5, py + 19.5, (bw - 3) * frac, 9, 4.5); ctx.fill(); }
         ctx.font = `600 ${small ? 10 : 11}px Fredoka, sans-serif`;
         ctx.fillStyle = '#e0c8ff';
-        ctx.fillText('💜 the Gloomheart', W / 2, py + 42);
+        ctx.fillText(b.bossName || 'Chapter Boss', W / 2, py + 42);
       }
+    } else if (miniBoss && miniBoss.bossTier) {
+      const bw = Math.min(360, W * .38);
+      ctx.fillStyle = 'rgba(10,6,20,.65)';
+      ctx.beginPath(); ctx.roundRect(W / 2 - bw / 2, py + 18, bw, 10, 5); ctx.fill();
+      const frac = Math.max(0, miniBoss.hp / miniBoss.maxHp);
+      ctx.fillStyle = '#ff86b8';
+      if (frac > 0) { ctx.beginPath(); ctx.roundRect(W / 2 - bw / 2 + 1, py + 19, (bw - 2) * frac, 8, 4); ctx.fill(); }
+      ctx.font = `600 ${small ? 10 : 11}px Fredoka, sans-serif`;
+      ctx.fillStyle = '#ffd7ec';
+      ctx.fillText(miniBoss.bossName || 'Strong Boss', W / 2, py + 42);
     } else if (L.gateX) {
       // progress track with waypoints (like the reference)
       const prog = U.clamp(Math.max(G.me.x, G.mate.x) / L.gateX, 0, 1);
@@ -1323,7 +1511,8 @@ const Game = {
     }
 
     // love meter
-    const lw = small ? 120 : 170, lx = W / 2 - lw / 2, ly = py + (L.boss ? 48 : 32);
+    const bossHud = (L.boss && (G.bossActive || L.boss.dying > 0)) || (miniBoss && miniBoss.bossTier);
+    const lw = small ? 120 : 170, lx = W / 2 - lw / 2, ly = py + (bossHud ? 48 : 32);
     const full = G.love >= 100;
     const pulse = full ? 1 + Math.sin(G.time * 8) * .12 : 1;
     ctx.save();
@@ -1342,6 +1531,11 @@ const Game = {
       ctx.font = `700 ${small ? 10 : 11}px Fredoka, sans-serif`;
       ctx.fillStyle = '#ffd7ec';
       ctx.fillText('💋 KISS READY — press ❤ together!', W / 2, ly + 24);
+    }
+    if (G.me.weapon && Weapons[G.me.weapon]) {
+      ctx.font = `600 ${small ? 10 : 12}px Fredoka, sans-serif`;
+      ctx.fillStyle = Weapons[G.me.weapon].color;
+      ctx.fillText(Weapons[G.me.weapon].name, W / 2, ly + (full ? 40 : 25));
     }
 
     // offscreen partner arrow
@@ -1408,6 +1602,29 @@ const Game = {
     mg2.addColorStop(0, '#4fc8ff'); mg2.addColorStop(1, '#2a6ae0');
     ctx.fillStyle = mg2;
     if (mf > 0.01) { ctx.beginPath(); ctx.roundRect(bx + 1, mpY + 1, (bw * .8 - 2) * mf, barH - 4, (barH - 4) / 2); ctx.fill(); }
+  },
+
+  drawPetCard(ctx, x, y, w, h, pet, small) {
+    const name = Story.NAMES[pet.kind] || pet.kind;
+    ctx.fillStyle = 'rgba(8,24,34,.48)';
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
+    ctx.strokeStyle = pet.kind === 'dog' ? 'rgba(110,190,255,.45)' : 'rgba(255,150,200,.45)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.font = `700 ${small ? 9 : 10}px Fredoka, sans-serif`;
+    ctx.fillStyle = pet.kind === 'dog' ? '#aadfff' : '#ffc4dc';
+    ctx.fillText(name, x + 8, y + 11);
+    const bx = x + (small ? 52 : 62), bw = w - (small ? 60 : 72), hpY = y + 6;
+    const hp = U.clamp(pet.hp / pet.maxHp, 0, 1), mp = U.clamp(pet.mp / pet.maxMp, 0, 1);
+    ctx.fillStyle = 'rgba(0,0,0,.42)';
+    ctx.beginPath(); ctx.roundRect(bx, hpY, bw, 7, 3.5); ctx.fill();
+    ctx.fillStyle = '#e85858';
+    ctx.beginPath(); ctx.roundRect(bx + 1, hpY + 1, Math.max(0, (bw - 2) * hp), 5, 2.5); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.42)';
+    ctx.beginPath(); ctx.roundRect(bx, hpY + 11, bw * .85, 6, 3); ctx.fill();
+    ctx.fillStyle = '#4fc8ff';
+    ctx.beginPath(); ctx.roundRect(bx + 1, hpY + 12, Math.max(0, (bw * .85 - 2) * mp), 4, 2); ctx.fill();
   },
 
   /* ================= dialog box ================= */

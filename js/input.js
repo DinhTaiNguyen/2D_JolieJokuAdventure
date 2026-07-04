@@ -16,6 +16,7 @@ const Input = {
     'j': 'attack', 'z': 'attack',
     'k': 'special', 'x': 'special',
     'l': 'heart', 'c': 'heart', 'e': 'heart',
+    'q': 'drop',
     'enter': 'confirm', 'escape': 'pause'
   },
 
@@ -89,7 +90,7 @@ const Input = {
       el.addEventListener('pointercancel', up);
       el.addEventListener('contextmenu', e => e.preventDefault());
     };
-    bind('tJump', 'jump'); bind('tAtk', 'attack'); bind('tSp', 'special'); bind('tHeart', 'heart');
+    bind('tJump', 'jump'); bind('tAtk', 'attack'); bind('tSp', 'special'); bind('tHeart', 'heart'); bind('tDrop', 'drop');
 
     document.addEventListener('contextmenu', e => e.preventDefault());
 

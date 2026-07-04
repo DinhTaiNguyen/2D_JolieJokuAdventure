@@ -6,6 +6,8 @@ html, body {
   touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
   overscroll-behavior:none;
 }
+html.softFullscreen, html.softFullscreen body { min-height:100svh; height:100svh; }
+html.softFullscreen #game, html.softFullscreen #ui { width:100svw; height:100svh; }
 #game { position:fixed; inset:0; width:100%; height:100%; display:block; }
 #ui { position:fixed; inset:0; pointer-events:none; }
 #ui > * { pointer-events:auto; }
@@ -99,6 +101,17 @@ input, textarea {
 #gameFullBtn { right:calc(24% + 48px); font-size:21px; }
 #pauseBtn:active, .cornerBtn:active { transform:scale(.92); }
 #pausePanel .mbtn { width:min(70vw,280px); margin-top:8px; }
+.settingsGrid {
+  display:grid; grid-template-columns:1fr 1fr; gap:8px; width:min(78vw,360px);
+  margin:10px auto 2px; text-align:left;
+}
+.settingsGrid label { color:#cfeaf7; font-size:12px; font-weight:600; }
+.settingsGrid select {
+  width:100%; margin-top:3px; padding:8px 10px; border-radius:10px;
+  border:1px solid rgba(255,255,255,.2); background:rgba(0,0,0,.35); color:#e8f7ff;
+  font-family:inherit; font-weight:600;
+}
+.settingsGrid .mbtn { grid-column:span 1; width:100%; font-size:14px; padding:10px 8px; }
 
 /* ============ Touch controls ============ */
 #touchUI { position:absolute; inset:0; z-index:10; pointer-events:none; }
@@ -125,6 +138,7 @@ input, textarea {
   box-shadow:0 4px 14px rgba(0,0,0,.4);
 }
 .tbtn.big { width:80px; height:80px; font-size:32px; }
+.tbtn.small { width:54px; height:54px; font-size:24px; grid-column:1 / -1; opacity:.88; }
 .tbtn:active, .tbtn.pressed { filter:brightness(1.6); transform:scale(.93); }
 #tHeart { border-color:rgba(255,140,195,.6); }
 

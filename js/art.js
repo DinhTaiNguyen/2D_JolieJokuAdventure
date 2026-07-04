@@ -517,7 +517,7 @@ const Art = {
   },
 
   /* ================= PETS ================= */
-  drawDog(ctx, pet, t) { // Kai the blue puppy 💙
+  drawDog(ctx, pet, t) { // Lulu the blue puppy
     ctx.save();
     ctx.translate(pet.x, pet.y);
     ctx.scale(pet.dir * 1.12, 1.12);
@@ -587,7 +587,7 @@ const Art = {
     ctx.restore();
   },
 
-  drawPanda(ctx, pet, t) { // Momo the pink panda 💗
+  drawPanda(ctx, pet, t) { // Biscuit the pink panda
     ctx.save();
     ctx.translate(pet.x, pet.y);
     ctx.scale(pet.dir * 1.12, 1.12);
@@ -664,6 +664,7 @@ const Art = {
     ctx.save();
     ctx.translate(e.x, e.y);
     const flash = e.flash > 0;
+    if (e.bossTier) ctx.scale(1.55, 1.55);
     switch (e.type) {
       case 'slime': {
         const squish = 1 + Math.sin(e.t * 6) * .08 - (e.hopY > 1 ? .15 : 0);
@@ -871,6 +872,61 @@ const Art = {
         ctx.restore();
         break;
       }
+      case 'bat': {
+        const flap = Math.sin(e.t * 16) * 8;
+        ctx.scale(e.dir, 1);
+        ctx.globalCompositeOperation = 'lighter';
+        this.glow(ctx, 0, -18, 24, '#7fd8ff', .35);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = flash ? '#e8f8ff' : '#293f74';
+        for (const s of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(0, -17);
+          ctx.quadraticCurveTo(s * 18, -32 - flap, s * 32, -14 + flap * .4);
+          ctx.quadraticCurveTo(s * 16, -9, 0, -14);
+          ctx.fill();
+        }
+        ctx.fillStyle = flash ? '#fff' : '#1b244a';
+        ctx.beginPath(); ctx.ellipse(0, -16, 10, 8, 0, 0, U.TAU); ctx.fill();
+        ctx.fillStyle = '#ff86b8';
+        ctx.beginPath(); ctx.arc(-3, -17, 1.6, 0, U.TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(4, -17, 1.6, 0, U.TAU); ctx.fill();
+        ctx.fillStyle = '#d9f4ff';
+        ctx.beginPath(); ctx.moveTo(-2, -11); ctx.lineTo(0, -7); ctx.lineTo(2, -11); ctx.fill();
+        break;
+      }
+      case 'golem': {
+        ctx.scale(e.dir, 1);
+        ctx.globalCompositeOperation = 'lighter';
+        this.glow(ctx, 0, -25, 30, '#ff9d6f', .28);
+        ctx.globalCompositeOperation = 'source-over';
+        const gg = ctx.createLinearGradient(0, -52, 0, 0);
+        gg.addColorStop(0, flash ? '#ffe4d0' : '#8b4f55');
+        gg.addColorStop(1, flash ? '#bd8d8d' : '#3b2434');
+        ctx.fillStyle = gg;
+        ctx.beginPath(); ctx.roundRect(-18, -46, 36, 38, 9); ctx.fill();
+        ctx.fillStyle = flash ? '#fff0d8' : '#5b3346';
+        ctx.beginPath(); ctx.roundRect(-23, -35, 11, 22, 5); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(12, -35, 11, 22, 5); ctx.fill();
+        ctx.fillStyle = '#ffb45f';
+        ctx.beginPath(); ctx.arc(-6, -31, 2.4, 0, U.TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(7, -31, 2.4, 0, U.TAU); ctx.fill();
+        ctx.strokeStyle = '#1b0d16'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(-8, -20); ctx.lineTo(8, -20); ctx.stroke();
+        ctx.fillStyle = '#241521';
+        ctx.beginPath(); ctx.roundRect(-16, -11, 12, 11, 4); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(4, -11, 12, 11, 4); ctx.fill();
+        break;
+      }
+    }
+    if (e.bossTier) {
+      ctx.globalAlpha = 1;
+      ctx.scale(1 / 1.55, 1 / 1.55);
+      const bw = 58, frac = U.clamp(e.hp / e.maxHp, 0, 1);
+      ctx.fillStyle = 'rgba(20,8,18,.75)';
+      ctx.beginPath(); ctx.roundRect(-bw / 2, -72, bw, 7, 3.5); ctx.fill();
+      ctx.fillStyle = '#ff86b8';
+      ctx.beginPath(); ctx.roundRect(-bw / 2 + 1, -71, (bw - 2) * frac, 5, 2.5); ctx.fill();
     }
     ctx.restore();
     // hp bar when recently hurt
@@ -883,16 +939,25 @@ const Art = {
     }
   },
 
-  /* ================= BOSS — the Gloomheart ================= */
+  /* ================= BOSS — chapter hearts ================= */
   drawBoss(ctx, e, t) {
     ctx.save();
     ctx.translate(e.x, e.y);
     const pulse = 1 + Math.sin(t * 3) * .04 + (e.flash > 0 ? .06 : 0);
     const dying = e.dying || 0;
+    const bossPal = {
+      root: { aura: '#63d18a', body0: '#486d45', body1: '#1a3826', shard: '#264631', shardGlow: '#8df0aa', gem: '#6be784', eye: '#b7ff90', crack: '#9af0ae' },
+      tide: { aura: '#4fc7ff', body0: '#2d6288', body1: '#102c52', shard: '#16395c', shardGlow: '#8ee8ff', gem: '#4fd3ff', eye: '#bff7ff', crack: '#92e7ff' },
+      briar: { aura: '#ff7fba', body0: '#83375d', body1: '#3c1430', shard: '#4a1732', shardGlow: '#ffb1da', gem: '#ff5fa6', eye: '#ffd0e6', crack: '#ffc0df' },
+      gloom: { aura: '#6e3ad8', body0: '#4a2a78', body1: '#1c0e38', shard: '#2a1548', shardGlow: '#9e5eff', gem: '#c42450', eye: '#ff4a6a', crack: '#c8a0ff' },
+      ember: { aura: '#ff8a3d', body0: '#8a3d28', body1: '#42140f', shard: '#4b1c12', shardGlow: '#ffc05a', gem: '#ff5e2e', eye: '#ffd37a', crack: '#ffb068' },
+      eclipse: { aura: '#8be8ff', body0: '#30457d', body1: '#120f3c', shard: '#1a1e4f', shardGlow: '#d7b7ff', gem: '#8ff3ff', eye: '#f5e9ff', crack: '#d7c6ff' }
+    };
+    const bp = bossPal[e.bossKind] || bossPal.gloom;
     ctx.scale(pulse, pulse);
     // dark aura
     ctx.globalCompositeOperation = 'lighter';
-    this.glow(ctx, 0, -10, 120, dying > 0 ? '#ff9fce' : '#6e3ad8', .4 + Math.sin(t * 2) * .1);
+    this.glow(ctx, 0, -10, 120, dying > 0 ? '#ff9fce' : bp.aura, .4 + Math.sin(t * 2) * .1);
     ctx.globalCompositeOperation = 'source-over';
     // orbiting dark shards
     for (let i = 0; i < 3; i++) {
@@ -901,12 +966,12 @@ const Art = {
       ctx.save();
       ctx.translate(sxs, sys);
       ctx.globalCompositeOperation = 'lighter';
-      this.glow(ctx, 0, 0, 14, dying > 0 ? '#ffb9d5' : '#9e5eff', .5);
+      this.glow(ctx, 0, 0, 14, dying > 0 ? '#ffb9d5' : bp.shardGlow, .5);
       ctx.globalCompositeOperation = 'source-over';
       ctx.rotate(an * 2);
-      ctx.fillStyle = dying > 0 ? '#ff9fce' : '#2a1548';
+      ctx.fillStyle = dying > 0 ? '#ff9fce' : bp.shard;
       ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(7.5, 6.5); ctx.lineTo(-7.5, 6.5); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = dying > 0 ? 'rgba(255,235,245,.7)' : 'rgba(180,130,255,.6)';
+      ctx.strokeStyle = dying > 0 ? 'rgba(255,235,245,.7)' : bp.crack + '99';
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.restore();
@@ -915,7 +980,7 @@ const Art = {
     const s = 85;
     const g = ctx.createLinearGradient(0, -s, 0, s * .5);
     if (dying > 0) { g.addColorStop(0, '#ff9fce'); g.addColorStop(1, '#e2609d'); }
-    else { g.addColorStop(0, e.flash > 0 ? '#8a6ab8' : '#4a2a78'); g.addColorStop(1, e.flash > 0 ? '#5e447e' : '#1c0e38'); }
+    else { g.addColorStop(0, e.flash > 0 ? '#8a6ab8' : bp.body0); g.addColorStop(1, e.flash > 0 ? '#5e447e' : bp.body1); }
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.moveTo(0, s * .42);
@@ -925,7 +990,7 @@ const Art = {
     // cracks appear as it weakens
     const dmg = 1 - e.hp / e.maxHp;
     if (dmg > .1 && dying === 0) {
-      ctx.strokeStyle = `rgba(200,160,255,${.3 + dmg * .5})`; ctx.lineWidth = 2.5;
+      ctx.strokeStyle = bp.crack + Math.round((.3 + dmg * .5) * 255).toString(16).padStart(2, '0'); ctx.lineWidth = 2.5;
       const cracks = [[-20, -50, -34, -20, -22, 6], [15, -55, 30, -25, 20, 2], [0, -30, -8, 0, 4, 20]];
       const n = Math.ceil(dmg * 3);
       for (let i = 0; i < n; i++) {
@@ -935,7 +1000,7 @@ const Art = {
     }
     // thorn crown with gem
     if (dying === 0) {
-      ctx.fillStyle = '#241538';
+      ctx.fillStyle = bp.shard;
       for (let i = -2; i <= 2; i++) {
         ctx.beginPath();
         ctx.moveTo(i * 18 - 7, -s * .62);
@@ -944,9 +1009,9 @@ const Art = {
         ctx.fill();
       }
       ctx.globalCompositeOperation = 'lighter';
-      this.glow(ctx, 0, -s * .62 - 10, 10, '#ff4a6a', .8);
+      this.glow(ctx, 0, -s * .62 - 10, 10, bp.gem, .8);
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = '#c42450';
+      ctx.fillStyle = bp.gem;
       ctx.beginPath(); ctx.arc(0, -s * .62 - 10, 4.5, 0, U.TAU); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,.65)';
       ctx.beginPath(); ctx.arc(-1.4, -s * .62 - 11.5, 1.4, 0, U.TAU); ctx.fill();
@@ -957,7 +1022,7 @@ const Art = {
       ctx.globalCompositeOperation = 'lighter';
       for (const ex of [-22, 22]) {
         const fh = 10 + (rage >= 2 ? 8 : 0) + Math.sin(t * 12 + ex) * 3;
-        this.glow(ctx, ex, -34 - fh * .4, 9 + fh * .4, '#ff5e7a', .7);
+        this.glow(ctx, ex, -34 - fh * .4, 9 + fh * .4, bp.eye, .7);
       }
       ctx.globalCompositeOperation = 'source-over';
     }
@@ -968,12 +1033,12 @@ const Art = {
       ctx.beginPath(); ctx.arc(22, -25, 8, .2, Math.PI - .2); ctx.stroke();
       ctx.beginPath(); ctx.arc(0, -2, 12, .3, Math.PI - .3); ctx.stroke();
     } else {
-      ctx.fillStyle = '#ff4a6a';
+      ctx.fillStyle = bp.eye;
       ctx.save(); ctx.translate(-22, -28); ctx.rotate(.35);
       ctx.beginPath(); ctx.ellipse(0, 0, 11, 4.5, 0, 0, U.TAU); ctx.fill(); ctx.restore();
       ctx.save(); ctx.translate(22, -28); ctx.rotate(-.35);
       ctx.beginPath(); ctx.ellipse(0, 0, 11, 4.5, 0, 0, U.TAU); ctx.fill(); ctx.restore();
-      ctx.strokeStyle = '#ff7a94'; ctx.lineWidth = 3.5;
+      ctx.strokeStyle = bp.eye; ctx.lineWidth = 3.5;
       ctx.beginPath(); ctx.arc(0, 8, 14, Math.PI + .5, U.TAU - .5); ctx.stroke();
     }
     ctx.restore();
@@ -1036,6 +1101,23 @@ const Art = {
         ctx.fillRect(-3.4, -3.4, 6.8, 6.8);
         ctx.restore();
         break;
+      case 'weapon': {
+        const def = Weapons[it.weapon] || Weapons.tideSpear;
+        ctx.globalCompositeOperation = 'lighter';
+        this.glow(ctx, it.x, y, 22, def.color, .55);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.save(); ctx.translate(it.x, y); ctx.rotate(Math.sin(t * 2 + it.x) * .25);
+        ctx.strokeStyle = '#f7fbff'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(0, 12); ctx.lineTo(0, -12); ctx.stroke();
+        ctx.fillStyle = def.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -18); ctx.lineTo(8, -6); ctx.lineTo(0, -10); ctx.lineTo(-8, -6);
+        ctx.fill();
+        ctx.strokeStyle = def.color; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(-9, 4); ctx.lineTo(9, 4); ctx.stroke();
+        ctx.restore();
+        break;
+      }
     }
   },
 
@@ -1413,6 +1495,21 @@ const Art = {
         ctx.fillStyle = '#c9a0ff';
         ctx.beginPath(); ctx.arc(-2, -2, 2.5, 0, U.TAU); ctx.fill();
         break;
+      case 'starshot': {
+        ctx.rotate(pr.t * 8);
+        ctx.globalCompositeOperation = 'lighter';
+        this.glow(ctx, 0, 0, 20, '#fff3a8', .8);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#fff3a8';
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const r = i % 2 ? 5 : 11;
+          const a = -Math.PI / 2 + i * Math.PI / 5;
+          ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r);
+        }
+        ctx.closePath(); ctx.fill();
+        break;
+      }
       case 'shock': {
         ctx.globalCompositeOperation = 'lighter';
         this.glow(ctx, 0, -6, 20, '#b06aff', .7);
@@ -1444,6 +1541,12 @@ const Art = {
     shadow: { skyT: '#070512', skyB: '#2e1c4a', glowSky: '#8a62c8', far: '#1c1233', farHi: '#291b45', mid: '#140c26', midHi: '#20143a', near: '#0c0718',
       soilT: '#251a33', soilB: '#100a18', grassT: '#4e3d74', grassB: '#332656',
       shroom: ['#a866ff', '#6e3ad8'], shroomGlow: '#cfa8ff', mist: 'rgba(130,95,190,.16)', fall: false, dead: true },
+    ember: { skyT: '#180b16', skyB: '#7b3040', glowSky: '#ffd08a', far: '#5e2436', farHi: '#8a3a44', mid: '#3a1a2c', midHi: '#66303a', near: '#1a0d16',
+      soilT: '#4a2a2d', soilB: '#1b0d0d', grassT: '#c05d45', grassB: '#6f372b',
+      shroom: ['#ffb05f', '#d45535'], shroomGlow: '#ffd08a', mist: 'rgba(255,150,95,.13)', fall: false },
+    star: { skyT: '#071025', skyB: '#27416e', glowSky: '#cfe8ff', far: '#1e3154', farHi: '#385f86', mid: '#142442', midHi: '#2e4d74', near: '#08162a',
+      soilT: '#27324a', soilB: '#101827', grassT: '#5aa8a0', grassB: '#32696a',
+      shroom: ['#9fe7ff', '#7a8cff'], shroomGlow: '#d7f7ff', mist: 'rgba(180,220,255,.14)', fall: true },
   },
 
   makeBackground(theme, seed) {
@@ -1490,7 +1593,7 @@ const Art = {
       g0.fill(); g0.restore();
     }
     g0.restore();
-    if (theme === 'shadow') { // stars
+    if (theme === 'shadow' || theme === 'star') { // stars
       g0.fillStyle = 'rgba(220,200,255,.7)';
       for (let i = 0; i < 110; i++) { const s = r() * 1.7 + .4; g0.fillRect(r() * W, r() * H * .6, s, s); }
     }

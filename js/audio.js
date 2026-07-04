@@ -2,7 +2,7 @@
 /* ============ WebAudio: synth SFX + gentle music, no asset files ============ */
 const SND = {
   ctx: null, master: null, musicGain: null, enabled: true, musicOn: true,
-  _musicTimer: null, _step: 0, _theme: 0,
+  _musicTimer: null, _step: 0, _theme: 0, _epic: false,
 
   unlock() { // must be called from a user gesture (iOS/Android)
     if (!this.ctx) {
@@ -98,15 +98,18 @@ const SND = {
     { roots: [146.8, 220.0, 174.6, 164.8], mood: 1 },   // falls   Dm Am F Em
     { roots: [174.6, 196.0, 220.0, 130.8], mood: 1.06 },// blossom F G Am C
     { roots: [110.0, 116.5, 110.0, 103.8], mood: .94 }, // shadow  darker
+    { roots: [130.8, 164.8, 196.0, 146.8], mood: .98 }, // ember
+    { roots: [196.0, 246.9, 164.8, 220.0], mood: 1.02 },// starlit
   ],
   ARP: [1, 1.5, 2, 2.4, 3, 4, 3, 2.4],
 
-  startMusic(themeIdx) {
+  startMusic(themeIdx, epic = false) {
     this._theme = U.clamp(themeIdx, 0, this.THEMES.length - 1);
+    this._epic = epic;
     this.stopMusic();
     if (!this.ctx || !this.musicOn) return;
     this._step = 0;
-    this._musicTimer = setInterval(() => this._musicStep(), 240);
+    this._musicTimer = setInterval(() => this._musicStep(), epic ? 155 : 240);
   },
   stopMusic() { if (this._musicTimer) { clearInterval(this._musicTimer); this._musicTimer = null; } },
   _musicStep() {
@@ -115,14 +118,17 @@ const SND = {
     const bar = (this._step / 8 | 0) % th.roots.length;
     const root = th.roots[bar] * th.mood;
     const s = this._step % 8;
-    if (s === 0) { // soft pad
-      this.tone({ f: root, type: 'triangle', d: 1.9, v: .5, music: true });
-      this.tone({ f: root * 1.5, type: 'triangle', d: 1.9, v: .3, music: true });
-      this.tone({ f: root * 2.994, type: 'sine', d: 1.9, v: .22, music: true });
+    if (s === 0) { // soft pad / boss drone
+      this.tone({ f: root * (this._epic ? .5 : 1), type: this._epic ? 'sawtooth' : 'triangle', d: this._epic ? 1.2 : 1.9, v: this._epic ? .42 : .5, music: true });
+      this.tone({ f: root * 1.5, type: 'triangle', d: this._epic ? 1.2 : 1.9, v: .3, music: true });
+      this.tone({ f: root * 2.994, type: 'sine', d: this._epic ? 1 : 1.9, v: .22, music: true });
     }
-    if (this._step % 2 === 0) { // gentle arp
+    if (this._epic && this._step % 4 === 0) {
+      this.noise({ d: .08, v: .045, f: 190, delay: 0 });
+    }
+    if (this._step % (this._epic ? 1 : 2) === 0) { // gentle/epic arp
       const n = this.ARP[(s + bar * 3) % 8];
-      this.tone({ f: root * 2 * n, type: 'sine', d: .32, v: .28, music: true });
+      this.tone({ f: root * 2 * n, type: this._epic ? 'triangle' : 'sine', d: this._epic ? .18 : .32, v: this._epic ? .24 : .28, music: true });
     }
     this._step++;
   }

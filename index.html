@@ -69,7 +69,7 @@
       If one of you falls, the other can revive with a hug (hold ❤ next to them).</p>
       <p class="dim">Fill the Love Meter by fighting together, staying close, and collecting hearts.
       Joku 🌊 shoots water phoenixes and dashes on wings. Jolie 🌸 fires petals and blooms a healing field.
-      Your supporters fight too — 🐶 Kai bites nearby shadows, 🐼 Momo tosses healing hearts when you're hurt.
+      Your supporters fight too — 🐶 Lulu bites nearby shadows, 🐼 Biscuit tosses healing hearts when you're hurt.
       Watch out for dive-bombing imps, and jump the boss's shockwaves!</p>
       <button id="helpClose" class="mbtn">Got it! 💕</button>
     </div>
@@ -102,6 +102,20 @@
     <div class="panel">
       <h2>Paused 💤</h2>
       <button id="btnResume" class="mbtn host">▶ Continue</button>
+      <div class="settingsGrid">
+        <label>Difficulty
+          <select id="difficultySelect">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+        </label>
+        <label>Chapter
+          <select id="chapterSelect"></select>
+        </label>
+        <button id="btnGoChapter" class="mbtn ghost">Go to Chapter</button>
+        <button id="btnDropWeapon" class="mbtn ghost">Drop Weapon</button>
+      </div>
       <button id="btnSound2" class="mbtn ghost">🔊 Sound</button>
       <button id="btnQuit" class="mbtn ghost">🚪 Quit to Menu</button>
     </div>
@@ -115,6 +129,7 @@
       <button class="tbtn" id="tSp">🌊</button>
       <button class="tbtn" id="tAtk">⚔️</button>
       <button class="tbtn big" id="tJump">⬆️</button>
+      <button class="tbtn small" id="tDrop" title="Drop weapon">⇩</button>
     </div>
   </div>
 

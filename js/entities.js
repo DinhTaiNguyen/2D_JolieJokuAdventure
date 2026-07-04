@@ -12,12 +12,17 @@ const Ent = {
       animT: 0, squash: 0, blink: 0, blinkT: 3,
       pose: null, poseT: 0, down: false, downT: 0,
       invuln: 0, hurtCd: 0, holding: false,
-      safeX: 140, safeY: 400, remote: false, bot: false,
+      safeX: 140, safeY: 400, remote: false, bot: false, weapon: null,
     };
   },
 
   makePet(kind, owner) {
-    return { kind, owner, x: owner.x - 50, y: owner.y, vx: 0, dir: 1, animT: 0, emoteT: 4, skillCd: 4, mode: 'follow', modeT: 0, targetE: null, healFx: null };
+    return {
+      kind, owner, x: owner.x - 50, y: owner.y, vx: 0, dir: 1, animT: 0, emoteT: 4,
+      hp: kind === 'dog' ? 90 : 80, maxHp: kind === 'dog' ? 90 : 80,
+      mp: 100, maxMp: 100, hurtCd: 0, downT: 0,
+      skillCd: 4, mode: 'follow', modeT: 0, targetE: null, healFx: null
+    };
   },
 
   localInput() {
@@ -96,21 +101,31 @@ const Ent = {
 
     // attack
     if (!locked && inp.attack && p.atkCd <= 0 && p.atkT > .18) {
+      const w = Weapons[p.weapon] || null;
+      const dmgMul = w ? w.dmg : 1;
       p.atkCd = p.char === 'joku' ? .38 : .46;
       p.atkT = 0;
       if (p.char === 'joku') {
         SND.sfx('shootJ');
-        Game.addProj({ kind: 'phoenix', x: p.x + p.dir * 16, y: p.y - 36, vx: p.dir * 620, vy: 0, dmg: 28, life: 1.1, mine: !p.remote, owner: p.char });
+        Game.addProj({ kind: 'phoenix', x: p.x + p.dir * 16, y: p.y - 36, vx: p.dir * (w && w.range ? 700 : 620), vy: 0, dmg: Math.round(28 * dmgMul), life: 1.1 + (w && w.range ? w.range : 0), mine: !p.remote, owner: p.char });
       } else {
         SND.sfx('shootP');
         for (const sp of [-.22, 0, .22]) {
-          Game.addProj({ kind: 'petal', x: p.x + p.dir * 14, y: p.y - 36, vx: p.dir * 540 * Math.cos(sp), vy: 540 * Math.sin(sp), dmg: 12, life: .9, mine: !p.remote, owner: p.char });
+          Game.addProj({ kind: 'petal', x: p.x + p.dir * 14, y: p.y - 36, vx: p.dir * 540 * Math.cos(sp), vy: 540 * Math.sin(sp), dmg: Math.round(12 * dmgMul), life: .9 + (w && w.range ? .12 : 0), mine: !p.remote, owner: p.char });
         }
+      }
+      if (w && w.star) {
+        Game.addProj({ kind: 'starshot', x: p.x + p.dir * 18, y: p.y - 52, vx: p.dir * 500, vy: -140, dmg: 16, life: 1, mine: !p.remote, owner: p.char, g: 220 });
       }
     }
     // special
-    if (!locked && inp.special && p.spCd <= 0 && p.mp >= 35) {
-      p.mp -= 35; p.spCd = 2.2; p.atkT = 0;
+    const spCost = p.weapon === 'heartStaff' ? 24 : 35;
+    if (!locked && inp.special && p.spCd <= 0 && p.mp >= spCost) {
+      p.mp -= spCost; p.spCd = 2.2; p.atkT = 0;
+      if (p.weapon === 'heartStaff') {
+        p.hp = Math.min(p.maxHp, p.hp + 10);
+        Ptc.burst('heart', p.x, p.y - 42, 5, { sp: 90, r: 5, life: .8 });
+      }
       if (p.char === 'joku') {
         p.dashT = .32; p.invuln = Math.max(p.invuln, .45);
         SND.sfx('dash');
@@ -235,9 +250,26 @@ const Ent = {
   updatePet(pet, dt) {
     const o = pet.owner, L = G.level;
     pet.skillCd -= dt;
+    pet.hurtCd = Math.max(0, (pet.hurtCd || 0) - dt);
+    pet.mp = Math.min(pet.maxMp, pet.mp + 8 * dt);
+    if (pet.hp <= 0) {
+      pet.downT += dt;
+      pet.vx = 0;
+      pet.animT += dt * .25;
+      pet.x += (o.x - o.dir * 56 - pet.x) * Math.min(1, 2.5 * dt);
+      pet.y += (o.y - pet.y) * Math.min(1, 5 * dt);
+      if (pet.downT > 5) {
+        pet.downT = 0;
+        pet.hp = pet.maxHp * .55;
+        pet.mp = Math.max(pet.mp, 35);
+        Ptc.burst('heart', pet.x, pet.y - 28, 8, { sp: 90, r: 5, life: .9 });
+      }
+      return;
+    }
+    pet.hp = Math.min(pet.maxHp, pet.hp + 1.2 * dt);
     pet.animT += dt * Math.min(1.4, Math.abs(pet.vx) / 300 + .0001);
 
-    // --- Kai's Tide Bite: dash at an enemy, chomp, splash ---
+    // --- Lulu's Tide Bite: dash at an enemy, chomp, splash ---
     if (pet.mode === 'dash') {
       const e = pet.targetE;
       pet.modeT += dt;
@@ -300,17 +332,17 @@ const Ent = {
 
     // --- skill triggers ---
     if (G.cut || G.kissCin > 0) return;
-    if (pet.kind === 'dog' && pet.skillCd <= 0 && !o.down) {
+    if (pet.kind === 'dog' && pet.skillCd <= 0 && pet.mp >= 24 && !o.down) {
       let best = null, bd = 250;
       for (const e of Game.enemiesAll()) {
         if (e.dead || e.dying > 0) continue;
         const d = U.dist(e.x, e.y, o.x, o.y);
         if (d < bd) { bd = d; best = e; }
       }
-      if (best) { pet.mode = 'dash'; pet.modeT = 0; pet.targetE = best; pet.skillCd = 6; }
+      if (best) { pet.mode = 'dash'; pet.modeT = 0; pet.targetE = best; pet.skillCd = 6; pet.mp -= 24; }
     }
-    // --- Momo's Heart Toss: lob a healing heart to whoever hurts most ---
-    if (pet.kind === 'panda' && pet.skillCd <= 0 && !pet.healFx) {
+    // --- Biscuit's Heart Toss: lob a healing heart to whoever hurts most ---
+    if (pet.kind === 'panda' && pet.skillCd <= 0 && pet.mp >= 30 && !pet.healFx) {
       const cands = [G.me];
       if (G.mate.bot) cands.push(G.mate);
       let best = null, worst = .8;
@@ -321,6 +353,7 @@ const Ent = {
       }
       if (best) {
         pet.skillCd = 9;
+        pet.mp -= 30;
         pet.healFx = { t: 0, sx: pet.x, sy: pet.y - 26, target: best };
         SND.sfx('heart');
       }
@@ -422,6 +455,34 @@ const Ent = {
           }
           break;
         }
+        case 'bat': {
+          e.x = e.homeX + Math.sin(e.t * 1.2) * 92;
+          e.y = e.homeY + Math.sin(e.t * 2.1) * 36;
+          if (tgt) e.dir = tgt.x > e.x ? 1 : -1;
+          if (e.atkT <= 0 && tgt && U.dist(tgt.x, tgt.y - 25, e.x, e.y) < 430) {
+            e.atkT = 2.1;
+            const a = Math.atan2((tgt.y - 34) - e.y, tgt.x - e.x);
+            Game.addProj({ kind: 'darkball', x: e.x, y: e.y - 16, vx: Math.cos(a) * 310, vy: Math.sin(a) * 310, dmg: e.dmg, life: 2.4, mine: false, foe: true, host: true });
+          }
+          break;
+        }
+        case 'golem': {
+          let sp = e.bossTier ? 82 : 48;
+          if (tgt && Math.abs(tgt.x - e.x) < 360 && Math.abs(tgt.y - e.y) < 120) {
+            e.dir = tgt.x > e.x ? 1 : -1; sp *= 1.9;
+            if (e.atkT <= 0 && Math.abs(tgt.x - e.x) < 95) {
+              e.atkT = e.bossTier ? 1.2 : 1.8;
+              Game.bossSlam(e.x, e.bossTier ? 15 : 10);
+            }
+          }
+          e.x += e.dir * sp * dt;
+          if (e.x < e.plat.x + 30 || e.x > e.plat.x + e.plat.w - 30 || Math.abs(e.x - e.homeX) > 330) {
+            e.dir *= -1;
+            e.x = U.clamp(e.x, e.plat.x + 30, e.plat.x + e.plat.w - 30);
+          }
+          e.y = e.plat.y;
+          break;
+        }
       }
     }
   },
@@ -515,13 +576,16 @@ const Ent = {
       if (pr.kind === 'petal' && Math.random() < .4) {
         Ptc.burst('petal', pr.x, pr.y, 1, { sp: 40, r: 4, life: .4 });
       }
+      if (pr.kind === 'starshot' && Math.random() < .55) {
+        Ptc.burst('star', pr.x, pr.y, 1, { color: '#fff3a8', sp: 45, r: 4, life: .35 });
+      }
 
       // my shots hurt enemies (authoritative on the shooter's device)
       if (!dead && pr.mine && !pr.foe) {
         for (const e of Game.enemiesAll()) {
           if (e.dead || (e.dying && e.dying > 0)) continue;
-          const er = e.type === 'boss' ? 74 : 22;
-          const ey = e.type === 'boss' ? e.y - 20 : e.y - 16;
+          const er = e.type === 'boss' ? 74 : (e.bossTier ? 42 : 22);
+          const ey = e.type === 'boss' ? e.y - 20 : e.y - (e.bossTier ? 26 : 16);
           if (U.dist(pr.x, pr.y, e.x, ey) < er) {
             Game.hitEnemy(e, pr.dmg, pr.owner);
             Ptc.burst(pr.kind === 'petal' ? 'petal' : 'drop', pr.x, pr.y, 6, { sp: 150, g: 500, r: 5, life: .5 });

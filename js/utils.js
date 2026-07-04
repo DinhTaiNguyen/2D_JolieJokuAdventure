@@ -22,6 +22,14 @@ const U = {
   fmtTime(s) { s |= 0; return (s / 60 | 0) + ':' + String(s % 60).padStart(2, '0'); }
 };
 
+const Weapons = {
+  tideSpear: { name: 'Tide Spear', color: '#7fd8ff', dmg: 1.25, range: .22 },
+  roseScepter: { name: 'Rose Scepter', color: '#ff86b8', dmg: 1.18, bloom: true },
+  starBlade: { name: 'Star Blade', color: '#fff3a8', dmg: 1.1, star: true },
+  heartStaff: { name: 'Heart Staff', color: '#ffc4dc', dmg: 1.0, mpSave: true, heal: true }
+};
+Weapons.IDS = Object.keys(Weapons);
+
 // surface uncaught errors on screen (helps debugging on phones too)
 addEventListener('error', e => {
   let el = document.getElementById('errbox');

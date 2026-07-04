@@ -2,10 +2,12 @@
 /* ============ level definitions & deterministic generation ============ */
 const World = {
   LEVELS: [
-    { name: 'Enchanted Forest', theme: 'forest', width: 5900, seed: 101, density: 1.0 },
-    { name: 'Crystal Falls', theme: 'falls', width: 6500, seed: 202, density: 1.2 },
-    { name: 'Blossom Glade', theme: 'blossom', width: 7100, seed: 303, density: 1.4 },
-    { name: 'Gloomheart Hollow', theme: 'shadow', width: 2200, seed: 404, boss: true },
+    { name: 'Enchanted Forest', theme: 'forest', width: 11200, seed: 101, density: 1.0, bossName: 'Rootbound Gloom', bossKind: 'root', miniBosses: [{ name: 'Mossjaw Guard', type: 'thorn' }, { name: 'Oakhide Titan', type: 'golem' }] },
+    { name: 'Crystal Falls', theme: 'falls', width: 12200, seed: 202, density: 1.15, bossName: 'Stormwater Leviathan', bossKind: 'tide', miniBosses: [{ name: 'Ripplefang Brute', type: 'thorn' }, { name: 'Basalt Breaker', type: 'golem' }] },
+    { name: 'Blossom Glade', theme: 'blossom', width: 13200, seed: 303, density: 1.3, bossName: 'Briarheart Queen', bossKind: 'briar', miniBosses: [{ name: 'Rosehook Knight', type: 'thorn' }, { name: 'Petalstone Giant', type: 'golem' }] },
+    { name: 'Gloomheart Hollow', theme: 'shadow', width: 13800, seed: 404, density: 1.45, bossName: 'Nightmare Gloomheart', bossKind: 'gloom', miniBosses: [{ name: 'Umbra Fang', type: 'bat' }, { name: 'Dreadroot Captain', type: 'golem' }] },
+    { name: 'Ember Canopy', theme: 'ember', width: 12800, seed: 505, density: 1.55, bossName: 'Cinder Crown', bossKind: 'ember', miniBosses: [{ name: 'Ashthorn Warden', type: 'thorn' }, { name: 'Magmahide Golem', type: 'golem' }] },
+    { name: 'Starlit Grove', theme: 'star', width: 14200, seed: 606, density: 1.7, bossName: 'Eclipse Heart', bossKind: 'eclipse', miniBosses: [{ name: 'Moonbite Shade', type: 'bat' }, { name: 'Cometstone Colossus', type: 'golem' }] },
   ],
 
   DEATH_Y: 860,
@@ -49,14 +51,27 @@ const World = {
     const DEFS = {
       slime: { hp: 55, dmg: 13 }, thorn: { hp: 85, dmg: 17 },
       wisp: { hp: 45, dmg: 11 }, imp: { hp: 45, dmg: 13 },
+      bat: { hp: 58, dmg: 14 }, golem: { hp: 145, dmg: 23 },
     };
     const foe = (type, x, pl) => {
       const def = DEFS[type];
-      const air = type === 'wisp' ? U.range(r, 120, 190) : type === 'imp' ? U.range(r, 150, 200) : 0;
+      const air = type === 'wisp' ? U.range(r, 120, 190) : (type === 'imp' || type === 'bat') ? U.range(r, 150, 210) : 0;
       foes.push({
         id: 'e' + (foeId++), type, x, y: pl.y - air, homeX: x, homeY: pl.y - air, plat: pl,
         vx: 0, vy: 0, dir: 1, hp: def.hp, maxHp: def.hp, dmg: def.dmg,
         t: r() * 10, atkT: r() * 2, hopY: 0, flash: 0, hurtShow: 0, dead: false
+      });
+    };
+    const strongBoss = (rank, x, pl) => {
+      const mini = cfg.miniBosses && cfg.miniBosses[rank] ? cfg.miniBosses[rank] : null;
+      const type = mini && mini.type ? mini.type : (rank % 2 ? 'golem' : 'thorn');
+      const hp = 300 + idx * 55 + rank * 80;
+      const air = type === 'bat' ? U.range(r, 150, 210) : 0;
+      foes.push({
+        id: 'mb' + idx + '_' + rank, type, bossTier: 'normal', bossName: mini && mini.name ? mini.name : (rank === 0 ? 'Oathbreaker Brute' : 'Dreadroot Captain'),
+        x: U.clamp(x, pl.x + 90, pl.x + pl.w - 90), y: pl.y - air, homeX: x, homeY: pl.y - air, plat: pl,
+        vx: 0, vy: 0, dir: -1, hp, maxHp: hp, dmg: 22 + idx * 2 + rank * 3,
+        t: r() * 10, atkT: 1.4, hopY: 0, flash: 0, hurtShow: 0, dead: false, announced: false
       });
     };
 
@@ -80,6 +95,8 @@ const World = {
     let lastGroundY = y;
     const shrineTarget = cfg.width * .5;
     let shrineX = null;
+    const bossMarks = [cfg.width * .34, cfg.width * .66];
+    let bossMarkI = 0;
 
     while (x < cfg.width - 1500) {
       // gap with mushroom stepping stones
@@ -98,6 +115,11 @@ const World = {
       const w = U.range(r, 380, 720);
       const pl = ground(x, y, w);
       lastGroundY = y;
+      while (bossMarkI < bossMarks.length && x <= bossMarks[bossMarkI] && x + w >= bossMarks[bossMarkI]) {
+        strongBoss(bossMarkI, bossMarks[bossMarkI], pl);
+        row(bossMarks[bossMarkI] - 110, y - 54, 5, 'heartDrop');
+        bossMarkI++;
+      }
 
       // floating mushrooms above long segments w/ item trails
       if (w > 500 && r() < .8) {
@@ -115,10 +137,14 @@ const World = {
         if (x + w < 1200) break; // keep the start peaceful
         const t = r();
         const fx = x + 90 + r() * (w - 180);
-        if (t < .34) foe('slime', fx, pl);
-        else if (t < .6) foe('thorn', fx, pl);
-        else if (t < .82) foe('wisp', fx, pl);
-        else foe('imp', fx, pl);
+        if (cfg.theme === 'ember' && t > .72) foe('golem', fx, pl);
+        else if (cfg.theme === 'star' && t > .62) foe(t > .82 ? 'golem' : 'bat', fx, pl);
+        else if (cfg.theme === 'shadow' && t > .66) foe(t > .84 ? 'golem' : 'bat', fx, pl);
+        else if (t < .3) foe('slime', fx, pl);
+        else if (t < .54) foe('thorn', fx, pl);
+        else if (t < .76) foe('wisp', fx, pl);
+        else if (t < .9) foe('imp', fx, pl);
+        else foe('bat', fx, pl);
       }
       // shrine at ~50%
       if (shrineX === null && x > shrineTarget) {
@@ -131,14 +157,24 @@ const World = {
     // final gate meadow
     const endW = 800;
     y = U.clamp(lastGroundY, 460, 560);
-    ground(x, y, endW + 400);
-    const gateX = Math.min(x + endW * .62, cfg.width - 220);
+    ground(x, y, endW + 1200);
+    while (bossMarkI < bossMarks.length) {
+      strongBoss(bossMarkI, x + 180 + bossMarkI * 180, plats[plats.length - 1]);
+      bossMarkI++;
+    }
+    const gateX = Math.min(x + endW * .42, cfg.width - 900);
+    const bossX = U.clamp(gateX + 650, x + 520, cfg.width - 260);
     row(x + 80, y - 50, 4, 'heartDrop');
 
     return this._pack(cfg, idx, plats, items, foes, {
       shrineX, shrineY: this._topAtList(plats, shrineX), gateX, gateY: y,
       startX: 140, checkpoints: [{ x: 140, y: 520 }, { x: shrineX, y: this._topAtList(plats, shrineX) }],
-      boss: null
+      boss: {
+        id: 'boss', type: 'boss', bossName: cfg.bossName, bossKind: cfg.bossKind,
+        x: bossX, y: y - 125, homeX: bossX, homeY: y - 125, vx: 0, vy: 0, dir: -1,
+        hp: 950 + idx * 170, maxHp: 950 + idx * 170, dmg: 20 + idx * 3,
+        t: 0, atkT: 3, phase: 0, mode: 'idle', modeT: 2.5, flash: 0, hurtShow: 0, dying: 0, dead: false
+      }
     });
   },
 

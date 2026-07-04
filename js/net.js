@@ -8,7 +8,7 @@ const NET = {
   onPeerJoin: null,  // host: guest arrived
   onDrop: null,
 
-  ALPHA: 'ABCDEFGHJKMNPQRSTUVWXYZ23456789',
+  ALPHA: 'ABCDEFGHJKMNPQRSTUVWXYZ123456789',
 
   _newCode() {
     let c = '';
@@ -33,11 +33,11 @@ const NET = {
 
   available() { return typeof Peer !== 'undefined'; },
 
-  host() {
+  host(preferDefault = true) {
     if (!this.available()) { this._status('err', 'No internet — online play needs a connection.'); return; }
     this.close();
     this.mode = 'host';
-    this.code = this._newCode();
+    this.code = preferDefault ? '1234' : this._newCode();
     this._status('info', 'Opening the magic portal…');
     this.peer = new Peer(this._id(this.code), { debug: 0 });
     this.peer.on('open', () => this._status('code', this.code));
@@ -47,7 +47,7 @@ const NET = {
       this._wire(conn);
     });
     this.peer.on('error', err => {
-      if (err.type === 'unavailable-id') { this.host(); return; } // rare code clash — reroll
+      if (err.type === 'unavailable-id') { this.host(false); return; } // default/random code clash - reroll
       this._status('err', 'Portal error: ' + err.type + '. Try again.');
     });
   },

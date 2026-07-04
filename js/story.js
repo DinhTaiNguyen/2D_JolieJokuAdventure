@@ -1,7 +1,7 @@
 'use strict';
 /* ============ the love story — dialogues & cutscene scripts ============ */
 const Story = {
-  NAMES: { joku: 'Joku', jolie: 'Jolie', dog: 'Kai', panda: 'Momo' },
+  NAMES: { joku: 'Joku', jolie: 'Jolie', dog: 'Lulu', panda: 'Biscuit' },
   COLORS: { joku: '#7fd8ff', jolie: '#ffa9d8', dog: '#9fd0ff', panda: '#ffc4dc' },
 
   DLG: {
@@ -19,7 +19,7 @@ const Story = {
       ['jolie', 'It remembers us… Joku, hold my hand when we\'re close — tap the ❤ button!'],
       ['joku', 'And if you\'re hurt, come here. Hold ❤ and I\'ll hug you back to full bloom.'],
       ['dog', 'Woof woof! (And I\'ll BITE anything that dares touch you two!)'],
-      ['panda', 'Bao~ (I\'ll toss healing hearts when someone is hurt. Momo\'s got you!)'],
+      ['panda', 'Bao~ (I\'ll toss healing hearts when someone is hurt. Biscuit\'s got you!)'],
       ['jolie', 'When our Love Meter is full… maybe something magical happens? 💕'],
     ],
     gate0: [
@@ -56,14 +56,34 @@ const Story = {
       ['joku', 'Whatever happens in there… my heart already belongs to you.'],
       ['jolie', 'Then let\'s go give the Gloomheart what it\'s missing. 💗'],
     ],
+    lvl3: [
+      ['joku', 'Gloomheart Hollow stretches farther than before. Stay close, Jolie.'],
+      ['jolie', 'I feel stronger with you, Lulu, and Biscuit beside me.'],
+      ['dog', 'Woof! (I vote we bite the darkness until it apologizes!)'],
+    ],
+    lvl4: [
+      ['jolie', 'The Ember Canopy is burning with stolen love.'],
+      ['joku', 'Then my ocean phoenix will cool the flames, and your flowers will bring them back to life.'],
+      ['panda', 'Bao! (Biscuit packed courage. And snacks.)'],
+    ],
+    lvl5: [
+      ['joku', 'Starlit Grove... the last path. Every light is watching us.'],
+      ['jolie', 'Then let them see us finish this together. Joku, I am ready.'],
+      ['dog', 'Woof woof! (Lulu and Biscuit are ready too!)'],
+    ],
+    bossGate: [
+      ['joku', 'A boss gate. Breathe, Jolie. We get ready, then we go in together.'],
+      ['jolie', 'Together. Lulu, Biscuit, stay behind us until the opening is safe.'],
+      ['panda', 'Bao~ (Too late. We are already brave.)'],
+    ],
     bossIntro: [
-      ['joku', 'There it is! The Gloomheart — a heart that forgot how to love!'],
-      ['jolie', 'It\'s not evil, Joku. It\'s just… lonely. Look at it.'],
+      ['joku', () => 'There it is! ' + ((G.level && G.level.boss && G.level.boss.bossName) || 'The final boss') + ' is guarding this chapter\'s love!'],
+      ['jolie', 'It\'s not evil, Joku. It\'s just lonely. Look at it.'],
       ['joku', 'Then let\'s remind it! Water and flowers, together!'],
       ['jolie', 'Jump over its shockwaves! And when our love is full — KISS! 💥'],
     ],
     ending: [
-      ['jolie', 'Look! It\'s… smiling. The Gloomheart is glowing pink!'],
+      ['jolie', () => 'Look! ' + ((G.level && G.level.boss && G.level.boss.bossName) || 'The final boss') + ' is smiling. The light is coming back!'],
       ['joku', 'It just needed to see what real love looks like.'],
       ['dog', 'Woof woof woof! (The lights! The forest lights are coming back!)'],
       ['panda', 'Bao bao~! (Now THIS calls for snacks!)'],
@@ -94,14 +114,14 @@ const Story = {
         return [
           { a: 'move2', jx: gx - 26, lx: gx + 26 },
           { a: 'face' },
-          { a: 'dlg', key: 'gate' + Math.min(L.idx, 2) },
+          { a: 'dlg', key: L.idx < 3 ? 'gate' + L.idx : 'bossGate' },
           { a: 'pose', pose: 'hug', t: 2.2 },
           { a: 'fn', f: () => { SND.sfx('heart'); Game.hugHearts(gx); G.stats.hugs++; } },
           { a: 'wait', t: 1.6 },
           { a: 'fn', f: () => { SND.sfx('gate'); G.level.gateOpen = true; Game.shake(5); } },
           { a: 'wait', t: .9 },
-          { a: 'fade' },
-          { a: 'fn', f: () => Game.nextLevel() },
+          { a: 'dlg', key: 'bossIntro' },
+          { a: 'fn', f: () => Game.bossWake() },
         ];
       }
       case 'lvl':

@@ -49,13 +49,16 @@ const Main = {
     };
     $('btnSound').onclick = () => { SND.unlock(); SND.setEnabled(!SND.enabled); updSound(); };
     $('btnSound2').onclick = () => { SND.unlock(); SND.setEnabled(!SND.enabled); updSound(); };
-    $('btnFull').onclick = () => { SND.unlock(); this.goFullscreen(); };
-    $('gameFullBtn').onclick = () => { SND.unlock(); this.goFullscreen(); };
-    $('rotateFullBtn').onclick = e => { e.stopPropagation(); SND.unlock(); this.goFullscreen(); };
+    $('btnFull').onclick = () => { SND.unlock(); this.toggleFullscreen(); };
+    $('gameFullBtn').onclick = () => { SND.unlock(); this.toggleFullscreen(); };
+    $('rotateFullBtn').onclick = e => { e.stopPropagation(); SND.unlock(); this.toggleFullscreen(); };
 
     /* ---- pause ---- */
     $('pauseBtn').onclick = () => { SND.sfx('ui'); this.togglePause(); };
     $('btnResume').onclick = () => { SND.sfx('ui'); this.togglePause(); };
+    $('difficultySelect').onchange = () => { Game.setDifficulty($('difficultySelect').value); };
+    $('btnGoChapter').onclick = () => { SND.sfx('ui'); Game.gotoChapter(+$('chapterSelect').value); };
+    $('btnDropWeapon').onclick = () => { SND.sfx('ui'); Game.dropMyWeapon(); };
     $('btnQuit').onclick = () => { SND.sfx('ui'); this.hidePause(); Game.quitToMenu(); };
 
     /* ---- network status wiring ---- */
@@ -91,8 +94,8 @@ const Main = {
     this.el('rotateHint').onclick = () => { this._rotDismissed = true; this.checkRotate(); };
     addEventListener('resize', () => this.checkRotate());
     addEventListener('orientationchange', () => setTimeout(() => this.checkRotate(), 250));
-    document.addEventListener('fullscreenchange', () => this.checkRotate());
-    document.addEventListener('webkitfullscreenchange', () => this.checkRotate());
+    document.addEventListener('fullscreenchange', () => { this.updateFullscreenButtons(); this.checkRotate(); });
+    document.addEventListener('webkitfullscreenchange', () => { this.updateFullscreenButtons(); this.checkRotate(); });
     this.checkRotate();
 
     /* ---- copy invite link (host) ---- */
@@ -104,6 +107,7 @@ const Main = {
       );
     };
 
+    this.populateSettings();
     this.showMenu();
 
     /* ---- deep links: ?join=CODE auto-joins; ?solo&lvl=N for quick play/testing ---- */
@@ -156,6 +160,25 @@ const Main = {
     }
   },
 
+  populateSettings() {
+    const sel = this.el('chapterSelect');
+    sel.innerHTML = '';
+    World.LEVELS.forEach((lvl, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = (i + 1) + '. ' + lvl.name;
+      sel.appendChild(opt);
+    });
+    this.syncSettings();
+  },
+
+  syncSettings() {
+    const ch = this.el('chapterSelect');
+    const diff = this.el('difficultySelect');
+    if (ch) ch.value = String(G.levelIndex || 0);
+    if (diff) diff.value = G.difficulty || 'normal';
+  },
+
   cleanCodeInput() {
     const input = this.el('codeInput');
     const code = NET.normalizeCode(input.value);
@@ -180,7 +203,7 @@ const Main = {
   },
 
   preparePhonePlay() {
-    if (matchMedia('(pointer: coarse)').matches) this.goFullscreen({ quiet: true });
+    if (matchMedia('(pointer: coarse)').matches && !this.isFullscreen()) this.enterFullscreen({ quiet: true });
   },
 
   checkRotate() {
@@ -189,7 +212,28 @@ const Main = {
     this.el('rotateHint').classList.toggle('hidden', !show);
   },
 
-  goFullscreen(opt = {}) {
+  isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement || this._softFull);
+  },
+
+  updateFullscreenButtons() {
+    const on = this.isFullscreen();
+    for (const id of ['btnFull', 'gameFullBtn']) {
+      const el = this.el(id);
+      if (el) {
+        el.textContent = on ? '↙' : '⛶';
+        el.title = on ? 'Exit fullscreen' : 'Fullscreen';
+        el.setAttribute('aria-label', el.title);
+      }
+    }
+  },
+
+  toggleFullscreen() {
+    if (this.isFullscreen()) this.exitFullscreen();
+    else this.enterFullscreen();
+  },
+
+  enterFullscreen(opt = {}) {
     const de = document.documentElement;
     const fs = de.requestFullscreen || de.webkitRequestFullscreen || de.msRequestFullscreen;
     const fullscreenEl = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
@@ -203,10 +247,27 @@ const Main = {
         try { lock = screen.orientation.lock('landscape').then(() => true, () => false); } catch (e) {}
       }
       lock.then(locked => {
+        if (!ok && !locked) {
+          this._softFull = true;
+          document.documentElement.classList.add('softFullscreen');
+        }
+        setTimeout(() => scrollTo(0, 1), 60);
+        this.updateFullscreenButtons();
         this.checkRotate();
         if (!opt.quiet && !ok && !locked) this.toast('Rotate sideways; this browser limits fullscreen.');
       });
     });
+  },
+
+  exitFullscreen() {
+    this._softFull = false;
+    document.documentElement.classList.remove('softFullscreen');
+    const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+    if (exit && (document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement)) {
+      try { Promise.resolve(exit.call(document)).finally(() => this.updateFullscreenButtons()); } catch (e) { this.updateFullscreenButtons(); }
+    } else {
+      this.updateFullscreenButtons();
+    }
   },
 
   showMenu() {
@@ -229,7 +290,7 @@ const Main = {
     this.el('joinBox').classList.toggle('hidden', mode !== 'join');
     this.el('connTitle').textContent = mode === 'host' ? '💙 Hosting as Joku' : '💗 Joining as Jolie';
     if (mode === 'host') { this.el('codeBig').textContent = '····'; this.el('hostStatus').textContent = 'Opening the magic portal…'; }
-    else { this.el('joinStatus').textContent = ''; setTimeout(() => this.el('codeInput').focus(), 100); }
+    else { this.el('joinStatus').textContent = ''; this.el('codeInput').value = '1234'; setTimeout(() => this.el('codeInput').focus(), 100); }
   },
 
   hideOverlays() {
@@ -240,6 +301,7 @@ const Main = {
 
   showGameUI(myChar) {
     this.hideOverlays();
+    this.syncSettings();
     this.el('gameFullBtn').classList.remove('hidden');
     this.el('pauseBtn').classList.remove('hidden');
     if (Input.touchMode) {
@@ -255,6 +317,7 @@ const Main = {
   togglePause() {
     if (G.state !== 'play') return;
     G.paused = !G.paused;
+    if (G.paused) this.syncSettings();
     this.el('pausePanel').classList.toggle('hidden', !G.paused);
   },
   hidePause() {
@@ -273,13 +336,23 @@ const Main = {
   showEnd(stats, seconds) {
     let ep = this.el('endPanel');
     if (ep) ep.remove();
+    const loveLines = [
+      'Joku and Jolie proved that love is strongest when Lulu and Biscuit are running beside it.',
+      'Every chapter became brighter because Joku, Jolie, Lulu, and Biscuit chose each other again.',
+      'The forest will remember this: two hearts, two supporters, one forever adventure.',
+      'Lulu barked, Biscuit cheered, and Joku and Jolie turned every shadow into a love story.'
+    ];
+    const loveLine = loveLines[(Math.random() * loveLines.length) | 0];
+    const finalBoss = (G.level && G.level.boss && G.level.boss.bossName) || 'the final boss';
     ep = document.createElement('div');
     ep.id = 'endPanel';
     ep.className = 'overlay';
     ep.innerHTML = `
       <div class="panel">
         <h2>💞 You brought the love back! 💞</h2>
-        <p style="font-size:16px">The Gloomheart glows pink, the forest lights shine again,<br>
+        <p style="font-size:17px"><b>Congratulations!</b></p>
+        <p>${loveLine}</p>
+        <p style="font-size:16px">${finalBoss} glows pink, the forest lights shine again,<br>
         and Joku &amp; Jolie lived happily — adventure after adventure.</p>
         <p style="font-size:15px; line-height:2">
           💧 Water orbs: <b>${stats.orbs}</b> &nbsp; 🌸 Flowers: <b>${stats.flowers}</b><br>
