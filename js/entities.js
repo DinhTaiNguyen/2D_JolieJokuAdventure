@@ -329,9 +329,9 @@ const Ent = {
     pet.y += (ty - pet.y) * Math.min(1, 12 * dt);
     if (Math.abs(pet.x - o.x) > 700) { pet.x = o.x - o.dir * 44; pet.y = o.y; }
 
-    // pets attract nearby goodies toward their owner
+    // pets attract nearby goodies toward their owner, but weapons stay where they landed.
     for (const it of G.level.items) {
-      if (it.taken) continue;
+      if (it.taken || it.kind === 'weapon') continue;
       if (Math.abs(it.x - pet.x) < 120 && Math.abs(it.y - pet.y) < 120) {
         const d = Math.max(1, U.dist(it.x, it.y, o.x, o.y - 26));
         it.x += (o.x - it.x) / d * 340 * dt;
@@ -550,12 +550,7 @@ const Ent = {
       }
       case 'volley': {
         if (b.modeT <= 0) {
-          const n = 6 + b.phase * 2;
-          for (let i = 0; i < n; i++) {
-            const a = Math.PI * .25 + (i / (n - 1)) * Math.PI * .5;
-            Game.addProj({ kind: 'darkball', x: b.x, y: b.y - 10, vx: Math.cos(Math.PI - a) * 270, vy: -Math.sin(a) * 270 + 120, dmg: 16, life: 4, mine: false, foe: true, host: true, g: 260 });
-          }
-          SND.sfx('boss');
+          Game.bossVolley(b);
           b.mode = 'recover'; b.modeT = 1.4;
         }
         break;

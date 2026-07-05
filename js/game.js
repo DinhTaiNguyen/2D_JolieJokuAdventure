@@ -1062,8 +1062,20 @@ const Game = {
       rot: Math.random() * U.TAU,
       vr: (Math.random() - .5) * 4,
       grounded: false,
+      _staticX: null,
+      _staticY: null,
       taken: false
     };
+  },
+
+  freezeWeaponItem(it, x = it.x, y = it.y) {
+    it.x = it._staticX = x;
+    it.y = it._staticY = y;
+    it.vx = 0;
+    it.vy = 0;
+    it.vr = 0;
+    it.grounded = true;
+    return it;
   },
 
   updateItems(dt) {
@@ -1075,12 +1087,10 @@ const Game = {
       if (it.rot == null) it.rot = 0;
       if (it.vr == null) it.vr = 0;
 
-      const topNow = World.topAt(G.level, it.x, it.y - 80);
-      const groundNow = topNow == null ? null : topNow - 32;
-      if (it.grounded && groundNow != null) {
-        it.x = it._staticX != null ? it._staticX : it.x;
-        it.y = groundNow;
-        it.vx = it.vy = it.vr = 0;
+      if (it.grounded) {
+        const sx = it._staticX != null ? it._staticX : it.x;
+        const sy = it._staticY != null ? it._staticY : it.y;
+        this.freezeWeaponItem(it, sx, sy);
         continue;
       }
 
@@ -1096,22 +1106,17 @@ const Game = {
           Ptc.add({ kind: 'ring', x: it.x, y: groundY + 10, vx: 0, vy: 0, r: 34, life: .35, color: (Weapons[it.weapon]?.color || '#fff3a8') + '88' });
         }
         it.y = groundY;
-        it.vy = 0;
-        it.grounded = true;
-        it._staticX = it.x;
-        it.vx = 0;
-        it.vr = 0;
+        this.freezeWeaponItem(it, it.x, groundY);
       } else {
         it.grounded = false;
+        it._staticX = null;
+        it._staticY = null;
         it.vx = 0;
       }
 
       if (it.y > World.DEATH_Y + 160) {
         const safeTop = World.topAt(G.level, U.clamp(it.x, 60, G.level.width - 60)) || 620;
-        it.y = safeTop - 32;
-        it.vx = it.vy = it.vr = 0;
-        it._staticX = it.x;
-        it.grounded = true;
+        this.freezeWeaponItem(it, it.x, safeTop - 32);
       }
     }
   },
@@ -1161,7 +1166,7 @@ const Game = {
         const p = this.byChar(by);
         if (!fromNet && p.weapon && p.weapon !== weapon) {
           const old = p.weapon;
-          const oldIt = this.weaponDropItem(old, it.x + (p.dir || 1) * 34, it.y - 4, 0, -70);
+          const oldIt = this.weaponDropItem(old, p.x + (p.dir || 1) * 34, p.y - 46, 0, -70);
           G.level.items.push(oldIt);
           this.emit('drop', { id: oldIt.id, kind: oldIt.kind, weapon: old, x: oldIt.x, y: oldIt.y, vx: oldIt.vx, vy: oldIt.vy });
           this.weaponBurst(oldIt.x, oldIt.y, old, .75);
@@ -1264,6 +1269,65 @@ const Game = {
     Ptc.add({ kind: 'ring', x, y: 500, vx: 0, vy: 0, r: 160, life: .5, color: 'rgba(158,94,255,.8)' });
     for (const dir of [-1, 1]) {
       this.addProj({ kind: 'shock', x: x + dir * 60, y: 520, vx: dir * 330, vy: 0, dmg, life: 2.4, mine: false, foe: true, host: true });
+    }
+  },
+  bossVolley(b) {
+    const color = this.bossColor(b.bossKind);
+    const phase = b.phase || 0;
+    const players = [G.me, G.mate].filter(p => p && !p.down);
+    const mid = this.playersMidX();
+    const shoot = (kind, x, y, vx, vy, dmg = 17, life = 3, g = 0) => {
+      this.addProj({ kind, color, x, y, vx, vy, dmg, life, g, mine: false, foe: true, host: true });
+    };
+    SND.sfx('boss');
+    this.shake(8 + phase * 2);
+    Ptc.add({ kind: 'ring', x: b.x, y: b.y - 24, vx: 0, vy: 0, r: 170 + phase * 24, life: .55, color: color + 'bb' });
+
+    switch (b.bossKind) {
+      case 'root':
+        for (const p of players) {
+          const gy = World.topAt(G.level, p.x) || p.y;
+          for (const off of [-110, 0, 110]) shoot('darkball', p.x + off, gy - 6, 0, -440 - phase * 45, 18 + phase * 2, 1.35, 760);
+        }
+        break;
+      case 'tide':
+        for (let i = 0; i < 4 + phase; i++) {
+          const y = b.y - 120 + i * 42;
+          shoot('darkball', b.x - 420 - i * 18, y, 430 + phase * 45, 70 - i * 16, 17 + phase * 2, 2.7, 70);
+          shoot('darkball', b.x + 420 + i * 18, y, -430 - phase * 45, 70 - i * 16, 17 + phase * 2, 2.7, 70);
+        }
+        break;
+      case 'briar': {
+        const n = 12 + phase * 3;
+        for (let i = 0; i < n; i++) {
+          const a = i * U.TAU / n + b.t * .4;
+          const sp = 250 + (i % 3) * 42 + phase * 35;
+          shoot('darkball', b.x, b.y - 22, Math.cos(a) * sp, Math.sin(a) * sp, 16 + phase * 2, 2.5);
+        }
+        break;
+      }
+      case 'ember':
+        for (let i = 0; i < 7 + phase * 2; i++) {
+          const x = mid - 360 + i * 120 + (Math.random() - .5) * 34;
+          shoot('darkball', x, b.y - 430 - Math.random() * 90, (Math.random() - .5) * 120, 90 + Math.random() * 70, 22 + phase * 3, 3.3, 620);
+        }
+        break;
+      case 'eclipse': {
+        const n = 14 + phase * 4;
+        for (let i = 0; i < n; i++) {
+          const a = i * U.TAU / n + b.t * .35;
+          shoot(i % 3 === 0 ? 'starshot' : 'darkball', b.x, b.y - 18, Math.cos(a) * (285 + phase * 34), Math.sin(a) * (285 + phase * 34), 17 + phase * 2, 2.55);
+        }
+        for (const p of players) shoot('darkball', p.x, p.y - 260, 0, 250 + phase * 30, 20 + phase * 2, 2.3, 150);
+        break;
+      }
+      case 'gloom':
+      default:
+        b.x = U.clamp(mid + (Math.random() < .5 ? -230 : 230), 320, G.level.width - 320);
+        for (const p of players) {
+          for (const off of [-90, 0, 90]) shoot('darkball', p.x + off, p.y - 250 - Math.abs(off) * .35, off * .55, 245 + phase * 38, 18 + phase * 2, 2.5, 130);
+        }
+        break;
     }
   },
   bossSpecial(b) {
@@ -1715,12 +1779,17 @@ const Game = {
             if (local) {
               local.x = it[3]; local.y = it[4];
               local.vx = it[5] || 0; local.vy = it[6] || 0; local.grounded = !!it[7];
-              if (local.grounded) local._staticX = local.x;
+              if (local.grounded) this.freezeWeaponItem(local, local.x, local.y);
+              else { local._staticX = null; local._staticY = null; }
               continue;
             }
-            G.level.items.push(it[1] === 'weapon'
-              ? this.weaponDropItem(it[2] || 'tideSpear', it[3], it[4], it[5] || 0, it[6] || 0, it[0])
-              : { id: it[0], kind: it[1], weapon: it[2] || null, x: it[3], y: it[4], taken: false });
+            if (it[1] === 'weapon') {
+              const dropped = this.weaponDropItem(it[2] || 'tideSpear', it[3], it[4], it[5] || 0, it[6] || 0, it[0]);
+              if (it[7]) this.freezeWeaponItem(dropped, it[3], it[4]);
+              G.level.items.push(dropped);
+            } else {
+              G.level.items.push({ id: it[0], kind: it[1], weapon: it[2] || null, x: it[3], y: it[4], taken: false });
+            }
           }
           for (const it of G.level.items) {
             if (!it.taken && (it.id[0] === 'w' || it.id[0] === 'd') && !liveItems.has(it.id)) it.taken = true;
@@ -1765,7 +1834,7 @@ const Game = {
             G.level.items.push(item);
           } else {
             item.kind = d.kind; item.weapon = d.weapon; item.x = d.x; item.y = d.y; item.taken = false;
-            if (d.kind === 'weapon') { item.vx = 0; item.vy = d.vy || 40; item.grounded = false; item._staticX = d.x; }
+            if (d.kind === 'weapon') { item.vx = 0; item.vy = d.vy || 40; item.grounded = false; item._staticX = null; item._staticY = null; }
           }
         }
         if (d.kind === 'weapon') { SND.sfx('weaponDrop'); this.weaponBurst(d.x, d.y, d.weapon, .85); }
