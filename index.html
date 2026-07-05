@@ -55,11 +55,13 @@
           <b>Attack</b> — J or Z<br>
           <b>Special</b> — K or X (uses MP)<br>
           <b>Second Skill</b> — I or V (uses MP)<br>
-          <b>Heart ❤</b> — L or C or E</p>
+          <b>Weapon Skill</b> — U, O, or B (needs a weapon)<br>
+          <b>Heart ❤</b> — L or C or E<br>
+          <b>Pick / Drop Weapon</b> — Q</p>
         </div>
         <div>
           <h3>📱 Touch</h3>
-          <p>Left side — joystick.<br>Right side — Jump, ⚔ Attack, ✦ Special, 💗 Heart buttons.</p>
+          <p>Left side — joystick.<br>Right side — Jump, Attack, Special, Second Skill, Weapon Skill, Heart, and Pick/Drop buttons.</p>
         </div>
       </div>
       <h3>💞 The Heart Button</h3>
@@ -67,9 +69,11 @@
       <b>Tap ❤</b> — hold hands: faster, protected, hearts everywhere.<br>
       <b>Hold ❤</b> — hug: heals you both.<br>
       <b>Full Love Meter + ❤</b> — KISS! A love burst clears the screen and fully heals you.<br>
-      If one of you falls, the other can revive with a hug (hold ❤ next to them).</p>
+      If one of you falls, the other can revive with a hug and kiss (hold ❤ next to them).</p>
       <p class="dim">Fill the Love Meter by fighting together, staying close, and collecting hearts.
-      Joku 🌊 shoots water phoenixes and dashes on wings. Jolie 🌸 fires petals and blooms a healing field.
+      Joku 🌊 attacks with water and Tide Breaker. Jolie 🌸 fires petals, blooms a healing field, and can cast Love Guard.
+      Weapons do not auto-pickup: stand near one and press Pick/Drop, then use Weapon Skill for its extra power.
+      Open Settings to review all weapon skills and roles.
       Your supporters fight too — 🐶 Lulu bites nearby shadows, 🐼 Biscuit tosses healing hearts when you're hurt.
       Watch out for dive-bombing imps, and jump the boss's shockwaves!</p>
       <button id="helpClose" class="mbtn">Got it! 💕</button>
@@ -120,6 +124,7 @@
         <button id="btnGoChapter" class="mbtn ghost">Go to Chapter</button>
         <button id="btnDropWeapon" class="mbtn ghost">Drop Weapon</button>
       </div>
+      <div id="weaponInfo" class="weaponInfo"></div>
       <div class="connectionSettings">
         <div id="settingsConnMode" class="dim">Connection: offline</div>
         <label>Room Code
@@ -142,6 +147,7 @@
     <div id="btns">
       <button class="tbtn" id="tHeart">💗</button>
       <button class="tbtn" id="tSkill2">💙</button>
+      <button class="tbtn" id="tWeapon">✦</button>
       <button class="tbtn" id="tSp">🌊</button>
       <button class="tbtn" id="tAtk">⚔️</button>
       <button class="tbtn big" id="tJump">⬆️</button>

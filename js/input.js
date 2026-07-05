@@ -16,6 +16,7 @@ const Input = {
     'j': 'attack', 'z': 'attack',
     'k': 'special', 'x': 'special',
     'i': 'skill2', 'v': 'skill2',
+    'u': 'weaponSkill', 'b': 'weaponSkill', 'o': 'weaponSkill',
     'l': 'heart', 'c': 'heart', 'e': 'heart',
     'q': 'drop',
     'enter': 'confirm', 'escape': 'pause'
@@ -91,7 +92,7 @@ const Input = {
       el.addEventListener('pointercancel', up);
       el.addEventListener('contextmenu', e => e.preventDefault());
     };
-    bind('tJump', 'jump'); bind('tAtk', 'attack'); bind('tSp', 'special'); bind('tSkill2', 'skill2'); bind('tHeart', 'heart'); bind('tDrop', 'drop');
+    bind('tJump', 'jump'); bind('tAtk', 'attack'); bind('tSp', 'special'); bind('tSkill2', 'skill2'); bind('tWeapon', 'weaponSkill'); bind('tHeart', 'heart'); bind('tDrop', 'drop');
 
     document.addEventListener('contextmenu', e => e.preventDefault());
 

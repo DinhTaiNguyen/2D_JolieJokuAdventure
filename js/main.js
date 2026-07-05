@@ -378,10 +378,9 @@ const Main = {
     if (Input.touchMode) {
       this.el('touchUI').classList.remove('hidden');
       this.el('tSp').textContent = myChar === 'joku' ? '🌊' : '🌸';
-      this.el('tSkill2').textContent = myChar === 'joku' ? '🛡' : '🌺';
-      this.el('tSkill2').textContent = myChar === 'joku' ? '🌊' : '🌹';
       this.el('tSkill2').textContent = myChar === 'joku' ? '🌀' : '🌹';
-      this.el('tSkill2').title = myChar === 'joku' ? 'Tide Breaker' : 'Rose Barrage';
+      this.el('tSkill2').title = myChar === 'joku' ? 'Tide Breaker' : 'Love Guard';
+      this.el('tWeapon').title = 'Weapon skill';
     }
     this.syncWeaponUI();
     // keep the screen awake on phones
@@ -398,6 +397,7 @@ const Main = {
       const deg = Math.round(frac * 360);
       el.style.backgroundImage = `conic-gradient(from -90deg, rgba(3,8,14,.84) 0deg, rgba(3,8,14,.84) ${deg}deg, rgba(255,255,255,.05) ${deg}deg 360deg), linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.05))`;
       el.style.filter = 'saturate(.75) brightness(.85)';
+      el.style.boxShadow = '0 4px 14px rgba(0,0,0,.4)';
     } else {
       el.style.backgroundImage = '';
       el.style.filter = '';
@@ -411,11 +411,19 @@ const Main = {
     const base = G.me.char === 'joku' ? '🌊' : '🌸';
     const sp = this.el('tSp');
     if (sp) {
-      sp.textContent = w ? w.skillIcon : base;
-      sp.title = w ? w.name + ': ' + w.skill : (G.me.char === 'joku' ? 'Water phoenix' : 'Healing bloom');
+      sp.textContent = base;
+      sp.title = G.me.char === 'joku' ? 'Ocean dash' : 'Healing bloom';
       sp.setAttribute('aria-label', sp.title);
-      sp.style.borderColor = w ? w.color : '';
-      sp.style.boxShadow = w ? '0 0 18px ' + w.color + '88, 0 4px 14px rgba(0,0,0,.4)' : '';
+      sp.style.borderColor = '';
+      sp.style.boxShadow = '';
+    }
+    const wp = this.el('tWeapon');
+    if (wp) {
+      wp.textContent = w ? w.skillIcon : '✦';
+      wp.title = w ? w.name + ': ' + w.skill : 'Equip a weapon to unlock this skill';
+      wp.setAttribute('aria-label', wp.title);
+      wp.style.borderColor = w ? w.color : '';
+      wp.style.boxShadow = w ? '0 0 18px ' + w.color + '88, 0 4px 14px rgba(0,0,0,.4)' : '';
     }
     const near = (typeof Game !== 'undefined' && Game.nearestWeapon) ? Game.nearestWeapon(G.me) : null;
     const drop = this.el('btnDropWeapon');
@@ -440,9 +448,26 @@ const Main = {
     if (p) {
       const atkMax = p.char === 'joku' ? .38 : .46;
       this.setCooldownButton('tAtk', Math.max(0, p.atkCd) / atkMax, '#ffffff');
-      this.setCooldownButton('tSp', Math.max(0, p.spCd) / 2.2, w ? w.color : (p.char === 'joku' ? '#7fd8ff' : '#ff9fce'));
+      this.setCooldownButton('tSp', Math.max(0, p.spCd) / 2.2, p.char === 'joku' ? '#7fd8ff' : '#ff9fce');
       this.setCooldownButton('tSkill2', Math.max(0, p.skill2Cd) / 8, p.char === 'joku' ? '#7fd8ff' : '#ff86b8');
+      this.setCooldownButton('tWeapon', w ? Math.max(0, p.weaponCd || 0) / (w.cd || 6) : 1, w ? w.color : '#fff3a8');
     }
+    this.syncWeaponInfo();
+  },
+
+  syncWeaponInfo() {
+    const box = this.el('weaponInfo');
+    if (!box || typeof Weapons === 'undefined') return;
+    const key = Weapons.IDS.map(id => {
+      const w = Weapons[id];
+      return [id, w.name, w.role, w.skill].join('|');
+    }).join('~');
+    if (box.dataset.key === key) return;
+    box.dataset.key = key;
+    box.innerHTML = '<h3>Weapon Skills</h3><div class="weaponInfoGrid">' + Weapons.IDS.map(id => {
+      const w = Weapons[id];
+      return `<div class="weaponInfoItem"><span>${w.icon}</span><div><b>${w.name}</b><br>${w.skill}</div><span class="weaponInfoRole">${w.role || 'Attack'}</span></div>`;
+    }).join('') + '</div>';
   },
 
   togglePause() {

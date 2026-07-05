@@ -1312,7 +1312,7 @@ const Art = {
 
   /* ================= ITEMS ================= */
   drawItem(ctx, it, t) {
-    const bob = Math.sin(t * 2.6 + it.x * .05) * 4;
+    const bob = it.kind === 'weapon' && !it.grounded ? 0 : Math.sin(t * 2.6 + it.x * .05) * 4;
     const y = it.y + bob;
     switch (it.kind) {
       case 'orb': {
@@ -1374,7 +1374,7 @@ const Art = {
         this.glow(ctx, it.x, y, 38, def.color, .6);
         this.glow(ctx, it.x, y, 16, '#ffffff', .35);
         ctx.globalCompositeOperation = 'source-over';
-        ctx.save(); ctx.translate(it.x, y); ctx.scale(pulse, pulse);
+        ctx.save(); ctx.translate(it.x, y); ctx.rotate(it.rot || 0); ctx.scale(pulse, pulse);
         ctx.strokeStyle = def.color + 'aa'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(0, 0, 24 + Math.sin(t * 3) * 2, 0, U.TAU); ctx.stroke();
         for (let i = 0; i < 4; i++) {

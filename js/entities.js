@@ -8,7 +8,7 @@ const Ent = {
       char, x: 0, y: 0, vx: 0, vy: 0, dir: 1, half: 10,
       onGround: false, coyote: 0, jumps: 0, glide: false,
       hp: 100, maxHp: 100, mp: 100, maxMp: 100,
-      atkCd: 0, spCd: 0, skill2Cd: 0, atkT: 9, dashT: 0, wing: 0,
+      atkCd: 0, spCd: 0, skill2Cd: 0, weaponCd: 0, atkT: 9, dashT: 0, wing: 0,
       animT: 0, squash: 0, blink: 0, blinkT: 3,
       pose: null, poseT: 0, down: false, downT: 0,
       invuln: 0, hurtCd: 0, holding: false,
@@ -33,6 +33,7 @@ const Ent = {
       attack: Input.take('attack') || Input.held('attack'),
       special: Input.take('special'),
       skill2: Input.take('skill2'),
+      weaponSkill: Input.take('weaponSkill'),
     };
   },
 
@@ -132,14 +133,11 @@ const Ent = {
       p.mp -= 45; p.skill2Cd = 8; p.atkT = 0;
       Game.characterSkill2(p);
     }
-    // special
-    const spCost = p.weapon && Weapons[p.weapon] && Weapons[p.weapon].mpSave ? 24 : 35;
+    // character special
+    const spCost = 35;
     if (!locked && inp.special && p.spCd <= 0 && p.mp >= spCost) {
       p.mp -= spCost; p.spCd = 2.2; p.atkT = 0;
-      const w = Weapons[p.weapon] || null;
-      if (w) {
-        Game.weaponSpecial(p, w);
-      } else if (p.char === 'joku') {
+      if (p.char === 'joku') {
         p.dashT = .32; p.invuln = Math.max(p.invuln, .45);
         SND.sfx('dash');
         Game.emitFx('dash', p.x, p.y);
@@ -148,6 +146,13 @@ const Ent = {
         Game.addAura(p.x, p.y, !p.remote);
         Game.emitFx('bloom', p.x, p.y);
       }
+    }
+    // equipped weapon skill: extra power, not a replacement for character special
+    const heldWeapon = Weapons[p.weapon] || null;
+    const wCost = heldWeapon && heldWeapon.mpSave ? 24 : 35;
+    if (!locked && inp.weaponSkill && heldWeapon && p.weaponCd <= 0 && p.mp >= wCost) {
+      p.mp -= wCost; p.weaponCd = heldWeapon.cd || 6; p.atkT = 0;
+      Game.weaponSpecial(p, heldWeapon);
     }
 
     this._movePlayer(p, dt);
@@ -160,7 +165,7 @@ const Ent = {
 
     // timers
     p.atkCd -= dt; p.spCd -= dt; p.atkT += dt;
-    p.skill2Cd -= dt;
+    p.skill2Cd -= dt; p.weaponCd -= dt;
     p.invuln -= dt; p.hurtCd -= dt;
     p.weaponPose = Math.max(0, (p.weaponPose || 0) - dt);
     p.wing = Math.max(0, p.wing - dt * (p.dashT > 0 ? 0 : 1.6));

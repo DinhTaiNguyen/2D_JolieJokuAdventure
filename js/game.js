@@ -177,12 +177,14 @@ const Game = {
     for (const c of ['joku', 'jolie']) {
       const p = this.byChar(c);
       p.weapon = G.loadout && G.loadout[c] && Weapons[G.loadout[c]] ? G.loadout[c] : null;
+      p.weaponCd = 0;
     }
   },
   setWeapon(char, weapon) {
     const p = this.byChar(char);
     const next = weapon && Weapons[weapon] ? weapon : null;
     p.weapon = next;
+    p.weaponCd = 0;
     G.loadout[char] = next;
     if (char === G.me.char && Main.syncWeaponUI) Main.syncWeaponUI();
   },
@@ -271,6 +273,7 @@ const Game = {
       this.lerpGuestEnemies(dt);
     }
     Ent.updateProjectiles(dt);
+    this.updateItems(dt);
     this.updateAuras(dt);
     if (G.mode !== 'guest' && !G.cut && !G.dialog && G.kissCin <= 0) this.updateLoveTrials(dt);
     if (!G.cut && G.kissCin <= 0) this.enforceProgressLocks(dt);
@@ -769,6 +772,8 @@ const Game = {
     const dir = p.dir || 1;
     const color = w.color || '#fff3a8';
     const mine = !p.remote;
+    p.weaponPose = Math.max(p.weaponPose || 0, .55);
+    p.cheerT = Math.max(p.cheerT || 0, .35);
     const shoot = (kind, vx, vy, dmg, life = 1.2, g = 0, x = p.x + dir * 20, y = p.y - 40) => {
       this.addProj({ kind, color, x, y, vx, vy, dmg, life, g, mine, owner: p.char });
     };
@@ -830,6 +835,7 @@ const Game = {
         this.loveAdd(18); this.hugHearts(p.x); p.hp = Math.min(p.maxHp, p.hp + 14); break;
     }
     this.weaponBurst(p.x, p.y - 45, p.weapon, .75);
+    this.emitFx('weapon', p.x, p.y, { special: w.special, weapon: p.weapon });
   },
 
   characterSkill2(p) {
@@ -844,14 +850,17 @@ const Game = {
       }
       this.emitFx('skill2', p.x, p.y, { char: p.char, atk: 'tide' });
     } else {
-      SND.sfx('shootP');
-      Ptc.text(p.x, p.y - 105, 'Rose Barrage', '#ffa9d8');
-      for (let i = 0; i < 7; i++) {
-        const off = (i - 3) * .16;
-        this.addProj({ kind: 'petal', color: '#ff86b8', x: p.x + dir * 18, y: p.y - 46 + (i - 3) * 5, vx: dir * 600 * Math.cos(off), vy: 600 * Math.sin(off), dmg: 13, life: 1.05, mine, owner: p.char });
+      SND.sfx('heal');
+      Ptc.text(p.x, p.y - 105, 'Love Guard', '#ffa9d8');
+      for (const q of [G.me, G.mate]) {
+        if (!q || q.down || U.dist(q.x, q.y, p.x, p.y) > 280) continue;
+        q.invuln = Math.max(q.invuln, 2.1);
+        q.hp = Math.min(q.maxHp, q.hp + 18);
+        Ptc.add({ kind: 'ring', x: q.x, y: q.y - 34, vx: 0, vy: 0, r: 74, life: .8, color: 'rgba(255,169,216,.86)' });
+        Ptc.burst('heart', q.x, q.y - 48, 8, { sp: 105, r: 6, life: 1 });
       }
-      Ptc.burst('petal', p.x + dir * 38, p.y - 48, 16, { sp: 150, r: 5, life: .8 });
-      this.emitFx('skill2', p.x, p.y, { char: p.char, atk: 'rose' });
+      this.loveAdd(8);
+      this.emitFx('skill2', p.x, p.y, { char: p.char, guard: true });
     }
   },
 
@@ -1028,6 +1037,62 @@ const Game = {
   },
 
   /* ================= pickups ================= */
+  weaponDropItem(weapon, x, y, vx = 0, vy = -170, id = null) {
+    return {
+      id: id || 'w' + (G._dropId++),
+      kind: 'weapon',
+      weapon,
+      x, y,
+      vx, vy,
+      rot: Math.random() * U.TAU,
+      vr: (Math.random() - .5) * 4,
+      grounded: false,
+      taken: false
+    };
+  },
+
+  updateItems(dt) {
+    if (!G.level) return;
+    for (const it of G.level.items) {
+      if (it.taken || it.kind !== 'weapon') continue;
+      if (it.vx == null) it.vx = 0;
+      if (it.vy == null) it.vy = it.grounded ? 0 : 40;
+      if (it.rot == null) it.rot = 0;
+      if (it.vr == null) it.vr = 0;
+
+      it.vy += 1700 * dt;
+      it.x += it.vx * dt;
+      it.y += it.vy * dt;
+      it.rot += it.vr * dt;
+
+      const top = World.topAt(G.level, it.x, it.y - 80);
+      const groundY = top == null ? null : top - 32;
+      if (groundY != null && it.y >= groundY && it.vy >= 0) {
+        if (!it.grounded && Math.abs(it.vy) > 180) {
+          SND.sfx('weaponDrop');
+          Ptc.add({ kind: 'ring', x: it.x, y: groundY + 10, vx: 0, vy: 0, r: 34, life: .35, color: (Weapons[it.weapon]?.color || '#fff3a8') + '88' });
+        }
+        it.y = groundY;
+        it.vy = 0;
+        it.grounded = true;
+        it.vx *= Math.max(0, 1 - 8 * dt);
+        it.vr *= Math.max(0, 1 - 10 * dt);
+        if (Math.abs(it.vx) < 4) it.vx = 0;
+        if (Math.abs(it.vr) < .1) it.vr = 0;
+      } else {
+        it.grounded = false;
+        it.vx *= Math.max(0, 1 - 1.2 * dt);
+      }
+
+      if (it.y > World.DEATH_Y + 160) {
+        const safeTop = World.topAt(G.level, U.clamp(it.x, 60, G.level.width - 60)) || 620;
+        it.y = safeTop - 32;
+        it.vx = it.vy = it.vr = 0;
+        it.grounded = true;
+      }
+    }
+  },
+
   nearestWeapon(p = G.me, radius = 76) {
     if (!p || !G.level) return null;
     let best = null, bd = radius * radius;
@@ -1073,15 +1138,15 @@ const Game = {
         const p = this.byChar(by);
         if (!fromNet && p.weapon && p.weapon !== weapon) {
           const old = p.weapon;
-          const oldIt = { id: 'w' + (G._dropId++), kind: 'weapon', weapon: old, x: it.x + (p.dir || 1) * 34, y: it.y - 4, taken: false };
+          const oldIt = this.weaponDropItem(old, it.x + (p.dir || 1) * 34, it.y - 4, (p.dir || 1) * 85, -145);
           G.level.items.push(oldIt);
-          this.emit('drop', { id: oldIt.id, kind: oldIt.kind, weapon: old, x: oldIt.x, y: oldIt.y });
+          this.emit('drop', { id: oldIt.id, kind: oldIt.kind, weapon: old, x: oldIt.x, y: oldIt.y, vx: oldIt.vx, vy: oldIt.vy });
           this.weaponBurst(oldIt.x, oldIt.y, old, .75);
         }
         this.setWeapon(by, weapon);
         p.weaponPose = .9;
         p.cheerT = Math.max(p.cheerT || 0, .55);
-        if (forMe) this.toastMsg('Equipped ' + Weapons[weapon].name + '. Press Q or ⇩ to drop it.');
+        if (forMe) this.toastMsg('Equipped ' + Weapons[weapon].name + '. Use Weapon Skill (U/O/B) or Pick/Drop to change it.');
         if (!fromNet) SND.sfx('weaponPickup');
         this.weaponBurst(it.x, it.y, weapon, 1.15);
         break;
@@ -1106,10 +1171,11 @@ const Game = {
     SND.sfx('weaponDrop');
     for (let i = 0; i < n; i++) {
       const weapon = this.randomWeapon();
-      const it = { id: 'w' + (G._dropId++), kind: 'weapon', weapon, x: x + (i ? 38 : -38), y: y - 52, taken: false };
+      const side = i % 2 ? 1 : -1;
+      const it = this.weaponDropItem(weapon, x + side * (38 + i * 8), y - 62, side * (115 + i * 18), -220 - i * 24);
       G.level.items.push(it);
       this.weaponBurst(it.x, it.y, weapon, .9);
-      this.emit('drop', { id: it.id, kind: it.kind, weapon, x: it.x, y: it.y });
+      this.emit('drop', { id: it.id, kind: it.kind, weapon, x: it.x, y: it.y, vx: it.vx, vy: it.vy });
     }
   },
 
@@ -1124,9 +1190,9 @@ const Game = {
     if (!p.weapon) { this.toastMsg('Stand near a weapon to pick it.'); return; }
     const weapon = p.weapon;
     this.setWeapon(p.char, null);
-    const it = { id: 'w' + (G._dropId++), kind: 'weapon', weapon, x: p.x + p.dir * 34, y: p.y - 46, taken: false };
+    const it = this.weaponDropItem(weapon, p.x + p.dir * 34, p.y - 46, p.dir * 100, -160);
     G.level.items.push(it);
-    this.emit('drop', { id: it.id, kind: it.kind, weapon, x: it.x, y: it.y });
+    this.emit('drop', { id: it.id, kind: it.kind, weapon, x: it.x, y: it.y, vx: it.vx, vy: it.vy });
     SND.sfx('weaponDrop');
     this.weaponBurst(it.x, it.y, weapon, .9);
     this.toastMsg('Dropped ' + (Weapons[weapon] ? Weapons[weapon].name : 'weapon') + '.');
@@ -1540,7 +1606,7 @@ const Game = {
     const dead = G.level.foes.filter(e => e.dead).map(e => e.id);
     const items = G.level.items
       .filter(it => !it.taken && (it.id[0] === 'w' || it.id[0] === 'd'))
-      .map(it => [it.id, it.kind, it.weapon || '', Math.round(it.x), Math.round(it.y)]);
+      .map(it => [it.id, it.kind, it.weapon || '', Math.round(it.x), Math.round(it.y), Math.round(it.vx || 0), Math.round(it.vy || 0), it.grounded ? 1 : 0]);
     NET.send({
       t: 'w', q: ++G.netT.wseq, love: Math.round(G.love), foes,
       dead, items, trials, gate: G.level.gateOpen ? 1 : 0, shrine: G.level.shrineDone ? 1 : 0,
@@ -1610,8 +1676,21 @@ const Game = {
           if (e && !e.dead) { e.tx = f[1]; e.ty = f[2]; e.dir = f[3]; e.hp = f[4]; }
         }
         if (m.items) {
+          const liveItems = new Set();
           for (const it of m.items) {
-            if (!G.level.items.find(x => x.id === it[0])) G.level.items.push({ id: it[0], kind: it[1], weapon: it[2] || null, x: it[3], y: it[4], taken: false });
+            liveItems.add(it[0]);
+            const local = G.level.items.find(x => x.id === it[0]);
+            if (local) {
+              local.x = it[3]; local.y = it[4];
+              local.vx = it[5] || 0; local.vy = it[6] || 0; local.grounded = !!it[7];
+              continue;
+            }
+            G.level.items.push(it[1] === 'weapon'
+              ? this.weaponDropItem(it[2] || 'tideSpear', it[3], it[4], it[5] || 0, it[6] || 0, it[0])
+              : { id: it[0], kind: it[1], weapon: it[2] || null, x: it[3], y: it[4], taken: false });
+          }
+          for (const it of G.level.items) {
+            if (!it.taken && (it.id[0] === 'w' || it.id[0] === 'd') && !liveItems.has(it.id)) it.taken = true;
           }
         }
         if (m.trials) {
@@ -1644,7 +1723,18 @@ const Game = {
         break;
       }
       case 'drop':
-        G.level.items.push({ id: d.id, kind: d.kind, weapon: d.weapon, x: d.x, y: d.y, taken: false });
+        {
+          let item = G.level.items.find(x => x.id === d.id);
+          if (!item) {
+            item = d.kind === 'weapon'
+              ? this.weaponDropItem(d.weapon, d.x, d.y, d.vx || 0, d.vy || 40, d.id)
+              : { id: d.id, kind: d.kind, weapon: d.weapon, x: d.x, y: d.y, taken: false };
+            G.level.items.push(item);
+          } else {
+            item.kind = d.kind; item.weapon = d.weapon; item.x = d.x; item.y = d.y; item.taken = false;
+            if (d.kind === 'weapon') { item.vx = d.vx || 0; item.vy = d.vy || 40; item.grounded = false; }
+          }
+        }
         if (d.kind === 'weapon') { SND.sfx('weaponDrop'); this.weaponBurst(d.x, d.y, d.weapon, .85); }
         break;
       case 'hit': {
@@ -1692,6 +1782,31 @@ const Game = {
         if (d.kind === 'skill2') {
           SND.sfx(d.char === 'jolie' ? 'heal' : 'dash');
           Ptc.add({ kind: 'ring', x: d.x, y: d.y - 30, vx: 0, vy: 0, r: 180, life: .8, color: d.char === 'jolie' ? 'rgba(255,169,216,.9)' : 'rgba(120,216,255,.9)' });
+          if (d.guard && !G.me.down && U.dist(G.me.x, G.me.y, d.x, d.y) < 300) {
+            G.me.invuln = Math.max(G.me.invuln, 2.1);
+            G.me.hp = Math.min(G.me.maxHp, G.me.hp + 18);
+            if (G.mode !== 'guest') this.loveAdd(8);
+            Ptc.burst('heart', G.me.x, G.me.y - 48, 9, { sp: 105, r: 6, life: 1 });
+          }
+        }
+        if (d.kind === 'weapon') {
+          const def = Weapons[d.weapon] || Weapons.tideSpear;
+          SND.sfx('weaponPickup');
+          this.weaponBurst(d.x, d.y - 45, d.weapon, .55);
+          if (!G.me.down && U.dist(G.me.x, G.me.y, d.x, d.y) < 320) {
+            if (['heartHeal', 'loveBeacon', 'pandaGift'].includes(d.special)) {
+              G.me.hp = Math.min(G.me.maxHp, G.me.hp + (d.special === 'pandaGift' ? 18 : 24));
+              G.me.mp = Math.min(G.me.maxMp, G.me.mp + (d.special === 'pandaGift' ? 24 : 8));
+              if (G.mode !== 'guest') this.loveAdd(d.special === 'loveBeacon' ? 18 : 6);
+              Ptc.burst('heart', G.me.x, G.me.y - 48, 10, { sp: 110, r: 6, life: 1 });
+            } else if (['sunGuard', 'auroraShield'].includes(d.special)) {
+              G.me.invuln = Math.max(G.me.invuln, d.special === 'sunGuard' ? 2.0 : 1.3);
+              Ptc.add({ kind: 'ring', x: G.me.x, y: G.me.y - 32, vx: 0, vy: 0, r: 110, life: .7, color: def.color + 'cc' });
+            } else if (d.special === 'dreamSong') {
+              if (G.mode !== 'guest') this.loveAdd(10);
+              Ptc.text(G.me.x, G.me.y - 78, '♪', def.color);
+            }
+          }
         }
         break;
     }
@@ -2013,15 +2128,16 @@ const Game = {
     const w = p.weapon && Weapons[p.weapon] ? Weapons[p.weapon] : null;
     const items = [
       { icon: '⚔', label: 'Atk', cd: Math.max(0, p.atkCd) / (p.char === 'joku' ? .38 : .46), color: '#ffffff' },
-      { icon: w ? w.skillIcon : (p.char === 'joku' ? '🌊' : '🌸'), label: 'Sp', cd: Math.max(0, p.spCd) / 2.2, color: w ? w.color : (p.char === 'joku' ? '#7fd8ff' : '#ff9fce') },
+      { icon: p.char === 'joku' ? '🌊' : '🌸', label: 'Sp', cd: Math.max(0, p.spCd) / 2.2, color: p.char === 'joku' ? '#7fd8ff' : '#ff9fce' },
       { icon: p.char === 'joku' ? '🌀' : '🌹', label: '2nd', cd: Math.max(0, p.skill2Cd) / 8, color: p.char === 'joku' ? '#7fd8ff' : '#ff86b8' },
+      { icon: w ? w.skillIcon : '✦', label: 'Wpn', cd: w ? Math.max(0, p.weaponCd || 0) / (w.cd || 6) : 1, color: w ? w.color : '#fff3a8' },
     ];
     const r = small ? 12 : 14;
     const gap = small ? 34 : 40;
     ctx.save();
     ctx.textAlign = 'center';
     for (let i = 0; i < items.length; i++) {
-      const it = items[i], x = cx + (i - 1) * gap;
+      const it = items[i], x = cx + (i - (items.length - 1) / 2) * gap;
       ctx.fillStyle = 'rgba(8,18,30,.62)';
       ctx.beginPath(); ctx.arc(x, y, r, 0, U.TAU); ctx.fill();
       ctx.strokeStyle = it.color + 'aa';
@@ -2040,7 +2156,8 @@ const Game = {
       ctx.fillText(it.icon, x, y + (small ? 4 : 5));
       ctx.font = `600 ${small ? 8 : 9}px Fredoka, sans-serif`;
       ctx.fillStyle = cd > .01 ? 'rgba(220,235,245,.62)' : it.color;
-      ctx.fillText(cd > .01 ? Math.ceil(cd * (i === 2 ? 8 : i === 1 ? 2.2 : .45)) + 's' : 'ready', x, y + r + 10);
+      const max = it.label === '2nd' ? 8 : it.label === 'Sp' ? 2.2 : it.label === 'Wpn' && w ? (w.cd || 6) : .45;
+      ctx.fillText(cd > .01 ? (it.label === 'Wpn' && !w ? '-' : Math.ceil(cd * max) + 's') : 'ready', x, y + r + 10);
     }
     ctx.restore();
   },

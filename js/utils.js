@@ -44,6 +44,52 @@ const Weapons = {
   auroraOrb: { name: 'Aurora Orb', color: '#8fffe7', shape: 'orb', icon: '◉', skillIcon: '🫧', skill: 'aurora shield', special: 'auroraShield', dmg: 1.05, shots: 3, spread: .22 },
   loveLantern: { name: 'Love Lantern', color: '#ff9fce', shape: 'lantern', icon: '♡', skillIcon: '💞', skill: 'love beacon', special: 'loveBeacon', dmg: 1.0, mpSave: true }
 };
+const WeaponRoles = {
+  tideSpear: 'Attack / mobility',
+  roseScepter: 'Attack / healing field',
+  starBlade: 'Attack',
+  heartStaff: 'Love / healing',
+  moonBow: 'Attack',
+  emberAxe: 'Attack',
+  thunderHammer: 'Attack / stun',
+  crystalDagger: 'Attack',
+  shadowKatana: 'Defense / mobility',
+  sunShield: 'Defense',
+  lotusFan: 'Attack / support',
+  riverBow: 'Defense / attack',
+  cometSword: 'Attack / mobility',
+  pandaBell: 'Support / rewards',
+  luluClaw: 'Attack / support',
+  phoenixWand: 'Attack',
+  dreamLyre: 'Love / control',
+  vineScythe: 'Control / attack',
+  auroraOrb: 'Defense / attack',
+  loveLantern: 'Love / support'
+};
+for (const id in WeaponRoles) if (Weapons[id]) Weapons[id].role = WeaponRoles[id];
+const WeaponSkillText = {
+  tideSpear: 'tide dash strike',
+  roseScepter: 'rose healing field',
+  starBlade: 'falling star rain',
+  heartStaff: 'nearby heart heal',
+  moonBow: 'wide moon arrow volley',
+  emberAxe: 'heavy flame arc',
+  thunderHammer: 'ground thunder slam',
+  crystalDagger: 'eight-way crystal burst',
+  shadowKatana: 'safe shadow blink',
+  sunShield: 'strong sun guard',
+  lotusFan: 'lotus wind and field',
+  riverBow: 'river wall barrage',
+  cometSword: 'comet dash shot',
+  pandaBell: 'Biscuit snack blessing',
+  luluClaw: 'Lulu loyal howl',
+  phoenixWand: 'phoenix nova circle',
+  dreamLyre: 'love sleep song',
+  vineScythe: 'vine snare control',
+  auroraOrb: 'aurora guard burst',
+  loveLantern: 'love beacon heal'
+};
+for (const id in WeaponSkillText) if (Weapons[id]) Weapons[id].skill = WeaponSkillText[id];
 Weapons.IDS = Object.keys(Weapons);
 
 // surface uncaught errors on screen (helps debugging on phones too)

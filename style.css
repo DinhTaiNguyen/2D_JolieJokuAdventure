@@ -126,6 +126,21 @@ input, textarea {
 .connBtns { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
 #pausePanel .connBtns .mbtn { width:100%; min-width:0; font-size:13px; padding:9px 6px; margin-top:0; }
 #settingsConnStatus { min-height:17px; margin-bottom:0; }
+.weaponInfo {
+  width:min(78vw,360px); max-height:130px; overflow-y:auto;
+  margin:10px auto 2px; padding:10px 12px; text-align:left;
+  border:1px solid rgba(255,255,255,.14); border-radius:14px;
+  background:rgba(0,0,0,.16); color:#cfeaf7;
+}
+.weaponInfo h3 { margin:0 0 6px; font-size:14px; }
+.weaponInfoGrid { display:grid; grid-template-columns:1fr; gap:5px; }
+.weaponInfoItem {
+  display:grid; grid-template-columns:28px 1fr auto; align-items:center; gap:8px;
+  font-size:12px; line-height:1.2; padding:5px 0; border-top:1px solid rgba(255,255,255,.08);
+}
+.weaponInfoItem:first-child { border-top:0; }
+.weaponInfoItem b { color:#f4fbff; font-size:12px; }
+.weaponInfoRole { color:#9fd8ff; font-size:11px; white-space:nowrap; }
 
 /* ============ Touch controls ============ */
 #touchUI { position:absolute; inset:0; z-index:10; pointer-events:none; }
@@ -155,6 +170,7 @@ input, textarea {
 .tbtn.small { width:54px; height:54px; font-size:24px; grid-column:2; opacity:.88; }
 .tbtn:active, .tbtn.pressed { filter:brightness(1.6); transform:scale(.93); }
 #tHeart { border-color:rgba(255,140,195,.6); }
+#tWeapon { border-color:rgba(255,235,150,.6); }
 
 /* ============ Toast & rotate hint ============ */
 #toast {
