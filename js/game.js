@@ -17,7 +17,7 @@ const G = {
   loadout: { joku: null, jolie: null },
   paused: false, bossActive: false, netLost: false, ended: false, nextLevelT: 0,
   netT: { p: 0, w: 0, seq: 0, wseq: 0 }, mateNet: null, mateBuf: [], lastMateSeq: 0, lastWorldSeq: 0, _dropId: 0, _comboToastT: 0,
-  demo: null, _lockHintT: 0,
+  demo: null, _lockHintT: 0, _uiSyncT: 0,
 };
 
 const Game = {
@@ -62,6 +62,9 @@ const Game = {
     G.stats = { orbs: 0, flowers: 0, hearts: 0, hugs: 0, kisses: 0, kills: 0, startT: performance.now() / 1000 };
     G.state = 'play'; G.paused = false; G.demo = null;
     this.loadLevel(startLevel);
+    if (opt.skipStory) {
+      G.cut = null; G.dialog = null; G.fade = 0; G.fadeDir = -1;
+    }
     Main.showGameUI(myChar);
   },
 
@@ -290,6 +293,7 @@ const Game = {
       if (it.taken) continue;
       for (const p of [G.me, G.mate]) {
         if (p.remote || p.down) continue;
+        if (it.kind === 'weapon') continue;
         if (Math.abs(it.x - p.x) < 30 && Math.abs(it.y - (p.y - 26)) < 42) {
           this.pickup(it, p === G.me ? G.me.char : G.mate.char, false);
           break;
@@ -337,6 +341,8 @@ const Game = {
     G.hugCd -= dt;
     G.shakeT -= dt;
     if (G._lockHintT > 0) G._lockHintT -= dt;
+    G._uiSyncT -= dt;
+    if (G._uiSyncT <= 0) { G._uiSyncT = .12; if (Main.syncWeaponUI) Main.syncWeaponUI(); }
     if (G.announce) { G.announce.t -= dt; if (G.announce.t <= 0) G.announce = null; }
     if (G._comboToastT > 0) G._comboToastT -= dt;
     if (G.nextLevelT > 0 && G.mode !== 'guest') {
@@ -450,18 +456,37 @@ const Game = {
     const together = nearMe && nearMate && !me.down && !mate.down;
     const holding = G.handHold || (Input.held('heart') && U.dist(me.x, me.y, mate.x, mate.y) < 150);
 
+    if (tr.stage === 2) {
+      tr.kissT = (tr.kissT || 1.05) - dt;
+      me.pose = mate.pose = 'kiss'; me.poseT = mate.poseT = .25;
+      me.dir = tr.x >= me.x ? 1 : -1; mate.dir = -me.dir;
+      if (Math.random() < dt * 16) Ptc.add({ kind: 'heart', x: tr.x + (Math.random() - .5) * 55, y: tr.y - 70 - Math.random() * 25, vx: (Math.random() - .5) * 45, vy: -65, r: 5, life: 1.1, color: '#ff9fce' });
+      if (tr.kissT <= 0) this.finishLoveTrial(tr, false);
+      return;
+    }
+
     if (together && holding) {
-      tr.charge = U.clamp((tr.charge || 0) + dt / 2.1, 0, 1);
+      tr.charge = U.clamp((tr.charge || 0) + dt / (tr.stage === 1 ? 1.35 : 1.05), 0, 1);
       if (!tr.started) {
         tr.started = true;
         const info = Story.trialInfo(G.levelIndex, tr.id);
-        G.announce = { txt: info.title, sub: info.hint, t: 2.8 };
+        G.announce = { txt: info.title, sub: tr.stage === 1 ? 'Tiếp tục giữ trái tim để trao nụ hôn mở khóa.' : info.hint, t: 2.8 };
         SND.sfx('heart');
       }
       if (Math.random() < dt * 12) {
         Ptc.add({ kind: 'heart', x: tr.x + (Math.random() - .5) * 90, y: tr.y - 24 - Math.random() * 70, vx: (Math.random() - .5) * 35, vy: -45, r: 4 + Math.random() * 4, life: 1, color: '#ff9fce' });
       }
-      if (tr.charge >= 1) this.finishLoveTrial(tr, false);
+      if (tr.charge >= 1 && tr.stage !== 1) {
+        tr.stage = 1; tr.charge = 0; tr.started = false;
+        me.pose = mate.pose = 'hug'; me.poseT = mate.poseT = 1.25;
+        this.hugHearts(tr.x);
+        G.announce = { txt: 'Cái ôm đã đánh thức vòng sáng', sub: 'Giữ thêm một chút để hôn và nhận vũ khí.', t: 2.7 };
+        SND.sfx('heal');
+      } else if (tr.charge >= 1) {
+        tr.stage = 2; tr.charge = 0; tr.kissT = 1.05;
+        SND.sfx('kiss');
+        Ptc.add({ kind: 'ring', x: tr.x, y: tr.y - 45, vx: 0, vy: 0, r: 110, life: .65, color: 'rgba(255,170,210,.85)' });
+      }
     } else {
       tr.started = false;
       tr.charge = Math.max(0, (tr.charge || 0) - dt * .35);
@@ -478,6 +503,7 @@ const Game = {
     const already = tr.done && tr._celebrated;
     tr.done = true;
     tr.charge = 1;
+    tr.stage = 3;
     tr._celebrated = true;
     this.setCheckpoint(tr.x, tr.y, 'Love Trial', true);
     const info = Story.trialInfo(G.levelIndex, tr.id);
@@ -731,7 +757,7 @@ const Game = {
     G.projs.push(o);
     if (!fromNet) {
       if (o.mine) this.emit('shoot', { kind: o.kind, color: o.color, x: o.x, y: o.y, vx: o.vx, vy: o.vy, life: o.life, g: o.g });
-      else if (o.host && G.mode === 'host') this.emit('shoot', { kind: o.kind, x: o.x, y: o.y, vx: o.vx, vy: o.vy, life: o.life, g: o.g, foe: true, dmg: o.dmg });
+      else if (o.host && G.mode === 'host') this.emit('shoot', { kind: o.kind, color: o.color, x: o.x, y: o.y, vx: o.vx, vy: o.vy, life: o.life, g: o.g, foe: true, dmg: o.dmg });
     }
   },
 
@@ -807,23 +833,25 @@ const Game = {
   },
 
   characterSkill2(p) {
+    const mine = !p.remote;
+    const dir = p.dir || 1;
     if (p.char === 'joku') {
-      SND.sfx('dash');
-      p.invuln = Math.max(p.invuln, 2);
-      for (const q of [G.me, G.mate]) if (!q.down && U.dist(q.x, q.y, p.x, p.y) < 340) q.mp = Math.min(q.maxMp, q.mp + 28);
-      Ptc.add({ kind: 'ring', x: p.x, y: p.y - 30, vx: 0, vy: 0, r: 220, life: .9, color: 'rgba(120,216,255,.9)' });
-      Ptc.text(p.x, p.y - 105, 'Ocean Guard', '#7fd8ff');
-      this.emitFx('skill2', p.x, p.y, { char: p.char });
-    } else {
-      SND.sfx('heal');
-      for (const q of [G.me, G.mate]) {
-        if (U.dist(q.x, q.y, p.x, p.y) < 360) {
-          q.down = false; q.pose = null; q.hp = Math.min(q.maxHp, Math.max(q.hp, q.maxHp * .55)); q.invuln = Math.max(q.invuln, 1.4);
-        }
+      SND.sfx('shootJ');
+      Ptc.text(p.x, p.y - 105, 'Tide Breaker', '#7fd8ff');
+      Ptc.add({ kind: 'ring', x: p.x + dir * 55, y: p.y - 34, vx: 0, vy: 0, r: 120, life: .65, color: 'rgba(120,216,255,.9)' });
+      for (let i = -1; i <= 1; i++) {
+        this.addProj({ kind: 'bolt', color: '#7fd8ff', x: p.x + dir * 24, y: p.y - 42 + i * 14, vx: dir * (760 - Math.abs(i) * 70), vy: i * 85, dmg: 26 - Math.abs(i) * 4, life: 1.05, mine, owner: p.char });
       }
-      this.addAura(p.x, p.y, !p.remote);
-      Ptc.text(p.x, p.y - 105, 'Rose Promise', '#ffa9d8');
-      this.emitFx('skill2', p.x, p.y, { char: p.char });
+      this.emitFx('skill2', p.x, p.y, { char: p.char, atk: 'tide' });
+    } else {
+      SND.sfx('shootP');
+      Ptc.text(p.x, p.y - 105, 'Rose Barrage', '#ffa9d8');
+      for (let i = 0; i < 7; i++) {
+        const off = (i - 3) * .16;
+        this.addProj({ kind: 'petal', color: '#ff86b8', x: p.x + dir * 18, y: p.y - 46 + (i - 3) * 5, vx: dir * 600 * Math.cos(off), vy: 600 * Math.sin(off), dmg: 13, life: 1.05, mine, owner: p.char });
+      }
+      Ptc.burst('petal', p.x + dir * 38, p.y - 48, 16, { sp: 150, r: 5, life: .8 });
+      this.emitFx('skill2', p.x, p.y, { char: p.char, atk: 'rose' });
     }
   },
 
@@ -1000,6 +1028,18 @@ const Game = {
   },
 
   /* ================= pickups ================= */
+  nearestWeapon(p = G.me, radius = 76) {
+    if (!p || !G.level) return null;
+    let best = null, bd = radius * radius;
+    for (const it of G.level.items) {
+      if (it.taken || it.kind !== 'weapon') continue;
+      const dx = it.x - p.x, dy = it.y - (p.y - 28);
+      const d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = it; }
+    }
+    return best;
+  },
+
   pickup(it, by, fromNet) {
     if (it.taken) return;
     it.taken = true;
@@ -1039,6 +1079,8 @@ const Game = {
           this.weaponBurst(oldIt.x, oldIt.y, old, .75);
         }
         this.setWeapon(by, weapon);
+        p.weaponPose = .9;
+        p.cheerT = Math.max(p.cheerT || 0, .55);
         if (forMe) this.toastMsg('Equipped ' + Weapons[weapon].name + '. Press Q or ⇩ to drop it.');
         if (!fromNet) SND.sfx('weaponPickup');
         this.weaponBurst(it.x, it.y, weapon, 1.15);
@@ -1073,7 +1115,13 @@ const Game = {
 
   dropMyWeapon() {
     const p = G.me;
-    if (!p || !p.weapon || G.state !== 'play') { this.toastMsg('No weapon equipped.'); return; }
+    if (!p || G.state !== 'play') return;
+    const near = this.nearestWeapon(p);
+    if (near) {
+      this.pickup(near, p.char, false);
+      return;
+    }
+    if (!p.weapon) { this.toastMsg('Stand near a weapon to pick it.'); return; }
     const weapon = p.weapon;
     this.setWeapon(p.char, null);
     const it = { id: 'w' + (G._dropId++), kind: 'weapon', weapon, x: p.x + p.dir * 34, y: p.y - 46, taken: false };
@@ -1085,6 +1133,33 @@ const Game = {
   },
 
   /* ================= boss ================= */
+  bossColor(kind) {
+    return ({
+      root: '#63d18a', tide: '#56d6ff', briar: '#ff86b8',
+      gloom: '#9e5eff', ember: '#ff8a4a', eclipse: '#d7b7ff'
+    })[kind || (G.level && G.level.boss && G.level.boss.bossKind)] || '#9e5eff';
+  },
+
+  miniBossSpecial(e, tgt) {
+    const color = this.bossColor(e.bossStyle);
+    const rank = e.bossRank || 0;
+    e.bossAtkT = rank ? 2.25 : 1.75;
+    e.flash = .2;
+    SND.sfx(rank ? 'slam' : 'boss');
+    if (rank === 0) {
+      for (const off of [-.28, 0, .28]) {
+        const a = Math.atan2((tgt.y - 34) - e.y, tgt.x - e.x) + off;
+        this.addProj({ kind: 'darkball', color, x: e.x, y: e.y - 34, vx: Math.cos(a) * 330, vy: Math.sin(a) * 330, dmg: e.dmg + 4, life: 2.6, mine: false, foe: true, host: true });
+      }
+      Ptc.add({ kind: 'ring', x: e.x, y: e.y - 28, vx: 0, vy: 0, r: 90, life: .45, color: color + 'bb' });
+    } else {
+      this.bossSlam(e.x, e.dmg + 3);
+      for (const dir of [-1, 1]) {
+        this.addProj({ kind: 'darkball', color, x: e.x, y: e.y - 75, vx: dir * 250, vy: -260, dmg: e.dmg, life: 2.4, g: 360, mine: false, foe: true, host: true });
+      }
+    }
+  },
+
   bossWake() {
     G.bossActive = true;
     const b = G.level.boss;
@@ -1100,6 +1175,38 @@ const Game = {
     Ptc.add({ kind: 'ring', x, y: 500, vx: 0, vy: 0, r: 160, life: .5, color: 'rgba(158,94,255,.8)' });
     for (const dir of [-1, 1]) {
       this.addProj({ kind: 'shock', x: x + dir * 60, y: 520, vx: dir * 330, vy: 0, dmg, life: 2.4, mine: false, foe: true, host: true });
+    }
+  },
+  bossSpecial(b) {
+    const color = this.bossColor(b.bossKind);
+    const mid = this.playersMidX();
+    SND.sfx('boss');
+    this.shake(7 + b.phase * 2);
+    Ptc.add({ kind: 'ring', x: b.x, y: b.y - 10, vx: 0, vy: 0, r: 210, life: .75, color: color + 'bb' });
+    const shoot = (x, y, vx, vy, dmg = 17, life = 3, g = 0) => {
+      this.addProj({ kind: 'darkball', color, x, y, vx, vy, dmg, life, g, mine: false, foe: true, host: true });
+    };
+    switch (b.bossKind) {
+      case 'root':
+        for (let i = -3; i <= 3; i++) shoot(mid + i * 95, 520, 0, -360 - Math.abs(i) * 22, 17 + b.phase * 2, 1.4, 620);
+        break;
+      case 'tide':
+        for (let i = 0; i < 6 + b.phase; i++) shoot(b.x - 260 + i * 104, b.y - 60, Math.sin(i) * 80, 260, 16, 2.4, 80);
+        break;
+      case 'briar':
+        for (let i = 0; i < 10; i++) { const a = -Math.PI + i * Math.PI / 9; shoot(b.x, b.y - 20, Math.cos(a) * 360, Math.sin(a) * 360, 15, 2.2); }
+        break;
+      case 'ember':
+        for (let i = 0; i < 5 + b.phase; i++) shoot(mid - 260 + i * 130, b.y - 360, (Math.random() - .5) * 90, 120, 22, 3.4, 520);
+        break;
+      case 'eclipse':
+        for (let i = 0; i < 12; i++) { const a = i * U.TAU / 12 + b.t * .2; shoot(b.x, b.y - 15, Math.cos(a) * 300, Math.sin(a) * 300, 16, 2.2); }
+        break;
+      case 'gloom':
+      default:
+        b.x = U.clamp(mid + (Math.random() < .5 ? -210 : 210), 320, G.level.width - 320);
+        for (const p of [G.me, G.mate]) if (!p.down) shoot(p.x, p.y - 240, 0, 220, 19, 2.2, 180);
+        break;
     }
   },
   bossSummon(n = 2) {
@@ -1451,7 +1558,11 @@ const Game = {
       case 'hello': // guest arrived — send them the world
         if (NET.mode === 'host') {
           this.resetNetSmoothing();
-          NET.send({ t: 'init', lvl: G.levelIndex, started: G.state === 'play', weapons: this.currentLoadout(), diff: G.difficulty });
+          NET.send({
+            t: 'init', lvl: G.levelIndex, started: G.state === 'play', weapons: this.currentLoadout(), diff: G.difficulty,
+            cp: G.checkpoint ? [Math.round(G.checkpoint.x), Math.round(G.checkpoint.y)] : null,
+            hostP: G.me ? [Math.round(G.me.x), Math.round(G.me.y)] : null
+          });
         }
         break;
       case 'init':
@@ -1461,12 +1572,20 @@ const Game = {
           if (m.diff) G.difficulty = m.diff;
           if (G.state !== 'play') {
             Main.hideOverlays();
-            this.startGame('guest', m.lvl, { loadout: G.loadout });
+            this.startGame('guest', m.lvl, { loadout: G.loadout, skipStory: m.started });
           } else if (G.levelIndex !== m.lvl) {
             this.loadLevel(m.lvl); // reconnected mid-adventure
+            if (m.started) { G.cut = null; G.dialog = null; G.fade = 0; G.fadeDir = -1; }
           } else {
             if (m.diff) this.applyDifficulty(G.level);
             this.applyLoadout();
+          }
+          if (m.cp) G.checkpoint = { x: m.cp[0], y: m.cp[1] };
+          if (m.hostP && G.me && G.mate) {
+            G.mate.x = m.hostP[0]; G.mate.y = m.hostP[1];
+            G.me.x = m.hostP[0] + 52; G.me.y = World.topAt(G.level, G.me.x) || m.hostP[1];
+            G.me.vx = G.me.vy = G.mate.vx = G.mate.vy = 0;
+            G.cam.x = G.me.x; G.cam.y = G.me.y - 100;
           }
         }
         break;
@@ -1853,6 +1972,7 @@ const Game = {
       ctx.fillStyle = def.color;
       ctx.fillText(def.name + ' - ' + def.skill, W / 2 + 8, wy);
     }
+    this.drawSkillCooldowns(ctx, W / 2, ly + (full ? 62 : 47), small);
 
     // offscreen partner arrow
     const s = this.scale * (1 + G.zoomK);
@@ -1885,6 +2005,44 @@ const Game = {
       ctx.fillText(`${Story.NAMES[G.mate.char]} can revive you (hold ❤ close) — or respawn in ${Math.ceil(20 - G.me.downT)}s`, W / 2, H * .3 + 30);
       ctx.shadowBlur = 0;
     }
+  },
+
+  drawSkillCooldowns(ctx, cx, y, small) {
+    const p = G.me;
+    if (!p) return;
+    const w = p.weapon && Weapons[p.weapon] ? Weapons[p.weapon] : null;
+    const items = [
+      { icon: '⚔', label: 'Atk', cd: Math.max(0, p.atkCd) / (p.char === 'joku' ? .38 : .46), color: '#ffffff' },
+      { icon: w ? w.skillIcon : (p.char === 'joku' ? '🌊' : '🌸'), label: 'Sp', cd: Math.max(0, p.spCd) / 2.2, color: w ? w.color : (p.char === 'joku' ? '#7fd8ff' : '#ff9fce') },
+      { icon: p.char === 'joku' ? '🌀' : '🌹', label: '2nd', cd: Math.max(0, p.skill2Cd) / 8, color: p.char === 'joku' ? '#7fd8ff' : '#ff86b8' },
+    ];
+    const r = small ? 12 : 14;
+    const gap = small ? 34 : 40;
+    ctx.save();
+    ctx.textAlign = 'center';
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i], x = cx + (i - 1) * gap;
+      ctx.fillStyle = 'rgba(8,18,30,.62)';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, U.TAU); ctx.fill();
+      ctx.strokeStyle = it.color + 'aa';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, U.TAU); ctx.stroke();
+      const cd = U.clamp(it.cd || 0, 0, 1);
+      if (cd > .01) {
+        ctx.fillStyle = 'rgba(4,8,14,.74)';
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.arc(x, y, r + 1, -Math.PI / 2, -Math.PI / 2 + U.TAU * cd);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.font = `${small ? 12 : 14}px Fredoka, sans-serif`;
+      ctx.fillStyle = cd > .01 ? 'rgba(255,255,255,.58)' : '#ffffff';
+      ctx.fillText(it.icon, x, y + (small ? 4 : 5));
+      ctx.font = `600 ${small ? 8 : 9}px Fredoka, sans-serif`;
+      ctx.fillStyle = cd > .01 ? 'rgba(220,235,245,.62)' : it.color;
+      ctx.fillText(cd > .01 ? Math.ceil(cd * (i === 2 ? 8 : i === 1 ? 2.2 : .45)) + 's' : 'ready', x, y + r + 10);
+    }
+    ctx.restore();
   },
 
   drawCard(ctx, x, y, w, h, who, p, small) {

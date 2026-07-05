@@ -68,7 +68,7 @@ const World = {
       const hp = 300 + idx * 55 + rank * 80;
       const air = type === 'bat' ? U.range(r, 150, 210) : 0;
       foes.push({
-        id: 'mb' + idx + '_' + rank, type, variant: cfg.theme, bossTier: 'normal', bossName: mini && mini.name ? mini.name : (rank === 0 ? 'Oathbreaker Brute' : 'Dreadroot Captain'),
+        id: 'mb' + idx + '_' + rank, type, variant: cfg.theme, bossTier: 'normal', bossRank: rank, bossStyle: cfg.bossKind, bossName: mini && mini.name ? mini.name : (rank === 0 ? 'Oathbreaker Brute' : 'Dreadroot Captain'),
         x: U.clamp(x, pl.x + 90, pl.x + pl.w - 90), y: pl.y - air, homeX: x, homeY: pl.y - air, plat: pl,
         vx: 0, vy: 0, dir: -1, hp, maxHp: hp, dmg: 22 + idx * 2 + rank * 3,
         t: r() * 10, atkT: 1.4, hopY: 0, flash: 0, hurtShow: 0, dead: false, announced: false

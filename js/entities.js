@@ -162,6 +162,7 @@ const Ent = {
     p.atkCd -= dt; p.spCd -= dt; p.atkT += dt;
     p.skill2Cd -= dt;
     p.invuln -= dt; p.hurtCd -= dt;
+    p.weaponPose = Math.max(0, (p.weaponPose || 0) - dt);
     p.wing = Math.max(0, p.wing - dt * (p.dashT > 0 ? 0 : 1.6));
     p.squash *= (1 - 9 * dt);
     p.coyote -= dt;
@@ -397,6 +398,10 @@ const Ent = {
       e.t += dt; e.flash -= dt; e.hurtShow -= dt; e.atkT -= dt;
       if (e._dashCd) e._dashCd -= dt;
       const tgt = Game.nearestPlayer(e.x, e.y);
+      if (e.bossTier && tgt) {
+        e.bossAtkT = (e.bossAtkT || 1.2) - dt;
+        if (e.bossAtkT <= 0 && U.dist(tgt.x, tgt.y, e.x, e.y) < 620) Game.miniBossSpecial(e, tgt);
+      }
       switch (e.type) {
         case 'slime': {
           if (e.hopY === 0 && e.vy === 0) { // grounded
@@ -519,9 +524,9 @@ const Ent = {
         b.x = U.clamp(b.x, 320, G.level.width - 320);
         b.y = b.homeY + Math.sin(b.t * 1.4) * 55; // deep bob — dips into attack range rhythmically
         if (b.modeT <= 0) {
-          b._cycle = ((b._cycle || 0) + 1) % 3;
-          b.mode = ['slam', 'volley', 'summon'][b._cycle];
-          b.modeT = b.mode === 'slam' ? .85 : (b.mode === 'volley' ? .7 : .5);
+          b._cycle = ((b._cycle || 0) + 1) % 4;
+          b.mode = ['slam', 'volley', 'special', 'summon'][b._cycle];
+          b.modeT = b.mode === 'slam' ? .85 : (b.mode === 'volley' ? .7 : (b.mode === 'special' ? .65 : .5));
           if (b.mode === 'slam') b._slamX = U.clamp(mid, 320, G.level.width - 320);
         }
         break;
@@ -558,6 +563,13 @@ const Ent = {
         if (b.modeT <= 0) {
           Game.bossSummon(2 + b.phase);
           b.mode = 'recover'; b.modeT = 1.6;
+        }
+        break;
+      }
+      case 'special': {
+        if (b.modeT <= 0) {
+          Game.bossSpecial(b);
+          b.mode = 'recover'; b.modeT = 1.55;
         }
         break;
       }

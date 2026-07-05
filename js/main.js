@@ -379,12 +379,29 @@ const Main = {
       this.el('touchUI').classList.remove('hidden');
       this.el('tSp').textContent = myChar === 'joku' ? '🌊' : '🌸';
       this.el('tSkill2').textContent = myChar === 'joku' ? '🛡' : '🌺';
-      this.el('tSkill2').title = myChar === 'joku' ? 'Ocean Guard' : 'Rose Promise';
+      this.el('tSkill2').textContent = myChar === 'joku' ? '🌊' : '🌹';
+      this.el('tSkill2').textContent = myChar === 'joku' ? '🌀' : '🌹';
+      this.el('tSkill2').title = myChar === 'joku' ? 'Tide Breaker' : 'Rose Barrage';
     }
     this.syncWeaponUI();
     // keep the screen awake on phones
     if (navigator.wakeLock && !this._wl) {
       navigator.wakeLock.request('screen').then(wl => { this._wl = wl; }).catch(() => {});
+    }
+  },
+
+  setCooldownButton(id, frac, readyColor) {
+    const el = this.el(id);
+    if (!el) return;
+    frac = U.clamp(frac || 0, 0, 1);
+    if (frac > .01) {
+      const deg = Math.round(frac * 360);
+      el.style.backgroundImage = `conic-gradient(from -90deg, rgba(3,8,14,.84) 0deg, rgba(3,8,14,.84) ${deg}deg, rgba(255,255,255,.05) ${deg}deg 360deg), linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.05))`;
+      el.style.filter = 'saturate(.75) brightness(.85)';
+    } else {
+      el.style.backgroundImage = '';
+      el.style.filter = '';
+      if (readyColor) el.style.boxShadow = `0 0 14px ${readyColor}88, 0 4px 14px rgba(0,0,0,.4)`;
     }
   },
 
@@ -400,8 +417,32 @@ const Main = {
       sp.style.borderColor = w ? w.color : '';
       sp.style.boxShadow = w ? '0 0 18px ' + w.color + '88, 0 4px 14px rgba(0,0,0,.4)' : '';
     }
+    const near = (typeof Game !== 'undefined' && Game.nearestWeapon) ? Game.nearestWeapon(G.me) : null;
     const drop = this.el('btnDropWeapon');
-    if (drop) drop.textContent = w ? 'Drop ' + w.name : 'Drop Weapon';
+    if (drop) {
+      drop.textContent = near && Weapons[near.weapon] ? 'Pick ' + Weapons[near.weapon].name : (w ? 'Drop ' + w.name : 'Pick / Drop Weapon');
+    }
+    const tDrop = this.el('tDrop');
+    if (tDrop) {
+      if (near && Weapons[near.weapon]) {
+        tDrop.textContent = '⬆';
+        tDrop.title = 'Pick ' + Weapons[near.weapon].name;
+      } else if (w) {
+        tDrop.textContent = '⇩';
+        tDrop.title = 'Drop ' + w.name;
+      } else {
+        tDrop.textContent = '◇';
+        tDrop.title = 'Stand near a weapon to pick it';
+      }
+      tDrop.setAttribute('aria-label', tDrop.title);
+    }
+    const p = G.me;
+    if (p) {
+      const atkMax = p.char === 'joku' ? .38 : .46;
+      this.setCooldownButton('tAtk', Math.max(0, p.atkCd) / atkMax, '#ffffff');
+      this.setCooldownButton('tSp', Math.max(0, p.spCd) / 2.2, w ? w.color : (p.char === 'joku' ? '#7fd8ff' : '#ff9fce'));
+      this.setCooldownButton('tSkill2', Math.max(0, p.skill2Cd) / 8, p.char === 'joku' ? '#7fd8ff' : '#ff86b8');
+    }
   },
 
   togglePause() {

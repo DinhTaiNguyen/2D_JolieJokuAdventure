@@ -46,6 +46,24 @@ const Art = {
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
   },
 
+  drawHeldWeapon(ctx, p, t, x, y, atk) {
+    if (!p.weapon || !Weapons[p.weapon]) return;
+    const def = Weapons[p.weapon];
+    const flash = U.clamp(p.weaponPose || 0, 0, 1);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((atk ? -.55 : -.22) + Math.sin(t * 3) * .035);
+    const size = atk ? 27 : 22;
+    if (flash > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      this.glow(ctx, 0, 0, 30 + flash * 30, def.color, .28 + flash * .45);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.scale(1 + flash * .18, 1 + flash * .18);
+    }
+    this.drawWeaponGlyph(ctx, p.weapon, 0, 0, size, t);
+    ctx.restore();
+  },
+
   /* ================= JOKU — phoenix of the ocean 💙 ================= */
   drawJoku(ctx, p, t) {
     ctx.save();
@@ -256,6 +274,7 @@ const Art = {
       this.limb(ctx, 6, -37, 8 - armSw * 7, -25 + Math.abs(armSw) * 3, 5.5, '#3878e0');
       ctx.fillStyle = '#ffd9b8'; ctx.beginPath(); ctx.arc(8.4 - armSw * 7, -24 + Math.abs(armSw) * 3, 2.4, 0, U.TAU); ctx.fill();
     }
+    this.drawHeldWeapon(ctx, p, t, atk ? 22 : (cheer ? 14 : 12 - armSw * 5), atk ? -38 : (cheer ? -52 : -27 + Math.abs(armSw) * 2), atk || p.weaponPose > 0);
 
     // ---- dash: leading water crescent ----
     if (p.dashT > 0) {
@@ -502,6 +521,7 @@ const Art = {
       this.limb(ctx, 5, -37, 7 - armSw * 6, -25 + Math.abs(armSw) * 3, 5, '#ffc2da');
       ctx.fillStyle = '#ffe0c4'; ctx.beginPath(); ctx.arc(7.4 - armSw * 6, -24 + Math.abs(armSw) * 3, 2.2, 0, U.TAU); ctx.fill();
     }
+    this.drawHeldWeapon(ctx, p, t, atk ? 21 : (cheer ? 13 : 11 - armSw * 5), atk ? -38 : (cheer ? -51 : -27 + Math.abs(armSw) * 2), atk || p.weaponPose > 0);
 
     ctx.restore();
     this._statusFx(ctx, p, t, '#ff9fce');
@@ -704,6 +724,31 @@ const Art = {
       this.glow(ctx, 0, -18, 25, ep.glow, .22 + Math.sin(t * 4) * .06);
     }
     ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+  },
+
+  miniBossCrown(ctx, e, t, ep) {
+    if (!e.bossTier) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    this.glow(ctx, 0, -42, 32, ep.eye, .45 + Math.sin(t * 5) * .08);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = ep.eye;
+    if ((e.bossRank || 0) === 0) {
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(s * 8, -30); ctx.quadraticCurveTo(s * 24, -48, s * 17, -62); ctx.quadraticCurveTo(s * 10, -49, s * 3, -35);
+        ctx.fill();
+      }
+    } else {
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * 8 - 4, -31); ctx.lineTo(i * 8, -52 - Math.abs(i) * 4); ctx.lineTo(i * 8 + 4, -31);
+        ctx.fill();
+      }
+    }
+    ctx.strokeStyle = 'rgba(10,5,16,.7)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, -20, 22, .12, Math.PI - .12, true); ctx.stroke();
     ctx.restore();
   },
 
@@ -969,6 +1014,7 @@ const Art = {
       }
     }
     this.enemyAccent(ctx, e, t, ep);
+    this.miniBossCrown(ctx, e, t, ep);
     if (e.bossTier) {
       ctx.globalAlpha = 1;
       ctx.scale(1 / 1.55, 1 / 1.55);
@@ -990,6 +1036,45 @@ const Art = {
   },
 
   /* ================= BOSS — chapter hearts ================= */
+  bossScaryShape(ctx, e, t, bp) {
+    if (e.dying > 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    if (e.bossKind === 'root') {
+      ctx.strokeStyle = bp.crack + 'cc'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+      for (const side of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(side * 38, -52); ctx.quadraticCurveTo(side * 95, -105, side * 78, -155); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(side * 56, -76); ctx.lineTo(side * 102, -112); ctx.stroke();
+      }
+    } else if (e.bossKind === 'tide') {
+      ctx.strokeStyle = bp.aura + 'cc'; ctx.lineWidth = 6;
+      for (const side of [-1, 1]) {
+        ctx.beginPath(); ctx.arc(side * 66, -8 + Math.sin(t * 3) * 8, 44, side > 0 ? 2.2 : -.9, side > 0 ? 4.8 : 1.9); ctx.stroke();
+      }
+    } else if (e.bossKind === 'briar') {
+      ctx.fillStyle = bp.shardGlow;
+      for (let i = -3; i <= 3; i++) {
+        ctx.beginPath(); ctx.moveTo(i * 22 - 5, -54); ctx.lineTo(i * 22, -98 - Math.abs(i) * 8); ctx.lineTo(i * 22 + 5, -54); ctx.fill();
+      }
+    } else if (e.bossKind === 'ember') {
+      this.glow(ctx, 0, -92, 62 + Math.sin(t * 9) * 5, bp.aura, .65);
+      ctx.fillStyle = bp.aura;
+      ctx.beginPath(); ctx.moveTo(0, -146); ctx.quadraticCurveTo(34, -100, 10, -64); ctx.quadraticCurveTo(-24, -94, 0, -146); ctx.fill();
+    } else if (e.bossKind === 'eclipse') {
+      ctx.strokeStyle = bp.shardGlow + 'dd'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(0, -30, 118, -2.45, -.7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -30, 118, .7, 2.45); ctx.stroke();
+      for (let i = 0; i < 4; i++) { const a = t + i * U.TAU / 4; this.star(ctx, Math.cos(a) * 118, -30 + Math.sin(a) * 68, 7, bp.eye); }
+    } else {
+      ctx.strokeStyle = bp.shardGlow + 'cc'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+      for (const side of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(side * 48, -42); ctx.bezierCurveTo(side * 125, -80, side * 120, 40, side * 66, 58); ctx.stroke();
+      }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+  },
+
   drawBoss(ctx, e, t) {
     ctx.save();
     ctx.translate(e.x, e.y);
@@ -1076,6 +1161,7 @@ const Art = {
       }
       ctx.globalCompositeOperation = 'source-over';
     }
+    this.bossScaryShape(ctx, e, t, bp);
     // face
     if (dying > 0) { // purified — happy at last
       ctx.strokeStyle = '#7e2a52'; ctx.lineWidth = 3;
@@ -1729,12 +1815,13 @@ const Art = {
         break;
       }
       case 'darkball':
+        const darkColor = pr.color || '#9e5eff';
         ctx.globalCompositeOperation = 'lighter';
-        this.glow(ctx, 0, 0, 18, '#9e5eff', .8);
+        this.glow(ctx, 0, 0, 18, darkColor, .8);
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = '#3a1f66';
         ctx.beginPath(); ctx.arc(0, 0, 8, 0, U.TAU); ctx.fill();
-        ctx.fillStyle = '#c9a0ff';
+        ctx.fillStyle = darkColor;
         ctx.beginPath(); ctx.arc(-2, -2, 2.5, 0, U.TAU); ctx.fill();
         break;
       case 'starshot': {
