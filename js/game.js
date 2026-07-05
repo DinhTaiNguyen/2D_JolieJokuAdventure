@@ -17,7 +17,7 @@ const G = {
   loadout: { joku: null, jolie: null },
   paused: false, bossActive: false, netLost: false, ended: false, nextLevelT: 0,
   netT: { p: 0, w: 0, seq: 0, wseq: 0 }, mateNet: null, mateBuf: [], lastMateSeq: 0, lastWorldSeq: 0, _dropId: 0, _comboToastT: 0,
-  demo: null,
+  demo: null, _lockHintT: 0,
 };
 
 const Game = {
@@ -92,6 +92,7 @@ const Game = {
     this.applyLoadout();
     for (const pet of G.pets) { pet.x = pet.owner.x - 40; pet.y = pet.owner.y; }
     G.checkpoint = { x: G.level.checkpoints[0].x, y: gy };
+    G._lockHintT = 0;
     G.handHold = false;
     G.cam.x = joku.x; G.cam.y = gy - 120;
 
@@ -268,6 +269,8 @@ const Game = {
     }
     Ent.updateProjectiles(dt);
     this.updateAuras(dt);
+    if (G.mode !== 'guest' && !G.cut && !G.dialog && G.kissCin <= 0) this.updateLoveTrials(dt);
+    if (!G.cut && G.kissCin <= 0) this.enforceProgressLocks(dt);
 
     // ----- touch damage from enemies -----
     if (!G.me.down && G.me.invuln <= 0 && G.kissCin <= 0 && !G.cut) {
@@ -333,6 +336,7 @@ const Game = {
     this.updateAmbient(dt);
     G.hugCd -= dt;
     G.shakeT -= dt;
+    if (G._lockHintT > 0) G._lockHintT -= dt;
     if (G.announce) { G.announce.t -= dt; if (G.announce.t <= 0) G.announce = null; }
     if (G._comboToastT > 0) G._comboToastT -= dt;
     if (G.nextLevelT > 0 && G.mode !== 'guest') {
@@ -436,6 +440,110 @@ const Game = {
     }
   },
 
+  updateLoveTrials(dt) {
+    const trials = (G.level && G.level.loveTrials) || [];
+    const tr = trials.find(x => !x.done);
+    if (!tr) return;
+    const me = G.me, mate = G.mate;
+    const nearMe = U.dist(me.x, me.y, tr.x, tr.y) < 135;
+    const nearMate = U.dist(mate.x, mate.y, tr.x, tr.y) < 135;
+    const together = nearMe && nearMate && !me.down && !mate.down;
+    const holding = G.handHold || (Input.held('heart') && U.dist(me.x, me.y, mate.x, mate.y) < 150);
+
+    if (together && holding) {
+      tr.charge = U.clamp((tr.charge || 0) + dt / 2.1, 0, 1);
+      if (!tr.started) {
+        tr.started = true;
+        const info = Story.trialInfo(G.levelIndex, tr.id);
+        G.announce = { txt: info.title, sub: info.hint, t: 2.8 };
+        SND.sfx('heart');
+      }
+      if (Math.random() < dt * 12) {
+        Ptc.add({ kind: 'heart', x: tr.x + (Math.random() - .5) * 90, y: tr.y - 24 - Math.random() * 70, vx: (Math.random() - .5) * 35, vy: -45, r: 4 + Math.random() * 4, life: 1, color: '#ff9fce' });
+      }
+      if (tr.charge >= 1) this.finishLoveTrial(tr, false);
+    } else {
+      tr.started = false;
+      tr.charge = Math.max(0, (tr.charge || 0) - dt * .35);
+      if ((nearMe || nearMate) && !G._lockHintT) {
+        const info = Story.trialInfo(G.levelIndex, tr.id);
+        G.announce = { txt: info.title, sub: info.hint, t: 2.4 };
+        G._lockHintT = 3;
+      }
+    }
+  },
+
+  finishLoveTrial(tr, fromNet) {
+    if (!tr) return;
+    const already = tr.done && tr._celebrated;
+    tr.done = true;
+    tr.charge = 1;
+    tr._celebrated = true;
+    this.setCheckpoint(tr.x, tr.y, 'Love Trial', true);
+    const info = Story.trialInfo(G.levelIndex, tr.id);
+    G.announce = { txt: info.done, sub: 'Vũ khí sáng đã xuất hiện. Hãy chọn món phù hợp!', t: 3.2 };
+    SND.sfx('gate');
+    Ptc.add({ kind: 'ring', x: tr.x, y: tr.y - 24, vx: 0, vy: 0, r: 180, life: .9, color: 'rgba(255,170,210,.9)' });
+    Ptc.burst('heart', tr.x, tr.y - 60, 18, { sp: 170, r: 7, life: 1.3 });
+    if (!fromNet && G.mode !== 'guest') {
+      this.loveAdd(18);
+      this.dropWeapons(tr.x, tr.y - 8, 2);
+      this.emit('trial', { id: tr.id });
+    } else if (!already) {
+      SND.sfx('weaponDrop');
+    }
+  },
+
+  progressLocks() {
+    const L = G.level;
+    if (!L) return [];
+    const locks = [];
+    const trial = (L.loveTrials || []).find(t => !t.done);
+    if (trial) {
+      const info = Story.trialInfo(G.levelIndex, trial.id);
+      locks.push({ x: trial.x, limit: trial.x + 190, txt: info.title, sub: info.hint });
+    }
+    for (const e of L.foes) {
+      if (e.bossTier && !e.dead && !(e.dying > 0)) {
+        locks.push({ x: e.x, limit: e.x + 330, txt: e.bossName || 'Strong Boss', sub: 'Đánh bại boss này để tiếp tục.' });
+      }
+    }
+    if (L.gateX && !L.gateOpen) {
+      locks.push({ x: L.gateX, limit: L.gateX + 135, txt: 'Cổng trái tim', sub: 'Cả hai đứng cạnh cổng để mở lối vào boss.' });
+    }
+    if (L.boss && G.bossActive && !L.boss.dead && !(L.boss.dying > 0)) {
+      locks.push({ x: L.boss.x, limit: L.boss.x + 420, txt: L.boss.bossName || 'Final Boss', sub: 'Đánh bại boss cuối để kết thúc chương.' });
+    }
+    return locks.sort((a, b) => a.x - b.x);
+  },
+
+  enforceProgressLocks(dt) {
+    const locks = this.progressLocks();
+    if (!locks.length) return;
+    const actors = G.mate && G.mate.bot ? [G.me, G.mate] : [G.me];
+    for (const p of actors) {
+      if (!p || p.down) continue;
+      const lock = locks.find(l => p.x > l.limit);
+      if (!lock) continue;
+      p.x = lock.limit;
+      p.vx = Math.min(0, p.vx);
+      if (p.safeX > lock.limit) p.safeX = lock.limit - 20;
+      if (G._lockHintT <= 0) {
+        G.announce = { txt: lock.txt, sub: lock.sub, t: 2.5 };
+        SND.sfx('ui');
+        G._lockHintT = 2.4;
+      }
+    }
+  },
+
+  setCheckpoint(x, y, label, quiet) {
+    if (!G.level) return;
+    const top = World.topAt(G.level, x, y - 120) || World.topAt(G.level, x) || y || 520;
+    G.checkpoint = { x, y: top };
+    if (!quiet && label) this.toastMsg('Save point: ' + label);
+    Ptc.add({ kind: 'ring', x, y: top - 20, vx: 0, vy: 0, r: 95, life: .7, color: 'rgba(170,230,255,.8)' });
+  },
+
   updatePetDamage(dt) {
     if (!G.level) return;
     for (const pet of G.pets) {
@@ -484,6 +592,8 @@ const Game = {
           this.loveAdd(10);
           Ptc.burst('heart', mate.x, mate.y - 40, 12, { sp: 140, r: 7, life: 1.2 });
           if (mate.bot) { mate.down = false; mate.pose = null; mate.hp = mate.maxHp * .6; mate.cheerT = 1; }
+          else { mate.down = false; mate.pose = null; mate.hp = Math.max(mate.hp, mate.maxHp * .45); }
+          this.reviveKiss((me.x + mate.x) / 2);
         }
       } else G.reviveT = 0;
       return;
@@ -620,13 +730,101 @@ const Game = {
     o.t = 0;
     G.projs.push(o);
     if (!fromNet) {
-      if (o.mine) this.emit('shoot', { kind: o.kind, x: o.x, y: o.y, vx: o.vx, vy: o.vy, life: o.life, g: o.g });
+      if (o.mine) this.emit('shoot', { kind: o.kind, color: o.color, x: o.x, y: o.y, vx: o.vx, vy: o.vy, life: o.life, g: o.g });
       else if (o.host && G.mode === 'host') this.emit('shoot', { kind: o.kind, x: o.x, y: o.y, vx: o.vx, vy: o.vy, life: o.life, g: o.g, foe: true, dmg: o.dmg });
     }
   },
 
   addAura(x, y, mine) {
     G.auras.push({ x, y, t: 3.5, mine });
+  },
+
+  weaponSpecial(p, w) {
+    const dir = p.dir || 1;
+    const color = w.color || '#fff3a8';
+    const mine = !p.remote;
+    const shoot = (kind, vx, vy, dmg, life = 1.2, g = 0, x = p.x + dir * 20, y = p.y - 40) => {
+      this.addProj({ kind, color, x, y, vx, vy, dmg, life, g, mine, owner: p.char });
+    };
+    SND.sfx('weaponPickup');
+    switch (w.special) {
+      case 'tideDash':
+        p.dashT = .42; p.invuln = Math.max(p.invuln, .65); this.emitFx('dash', p.x, p.y); break;
+      case 'roseBloom':
+        this.addAura(p.x, p.y, mine); this.emitFx('bloom', p.x, p.y); break;
+      case 'starRain':
+        for (let i = -2; i <= 2; i++) shoot('starshot', dir * (250 + i * 25), -340 - Math.abs(i) * 30, 19, 1.3, 520, p.x + i * 28, p.y - 120);
+        break;
+      case 'heartHeal':
+        for (const q of [G.me, G.mate]) if (!q.down && U.dist(q.x, q.y, p.x, p.y) < 260) q.hp = Math.min(q.maxHp, q.hp + 28);
+        Ptc.burst('heart', p.x, p.y - 48, 16, { sp: 120, r: 7, life: 1 });
+        this.loveAdd(6); break;
+      case 'moonVolley':
+        for (const a of [-.35, -.18, 0, .18, .35]) shoot('bolt', dir * 680 * Math.cos(a), 680 * Math.sin(a), 17, 1.15);
+        break;
+      case 'emberArc':
+        for (let i = 0; i < 4; i++) shoot('bolt', dir * (400 + i * 80), -230 - i * 35, 22, 1.15, 620);
+        break;
+      case 'thunderSlam':
+        this.bossSlam(p.x, 22); break;
+      case 'crystalBurst':
+        for (let i = 0; i < 8; i++) { const a = i * U.TAU / 8; shoot('bolt', Math.cos(a) * 420, Math.sin(a) * 420, 14, .9); }
+        break;
+      case 'shadowBlink':
+        p.x += dir * 180; p.invuln = Math.max(p.invuln, 1); Ptc.burst('dot', p.x, p.y - 35, 18, { color, sp: 160, r: 7, life: .7 }); break;
+      case 'sunGuard':
+        p.invuln = Math.max(p.invuln, 2.4); if (G.mate.bot) G.mate.invuln = Math.max(G.mate.invuln, 1.6); Ptc.add({ kind: 'ring', x: p.x, y: p.y - 32, vx: 0, vy: 0, r: 150, life: .8, color: color + 'dd' }); break;
+      case 'lotusWind':
+        for (const a of [-.45, -.22, 0, .22, .45]) shoot('petal', dir * 560 * Math.cos(a), 560 * Math.sin(a), 13, 1.2);
+        this.addAura(p.x + dir * 90, p.y, mine); break;
+      case 'riverWall':
+        for (let i = 0; i < 5; i++) shoot('phoenix', dir * 360, -220 + i * 110, 16, 1.25, 0, p.x + dir * 28, p.y - 95 + i * 24);
+        break;
+      case 'cometDash':
+        p.dashT = .34; p.invuln = Math.max(p.invuln, .7); shoot('starshot', dir * 820, -80, 30, .9, 0); break;
+      case 'pandaGift':
+        p.hp = Math.min(p.maxHp, p.hp + 22); p.mp = Math.min(p.maxMp, p.mp + 35); this.dropWeapons(p.x, p.y, 1); break;
+      case 'luluHowl':
+        for (const e of this.enemiesAll()) if (!e.dead && Math.abs(e.x - p.x) < 280) this.hitEnemy(e, 26, p.char);
+        Ptc.text(p.x, p.y - 88, 'HOWL!', color); break;
+      case 'phoenixNova':
+        for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * U.TAU / 10; shoot('phoenix', Math.cos(a) * 430, Math.sin(a) * 430, 18, 1.1); }
+        break;
+      case 'dreamSong':
+        this.loveAdd(14); for (const e of this.enemiesAll()) if (!e.dead && Math.abs(e.x - p.x) < 360) { e.atkT = Math.max(e.atkT, 2.2); e.flash = .2; }
+        Ptc.text(p.x, p.y - 82, '♪', color); break;
+      case 'vineSnare':
+        for (const e of this.enemiesAll()) if (!e.dead && Math.abs(e.x - p.x) < 420) { this.hitEnemy(e, 20, p.char); e.atkT = Math.max(e.atkT, 1.2); }
+        break;
+      case 'auroraShield':
+        p.invuln = Math.max(p.invuln, 1.4); for (let i = 0; i < 6; i++) { const a = i * U.TAU / 6; shoot('bolt', Math.cos(a) * 330, Math.sin(a) * 330, 12, 1); }
+        break;
+      case 'loveBeacon':
+      default:
+        this.loveAdd(18); this.hugHearts(p.x); p.hp = Math.min(p.maxHp, p.hp + 14); break;
+    }
+    this.weaponBurst(p.x, p.y - 45, p.weapon, .75);
+  },
+
+  characterSkill2(p) {
+    if (p.char === 'joku') {
+      SND.sfx('dash');
+      p.invuln = Math.max(p.invuln, 2);
+      for (const q of [G.me, G.mate]) if (!q.down && U.dist(q.x, q.y, p.x, p.y) < 340) q.mp = Math.min(q.maxMp, q.mp + 28);
+      Ptc.add({ kind: 'ring', x: p.x, y: p.y - 30, vx: 0, vy: 0, r: 220, life: .9, color: 'rgba(120,216,255,.9)' });
+      Ptc.text(p.x, p.y - 105, 'Ocean Guard', '#7fd8ff');
+      this.emitFx('skill2', p.x, p.y, { char: p.char });
+    } else {
+      SND.sfx('heal');
+      for (const q of [G.me, G.mate]) {
+        if (U.dist(q.x, q.y, p.x, p.y) < 360) {
+          q.down = false; q.pose = null; q.hp = Math.min(q.maxHp, Math.max(q.hp, q.maxHp * .55)); q.invuln = Math.max(q.invuln, 1.4);
+        }
+      }
+      this.addAura(p.x, p.y, !p.remote);
+      Ptc.text(p.x, p.y - 105, 'Rose Promise', '#ffa9d8');
+      this.emitFx('skill2', p.x, p.y, { char: p.char });
+    }
   },
 
   updateAuras(dt) {
@@ -700,6 +898,7 @@ const Game = {
     else if (G.mate.bot && by === G.mate.char) G.mate.cheerT = .9;
     Ptc.burst('dot', e.x, e.y - 14, 10, { color: '#b28fe8', sp: 160, r: 7, life: .6 });
     Ptc.burst('spark', e.x, e.y - 14, 6, { sp: 190, g: 500, r: 4, life: .6 });
+    if (e.bossTier) this.setCheckpoint(Math.max(140, e.x - 120), World.topAt(G.level, e.x) || e.y, e.bossName || 'Boss', true);
     if (G.mode !== 'guest') {
       if (e.bossTier) {
         this.dropWeapons(e.x, e.y, 2);
@@ -709,7 +908,9 @@ const Game = {
       // loot
       const r = Math.random();
       let kind = null;
-      if (r < .5) kind = 'mote';
+      if (!e.bossTier && r < .1) {
+        this.dropWeapons(e.x, e.y, 1);
+      } else if (r < .5) kind = 'mote';
       else if (r < .72) kind = 'heartDrop';
       if (kind) {
         const it = { id: 'd' + (G._dropId++), kind, x: e.x, y: e.y - 30, taken: false };
@@ -761,22 +962,40 @@ const Game = {
     this.loveAdd(10);
     SND.sfx('revive');
     Ptc.burst('heart', G.me.x, G.me.y - 40, 12, { sp: 140, r: 7, life: 1.2 });
+    this.reviveKiss((G.me.x + G.mate.x) / 2);
     this.toastMsg('💞 Love Surge! Revived by love.');
   },
 
+  reviveKiss(x) {
+    const joku = this.byChar('joku'), jolie = this.byChar('jolie');
+    if (!joku || !jolie) return;
+    x = x || (joku.x + jolie.x) / 2;
+    joku.pose = jolie.pose = 'kiss';
+    joku.poseT = jolie.poseT = .85;
+    joku.dir = x >= joku.x ? 1 : -1;
+    jolie.dir = -joku.dir;
+    SND.sfx('kiss');
+    Ptc.add({ kind: 'ring', x, y: Math.min(joku.y, jolie.y) - 42, vx: 0, vy: 0, r: 120, life: .65, color: 'rgba(255,170,210,.85)' });
+    Ptc.burst('heart', x, Math.min(joku.y, jolie.y) - 62, 10, { sp: 120, r: 6, life: 1 });
+  },
+
+  respawnPlayer(p, hpFrac) {
+    p.down = false; p.pose = null; p.downT = 0;
+    p.hp = p.maxHp * hpFrac; p.mp = Math.max(p.mp, p.maxMp * .35); p.invuln = 2.5;
+    p.x = G.checkpoint.x + (p.char === 'jolie' ? 46 : 0);
+    p.y = (World.topAt(G.level, p.x) || G.checkpoint.y);
+    p.vx = p.vy = 0;
+    Ptc.burst('heart', p.x, p.y - 40, 8, { sp: 110, r: 6, life: 1 });
+  },
+
   respawnMe(hpFrac) {
-    const me = G.me;
-    me.down = false; me.pose = null; me.downT = 0;
-    me.hp = me.maxHp * hpFrac; me.invuln = 2.5;
-    me.x = G.checkpoint.x + (me.char === 'jolie' ? 46 : 0);
-    me.y = (World.topAt(G.level, me.x) || G.checkpoint.y);
-    me.vx = me.vy = 0;
-    Ptc.burst('heart', me.x, me.y - 40, 8, { sp: 110, r: 6, life: 1 });
+    this.respawnPlayer(G.me, hpFrac);
   },
 
   applyWipe() {
     G._wiping = false;
     this.respawnMe(.6);
+    if (G.mate && G.mate.bot) this.respawnPlayer(G.mate, .6);
     this.toastMsg('💞 Love never gives up! Back to the shrine.');
   },
 
@@ -811,6 +1030,14 @@ const Game = {
         break;
       case 'weapon': {
         const weapon = Weapons[it.weapon] ? it.weapon : 'tideSpear';
+        const p = this.byChar(by);
+        if (!fromNet && p.weapon && p.weapon !== weapon) {
+          const old = p.weapon;
+          const oldIt = { id: 'w' + (G._dropId++), kind: 'weapon', weapon: old, x: it.x + (p.dir || 1) * 34, y: it.y - 4, taken: false };
+          G.level.items.push(oldIt);
+          this.emit('drop', { id: oldIt.id, kind: oldIt.kind, weapon: old, x: oldIt.x, y: oldIt.y });
+          this.weaponBurst(oldIt.x, oldIt.y, old, .75);
+        }
         this.setWeapon(by, weapon);
         if (forMe) this.toastMsg('Equipped ' + Weapons[weapon].name + '. Press Q or ⇩ to drop it.');
         if (!fromNet) SND.sfx('weaponPickup');
@@ -890,12 +1117,12 @@ const Game = {
       const type = summonTypes[(Math.random() * summonTypes.length) | 0];
       const hp = type === 'golem' ? 145 : type === 'thorn' ? 85 : type === 'slime' ? 55 : 58;
       const f = {
-        id: 'bs' + (G._dropId++), type, x: U.clamp(b.x + off, pl.x + 40, pl.x + pl.w - 40), y: pl.y, homeX: b.x + off, homeY: pl.y - (type === 'bat' || type === 'wisp' ? 170 : 0), plat: pl,
+        id: 'bs' + (G._dropId++), type, variant: G.level.theme, x: U.clamp(b.x + off, pl.x + 40, pl.x + pl.w - 40), y: pl.y, homeX: b.x + off, homeY: pl.y - (type === 'bat' || type === 'wisp' ? 170 : 0), plat: pl,
         vx: 0, vy: 0, dir: 1, hp, maxHp: hp, dmg: type === 'golem' ? 22 : 13, t: 0, atkT: .6, hopY: 0, flash: 0, hurtShow: 0, dead: false
       };
       if (type === 'bat' || type === 'wisp') f.y = f.homeY;
       G.level.foes.push(f);
-      this.emit('spawn', { id: f.id, type: f.type, x: f.x, y: f.y, hp: f.hp, dmg: f.dmg });
+      this.emit('spawn', { id: f.id, type: f.type, variant: f.variant, x: f.x, y: f.y, hp: f.hp, dmg: f.dmg });
       Ptc.burst('dot', f.x, f.y - 14, 8, { color: '#9e5eff', sp: 140, r: 7, life: .5 });
     }
   },
@@ -907,6 +1134,7 @@ const Game = {
     this.shake(14);
     Ptc.add({ kind: 'ring', x: b.x, y: b.y, vx: 0, vy: 0, r: 400, life: 1.2, color: 'rgba(255,170,210,.9)' });
     Ptc.burst('heart', b.x, b.y, 20, { sp: 260, r: 8, life: 1.6 });
+    this.setCheckpoint(Math.max(140, b.x - 220), World.topAt(G.level, b.x) || b.y + 125, b.bossName || 'Final Boss', true);
     this.dropWeapons(b.x, b.y, 2);
     this.emit('bossdead', {});
     SND.startMusic(G.levelIndex, false);
@@ -1181,8 +1409,8 @@ const Game = {
     if (G.mode === 'solo') return;
     NET.send({ t: 'ev', k, d: data });
   },
-  emitFx(kind, x, y) {
-    this.emit('fx', { kind, x, y });
+  emitFx(kind, x, y, extra) {
+    this.emit('fx', Object.assign({ kind, x, y }, extra || {}));
   },
 
   sendState() {
@@ -1201,8 +1429,16 @@ const Game = {
       if (!e.dead) foes.push([e.id, Math.round(e.x), Math.round(e.y), e.dir, Math.round(e.hp)]);
     }
     const b = G.level.boss;
+    const trials = (G.level.loveTrials || []).map(t => [t.id, t.done ? 1 : 0, Math.round((t.charge || 0) * 100)]);
+    const dead = G.level.foes.filter(e => e.dead).map(e => e.id);
+    const items = G.level.items
+      .filter(it => !it.taken && (it.id[0] === 'w' || it.id[0] === 'd'))
+      .map(it => [it.id, it.kind, it.weapon || '', Math.round(it.x), Math.round(it.y)]);
     NET.send({
       t: 'w', q: ++G.netT.wseq, love: Math.round(G.love), foes,
+      dead, items, trials, gate: G.level.gateOpen ? 1 : 0, shrine: G.level.shrineDone ? 1 : 0,
+      bossActive: G.bossActive ? 1 : 0,
+      cp: [Math.round(G.checkpoint.x), Math.round(G.checkpoint.y)],
       boss: b ? [Math.round(b.x), Math.round(b.y), Math.round(b.hp), b.dying > 0 ? 1 : 0] : null
     }, { volatile: true, maxBuffered: 32768 });
   },
@@ -1240,9 +1476,30 @@ const Game = {
         if (m.q && G.lastWorldSeq && m.q <= G.lastWorldSeq) break;
         if (m.q) G.lastWorldSeq = m.q;
         G.love = m.love;
+        if (m.gate != null) G.level.gateOpen = !!m.gate;
+        if (m.shrine != null) G.level.shrineDone = !!m.shrine;
+        if (m.bossActive != null) G.bossActive = !!m.bossActive;
+        if (m.cp) G.checkpoint = { x: m.cp[0], y: m.cp[1] };
+        if (m.dead) {
+          for (const id of m.dead) {
+            const e = G.level.foes.find(x => x.id === id);
+            if (e) e.dead = true;
+          }
+        }
         for (const f of m.foes) {
           const e = G.level.foes.find(x => x.id === f[0]);
           if (e && !e.dead) { e.tx = f[1]; e.ty = f[2]; e.dir = f[3]; e.hp = f[4]; }
+        }
+        if (m.items) {
+          for (const it of m.items) {
+            if (!G.level.items.find(x => x.id === it[0])) G.level.items.push({ id: it[0], kind: it[1], weapon: it[2] || null, x: it[3], y: it[4], taken: false });
+          }
+        }
+        if (m.trials) {
+          for (const tr of m.trials) {
+            const local = (G.level.loveTrials || []).find(x => x.id === tr[0]);
+            if (local) { local.done = !!tr[1]; local.charge = (tr[2] || 0) / 100; }
+          }
         }
         if (m.boss && G.level.boss) {
           const b = G.level.boss;
@@ -1258,7 +1515,7 @@ const Game = {
   applyEvent(k, d) {
     switch (k) {
       case 'shoot':
-        this.addProj({ kind: d.kind, x: d.x, y: d.y, vx: d.vx, vy: d.vy, dmg: d.foe ? (d.dmg || 14) : 0, life: d.life, g: d.g, mine: false, foe: !!d.foe }, true);
+        this.addProj({ kind: d.kind, color: d.color, x: d.x, y: d.y, vx: d.vx, vy: d.vy, dmg: d.foe ? (d.dmg || 14) : 0, life: d.life, g: d.g, mine: false, foe: !!d.foe }, true);
         if (d.kind === 'phoenix') SND.sfx('shootJ');
         else if (d.kind === 'petal') SND.sfx('shootP');
         break;
@@ -1286,12 +1543,17 @@ const Game = {
         const type = d.type || 'slime';
         const hp = d.hp || (type === 'golem' ? 145 : type === 'thorn' ? 85 : type === 'slime' ? 55 : 58);
         G.level.foes.push({
-          id: d.id, type, x: d.x, y: d.y, homeX: d.x, homeY: d.y, plat: pl, tx: d.x, ty: d.y,
+          id: d.id, type, variant: d.variant || G.level.theme, x: d.x, y: d.y, homeX: d.x, homeY: d.y, plat: pl, tx: d.x, ty: d.y,
           vx: 0, vy: 0, dir: 1, hp, maxHp: hp, dmg: d.dmg || 13, t: 0, atkT: 1, hopY: 0, flash: 0, hurtShow: 0, dead: false
         });
         break;
       }
       case 'love': this.applyLove(d.kind, d.x); break;
+      case 'trial': {
+        const tr = (G.level.loveTrials || []).find(x => x.id === d.id);
+        this.finishLoveTrial(tr, true);
+        break;
+      }
       case 'down':
         SND.sfx('down');
         this.toastMsg(G.mate.char === 'joku' ? '💔 Joku is down! Hug him back up!' : '💔 Jolie is down! Hug her back up!');
@@ -1308,6 +1570,10 @@ const Game = {
       case 'fx':
         if (d.kind === 'dash') { SND.sfx('dash'); }
         if (d.kind === 'bloom') { SND.sfx('bloom'); this.addAura(d.x, d.y, false); }
+        if (d.kind === 'skill2') {
+          SND.sfx(d.char === 'jolie' ? 'heal' : 'dash');
+          Ptc.add({ kind: 'ring', x: d.x, y: d.y - 30, vx: 0, vy: 0, r: 180, life: .8, color: d.char === 'jolie' ? 'rgba(255,169,216,.9)' : 'rgba(120,216,255,.9)' });
+        }
         break;
     }
   },
@@ -1356,6 +1622,10 @@ const Game = {
     // shrine & gate
     if (L.shrineX) Art.drawShrine(ctx, L.shrineX, L.shrineY, t, L.shrineDone);
     if (L.gateX) Art.drawGate(ctx, L.gateX, L.gateY, t, L.gateOpen || (Math.abs(G.me.x - L.gateX) < 160 && Math.abs(G.mate.x - L.gateX) < 160));
+    for (const tr of (L.loveTrials || [])) {
+      if (tr.x < viewL || tr.x > viewR) continue;
+      Art.drawLoveTrial(ctx, tr, t);
+    }
 
     // contact shadows (grounding!)
     for (const e of [G.me, G.mate]) {

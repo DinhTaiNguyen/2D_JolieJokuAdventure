@@ -378,6 +378,8 @@ const Main = {
     if (Input.touchMode) {
       this.el('touchUI').classList.remove('hidden');
       this.el('tSp').textContent = myChar === 'joku' ? '🌊' : '🌸';
+      this.el('tSkill2').textContent = myChar === 'joku' ? '🛡' : '🌺';
+      this.el('tSkill2').title = myChar === 'joku' ? 'Ocean Guard' : 'Rose Promise';
     }
     this.syncWeaponUI();
     // keep the screen awake on phones
@@ -455,6 +457,36 @@ const Main = {
     this.el('btnAgain').onclick = () => location.reload();
     this.el('btnEndMenu').onclick = () => { ep.remove(); Game.quitToMenu(); };
   }
+};
+
+Main.showEnd = function(stats, seconds) {
+  let ep = this.el('endPanel');
+  if (ep) ep.remove();
+  const loveLines = (typeof Story !== 'undefined' && Story.LOVE_LINES) || ['Joku, Jolie, Lulu và Biscuit đã cùng nhau đưa ánh sáng trở lại.'];
+  const loveLine = loveLines[(Math.random() * loveLines.length) | 0];
+  const finalBoss = (G.level && G.level.boss && G.level.boss.bossName) || 'boss cuối';
+  ep = document.createElement('div');
+  ep.id = 'endPanel';
+  ep.className = 'overlay';
+  ep.innerHTML = `
+    <div class="panel">
+      <h2>💞 Tình yêu đã trở lại! 💞</h2>
+      <p style="font-size:17px"><b>Chúc mừng Joku và Jolie!</b></p>
+      <p>${loveLine}</p>
+      <p style="font-size:16px">${finalBoss} đã dịu lại, ánh sáng rừng bừng lên lần nữa,<br>
+      và Joku &amp; Jolie tiếp tục yêu nhau qua từng cuộc phiêu lưu.</p>
+      <p style="font-size:15px; line-height:2">
+        💧 Ngọc nước: <b>${stats.orbs}</b> &nbsp; 🌸 Hoa: <b>${stats.flowers}</b><br>
+        💗 Trái tim: <b>${stats.hearts}</b> &nbsp; 🤗 Ôm: <b>${stats.hugs}</b> &nbsp; 💋 Hôn: <b>${stats.kisses}</b><br>
+        ⚔️ Bóng tối đã dọn: <b>${stats.kills}</b> &nbsp; ⏱ Thời gian: <b>${U.fmtTime(seconds)}</b>
+      </p>
+      <p class="dim">dành cho Joku 💙 &amp; Jolie 💗</p>
+      <button id="btnAgain" class="mbtn join">💕 Chơi lại</button>
+      <button id="btnEndMenu" class="mbtn ghost">🏠 Menu</button>
+    </div>`;
+  this.el('ui').appendChild(ep);
+  this.el('btnAgain').onclick = () => location.reload();
+  this.el('btnEndMenu').onclick = () => { ep.remove(); Game.quitToMenu(); };
 };
 
 /* ============ boot ============ */

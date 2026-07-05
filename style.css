@@ -142,7 +142,7 @@ input, textarea {
 }
 #btns {
   position:absolute; right:calc(14px + env(safe-area-inset-right)); bottom:calc(16px + env(safe-area-inset-bottom));
-  display:grid; grid-template-columns:repeat(2, 72px); gap:12px; pointer-events:auto;
+  display:grid; grid-template-columns:repeat(3, 66px); gap:10px; pointer-events:auto;
   justify-items:center; align-items:center;
 }
 .tbtn {
@@ -152,7 +152,7 @@ input, textarea {
   box-shadow:0 4px 14px rgba(0,0,0,.4);
 }
 .tbtn.big { width:80px; height:80px; font-size:32px; }
-.tbtn.small { width:54px; height:54px; font-size:24px; grid-column:1 / -1; opacity:.88; }
+.tbtn.small { width:54px; height:54px; font-size:24px; grid-column:2; opacity:.88; }
 .tbtn:active, .tbtn.pressed { filter:brightness(1.6); transform:scale(.93); }
 #tHeart { border-color:rgba(255,140,195,.6); }
 

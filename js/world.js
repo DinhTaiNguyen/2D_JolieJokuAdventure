@@ -57,7 +57,7 @@ const World = {
       const def = DEFS[type];
       const air = type === 'wisp' ? U.range(r, 120, 190) : (type === 'imp' || type === 'bat') ? U.range(r, 150, 210) : 0;
       foes.push({
-        id: 'e' + (foeId++), type, x, y: pl.y - air, homeX: x, homeY: pl.y - air, plat: pl,
+        id: 'e' + (foeId++), type, variant: cfg.theme, x, y: pl.y - air, homeX: x, homeY: pl.y - air, plat: pl,
         vx: 0, vy: 0, dir: 1, hp: def.hp, maxHp: def.hp, dmg: def.dmg,
         t: r() * 10, atkT: r() * 2, hopY: 0, flash: 0, hurtShow: 0, dead: false
       });
@@ -68,7 +68,7 @@ const World = {
       const hp = 300 + idx * 55 + rank * 80;
       const air = type === 'bat' ? U.range(r, 150, 210) : 0;
       foes.push({
-        id: 'mb' + idx + '_' + rank, type, bossTier: 'normal', bossName: mini && mini.name ? mini.name : (rank === 0 ? 'Oathbreaker Brute' : 'Dreadroot Captain'),
+        id: 'mb' + idx + '_' + rank, type, variant: cfg.theme, bossTier: 'normal', bossName: mini && mini.name ? mini.name : (rank === 0 ? 'Oathbreaker Brute' : 'Dreadroot Captain'),
         x: U.clamp(x, pl.x + 90, pl.x + pl.w - 90), y: pl.y - air, homeX: x, homeY: pl.y - air, plat: pl,
         vx: 0, vy: 0, dir: -1, hp, maxHp: hp, dmg: 22 + idx * 2 + rank * 3,
         t: r() * 10, atkT: 1.4, hopY: 0, flash: 0, hurtShow: 0, dead: false, announced: false
@@ -165,10 +165,25 @@ const World = {
     const gateX = Math.min(x + endW * .42, cfg.width - 900);
     const bossX = U.clamp(gateX + 650, x + 520, cfg.width - 260);
     row(x + 80, y - 50, 4, 'heartDrop');
+    const groundNear = tx => {
+      let best = null, bd = 1e9;
+      for (const pl of plats) {
+        if (pl.type !== 'ground') continue;
+        const cx = U.clamp(tx, pl.x + 130, pl.x + pl.w - 130);
+        const d = Math.abs(cx - tx);
+        if (d < bd) { bd = d; best = { pl, x: cx }; }
+      }
+      return best;
+    };
+    const loveTrials = [cfg.width * .24, cfg.width * .57].map((tx, i) => {
+      const g = groundNear(tx);
+      return { id: 'trial' + i, x: g.x, y: g.pl.y, done: false, charge: 0 };
+    });
 
     return this._pack(cfg, idx, plats, items, foes, {
       shrineX, shrineY: this._topAtList(plats, shrineX), gateX, gateY: y,
-      startX: 140, checkpoints: [{ x: 140, y: 520 }, { x: shrineX, y: this._topAtList(plats, shrineX) }],
+      loveTrials,
+      startX: 140, checkpoints: [{ x: 140, y: 520 }, ...loveTrials.map(t => ({ x: t.x, y: t.y })), { x: shrineX, y: this._topAtList(plats, shrineX) }],
       boss: {
         id: 'boss', type: 'boss', bossName: cfg.bossName, bossKind: cfg.bossKind,
         x: bossX, y: y - 125, homeX: bossX, homeY: y - 125, vx: 0, vy: 0, dir: -1,

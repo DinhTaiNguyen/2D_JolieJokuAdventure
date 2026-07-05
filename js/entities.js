@@ -8,7 +8,7 @@ const Ent = {
       char, x: 0, y: 0, vx: 0, vy: 0, dir: 1, half: 10,
       onGround: false, coyote: 0, jumps: 0, glide: false,
       hp: 100, maxHp: 100, mp: 100, maxMp: 100,
-      atkCd: 0, spCd: 0, atkT: 9, dashT: 0, wing: 0,
+      atkCd: 0, spCd: 0, skill2Cd: 0, atkT: 9, dashT: 0, wing: 0,
       animT: 0, squash: 0, blink: 0, blinkT: 3,
       pose: null, poseT: 0, down: false, downT: 0,
       invuln: 0, hurtCd: 0, holding: false,
@@ -32,6 +32,7 @@ const Ent = {
       jumpHeld: Input.held('jump'),
       attack: Input.take('attack') || Input.held('attack'),
       special: Input.take('special'),
+      skill2: Input.take('skill2'),
     };
   },
 
@@ -103,30 +104,42 @@ const Ent = {
     if (!locked && inp.attack && p.atkCd <= 0 && p.atkT > .18) {
       const w = Weapons[p.weapon] || null;
       const dmgMul = w ? w.dmg : 1;
+      const shots = w && w.shots ? w.shots : (p.char === 'jolie' ? 3 : 1);
+      const spread = w && w.spread != null ? w.spread : (p.char === 'jolie' ? .22 : 0);
+      const speed = (p.char === 'joku' ? 620 : 540) * (w && w.speed ? w.speed : 1);
+      const life = (p.char === 'joku' ? 1.1 : .9) + (w && w.range ? w.range : 0);
       p.atkCd = p.char === 'joku' ? .38 : .46;
       p.atkT = 0;
       if (p.char === 'joku') {
         SND.sfx('shootJ');
-        Game.addProj({ kind: 'phoenix', x: p.x + p.dir * 16, y: p.y - 36, vx: p.dir * (w && w.range ? 700 : 620), vy: 0, dmg: Math.round(28 * dmgMul), life: 1.1 + (w && w.range ? w.range : 0), mine: !p.remote, owner: p.char });
+        for (let i = 0; i < shots; i++) {
+          const off = (i - (shots - 1) / 2) * spread;
+          Game.addProj({ kind: shots > 1 ? 'bolt' : 'phoenix', color: w ? w.color : '#4fb0ff', x: p.x + p.dir * 16, y: p.y - 36, vx: p.dir * speed * Math.cos(off), vy: speed * Math.sin(off), dmg: Math.round(28 * dmgMul / Math.max(1, shots * .7)), life, mine: !p.remote, owner: p.char });
+        }
       } else {
         SND.sfx('shootP');
-        for (const sp of [-.22, 0, .22]) {
-          Game.addProj({ kind: 'petal', x: p.x + p.dir * 14, y: p.y - 36, vx: p.dir * 540 * Math.cos(sp), vy: 540 * Math.sin(sp), dmg: Math.round(12 * dmgMul), life: .9 + (w && w.range ? .12 : 0), mine: !p.remote, owner: p.char });
+        for (let i = 0; i < shots; i++) {
+          const sp = (i - (shots - 1) / 2) * spread;
+          Game.addProj({ kind: shots > 3 ? 'bolt' : 'petal', color: w ? w.color : '#ff8fc0', x: p.x + p.dir * 14, y: p.y - 36, vx: p.dir * speed * Math.cos(sp), vy: speed * Math.sin(sp), dmg: Math.round(12 * dmgMul / Math.max(1, shots * .45)), life, mine: !p.remote, owner: p.char });
         }
       }
-      if (w && w.star) {
-        Game.addProj({ kind: 'starshot', x: p.x + p.dir * 18, y: p.y - 52, vx: p.dir * 500, vy: -140, dmg: 16, life: 1, mine: !p.remote, owner: p.char, g: 220 });
+      if (w && w.extra) {
+        const kind = w.extra === 'starshot' ? 'starshot' : 'bolt';
+        Game.addProj({ kind, color: w.color, x: p.x + p.dir * 18, y: p.y - 52, vx: p.dir * 500, vy: -140, dmg: 16, life: 1, mine: !p.remote, owner: p.char, g: 220 });
       }
     }
+    if (!locked && inp.skill2 && p.skill2Cd <= 0 && p.mp >= 45) {
+      p.mp -= 45; p.skill2Cd = 8; p.atkT = 0;
+      Game.characterSkill2(p);
+    }
     // special
-    const spCost = p.weapon === 'heartStaff' ? 24 : 35;
+    const spCost = p.weapon && Weapons[p.weapon] && Weapons[p.weapon].mpSave ? 24 : 35;
     if (!locked && inp.special && p.spCd <= 0 && p.mp >= spCost) {
       p.mp -= spCost; p.spCd = 2.2; p.atkT = 0;
-      if (p.weapon === 'heartStaff') {
-        p.hp = Math.min(p.maxHp, p.hp + 10);
-        Ptc.burst('heart', p.x, p.y - 42, 5, { sp: 90, r: 5, life: .8 });
-      }
-      if (p.char === 'joku') {
+      const w = Weapons[p.weapon] || null;
+      if (w) {
+        Game.weaponSpecial(p, w);
+      } else if (p.char === 'joku') {
         p.dashT = .32; p.invuln = Math.max(p.invuln, .45);
         SND.sfx('dash');
         Game.emitFx('dash', p.x, p.y);
@@ -147,6 +160,7 @@ const Ent = {
 
     // timers
     p.atkCd -= dt; p.spCd -= dt; p.atkT += dt;
+    p.skill2Cd -= dt;
     p.invuln -= dt; p.hurtCd -= dt;
     p.wing = Math.max(0, p.wing - dt * (p.dashT > 0 ? 0 : 1.6));
     p.squash *= (1 - 9 * dt);
