@@ -57,11 +57,11 @@ revive with hugs (a revive grants a Love Surge), and finish big moments with a k
 The game is 100% static files. Any static host works, **HTTPS required** (WebRTC).
 
 - **Netlify Drop** (easiest): go to https://app.netlify.com/drop and drag this whole folder in. Done.
-- **GitHub Pages:** push this folder to a repo → Settings → Pages → deploy from branch.
+- **GitHub Pages:** push this folder to a repo, then Settings -> Pages -> Source: **GitHub Actions**. The included workflow publishes only the game files from `dist/`.
 - **Vercel:** `vercel deploy` in this folder, or import the repo at https://vercel.com.
 - **Cloudflare Pages:** create a project → direct upload of this folder.
 
-No build step. `serve.ps1` and `.claude/` are dev helpers — they deploy harmlessly or can be deleted.
+No app build step. `serve.ps1` and `.claude/` are dev helpers; the GitHub Pages workflow does not publish them.
 
 ## Running locally (for testing)
 
