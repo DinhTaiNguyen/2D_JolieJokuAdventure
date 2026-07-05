@@ -175,7 +175,7 @@ const World = {
       }
       return best;
     };
-    const loveTrials = [cfg.width * .24, cfg.width * .57].map((tx, i) => {
+    const loveTrials = [cfg.width * .48].map((tx, i) => {
       const g = groundNear(tx);
       return { id: 'trial' + i, x: g.x, y: g.pl.y, done: false, charge: 0 };
     });

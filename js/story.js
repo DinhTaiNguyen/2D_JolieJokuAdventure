@@ -39,8 +39,9 @@ const Story = {
   ],
 
   trialInfo(levelIdx, id) {
-    const n = U.clamp(parseInt(String(id || '0').replace(/\D/g, ''), 10) || 0, 0, 1);
-    return (this.TRIALS[levelIdx] && this.TRIALS[levelIdx][n]) || this.TRIALS[0][n];
+    const set = this.TRIALS[levelIdx] || this.TRIALS[0];
+    const n = U.clamp(parseInt(String(id || '0').replace(/\D/g, ''), 10) || 0, 0, set.length - 1);
+    return set[n] || this.TRIALS[0][0];
   },
 
   DLG: {
@@ -139,6 +140,36 @@ const Story = {
       ['jolie', 'Cùng nhau. Lulu, Biscuit, ở gần phía sau nhé.'],
       ['panda', 'Quá muộn rồi. Biscuit đã can đảm sẵn.'],
     ],
+    bossIntro0: [
+      ['jolie', 'Rễ cây kia đang siết cả khu rừng. Nó sợ tình yêu làm mình mềm lại.'],
+      ['joku', 'Vậy ta dùng nước mở đường, dùng hoa giữ nhau đứng vững. Lulu, Biscuit, ở gần nhé.'],
+      ['dog', 'Lulu sẽ cắn dây leo nào dám chạm vào Jolie!'],
+    ],
+    bossIntro1: [
+      ['joku', 'Con thủy quái đang kéo thác xuống bóng tối. Sóng của nó mạnh hơn boss trước nhiều.'],
+      ['jolie', 'Nếu nó cuốn anh đi, em sẽ gọi hoa níu anh lại. Mình đừng tách xa nhau.'],
+      ['panda', 'Biscuit bỏ phiếu: né sóng trước, ăn mừng sau.'],
+    ],
+    bossIntro2: [
+      ['jolie', 'Nữ hoàng gai dùng cái đẹp để giấu độc. Đừng để những bông hoa giả lừa mình.'],
+      ['joku', 'Hoa thật là em. Gai nào cũng sẽ gãy nếu hai trái tim đánh cùng nhịp.'],
+      ['dog', 'Gâu! Lulu phân biệt được hoa thơm và hoa xấu tính!'],
+    ],
+    bossIntro3: [
+      ['joku', 'Gloomheart ở đây không chỉ tấn công. Nó sẽ biến mất, phòng thủ, rồi đánh vào người đứng xa.'],
+      ['jolie', 'Vậy ta ở gần nhau. Nếu bóng tối muốn chia đôi chúng ta, nó đã thua từ đầu.'],
+      ['panda', 'Biscuit sẽ làm ánh sáng nhỏ. Nhỏ nhưng rất bướng.'],
+    ],
+    bossIntro4: [
+      ['jolie', 'Vương miện than hồng đang cháy dữ quá. Nó muốn chúng ta hoảng sợ và chạy riêng.'],
+      ['joku', 'Không. Anh làm mát lửa, em giữ nhịp tim. Cùng tiến, cùng lùi.'],
+      ['dog', 'Lulu không thích lửa, nhưng Lulu thích bảo vệ gia đình hơn!'],
+    ],
+    bossIntro5: [
+      ['joku', 'Trái tim nhật thực đã dựng khiên sao quanh nó. Đây là trận cuối, Jolie.'],
+      ['jolie', 'Vậy để các vì sao nhìn thấy tình yêu của chúng ta không né tránh bóng tối.'],
+      ['panda', 'Biscuit và Lulu cũng là một phần lời thề này. Đi cùng nhau nào!'],
+    ],
     bossIntro: [
       ['joku', () => 'Nó kia rồi! ' + ((G.level && G.level.boss && G.level.boss.bossName) || 'Boss cuối') + ' đang giữ tình yêu của chương này!'],
       ['jolie', 'Nó không chỉ hung dữ. Nó cô đơn. Nhưng cô đơn không được phép làm đau người khác.'],
@@ -183,6 +214,7 @@ const Story = {
       case 'gate': {
         const gx = L.gateX;
         const key = Story.DLG['gate' + L.idx] ? 'gate' + L.idx : 'bossGate';
+        const bossKey = Story.DLG['bossIntro' + L.idx] ? 'bossIntro' + L.idx : 'bossIntro';
         return [
           { a: 'move2', jx: gx - 26, lx: gx + 26 },
           { a: 'face' },
@@ -192,14 +224,16 @@ const Story = {
           { a: 'wait', t: 1.6 },
           { a: 'fn', f: () => { SND.sfx('gate'); G.level.gateOpen = true; Game.shake(5); } },
           { a: 'wait', t: .9 },
-          { a: 'dlg', key: 'bossIntro' },
+          { a: 'dlg', key: bossKey },
           { a: 'fn', f: () => Game.bossWake() },
         ];
       }
       case 'lvl':
         return [{ a: 'wait', t: .6 }, { a: 'dlg', key: 'lvl' + L.idx }];
-      case 'bossIntro':
-        return [{ a: 'wait', t: .5 }, { a: 'dlg', key: 'bossIntro' }, { a: 'fn', f: () => Game.bossWake() }];
+      case 'bossIntro': {
+        const bossKey = Story.DLG['bossIntro' + L.idx] ? 'bossIntro' + L.idx : 'bossIntro';
+        return [{ a: 'wait', t: .5 }, { a: 'dlg', key: bossKey }, { a: 'fn', f: () => Game.bossWake() }];
+      }
       case 'ending': {
         const bx = G.level.boss ? G.level.boss.x : L.width * .6;
         return [

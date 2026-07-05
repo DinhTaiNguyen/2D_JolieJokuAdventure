@@ -1039,6 +1039,55 @@ const Art = {
   bossScaryShape(ctx, e, t, bp) {
     if (e.dying > 0) return;
     ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = bp.shard + 'dd';
+    ctx.strokeStyle = bp.crack + 'aa';
+    ctx.lineWidth = 3;
+    if (e.bossKind === 'root') {
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * 54, 28);
+        ctx.bezierCurveTo(side * 118, 36, side * 128, -28, side * 84, -52);
+        ctx.bezierCurveTo(side * 70, -34, side * 72, 4, side * 54, 28);
+        ctx.fill(); ctx.stroke();
+      }
+    } else if (e.bossKind === 'tide') {
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * 48, -18);
+        ctx.quadraticCurveTo(side * 150, -42 + Math.sin(t * 3) * 8, side * 110, 54);
+        ctx.quadraticCurveTo(side * 84, 24, side * 62, 12);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+    } else if (e.bossKind === 'briar') {
+      ctx.beginPath();
+      ctx.moveTo(-82, 34); ctx.lineTo(-132, -20); ctx.lineTo(-86, -12);
+      ctx.lineTo(-58, -78); ctx.lineTo(-26, -42); ctx.lineTo(0, -104);
+      ctx.lineTo(26, -42); ctx.lineTo(58, -78); ctx.lineTo(86, -12);
+      ctx.lineTo(132, -20); ctx.lineTo(82, 34); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    } else if (e.bossKind === 'gloom') {
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * 36, -28);
+        ctx.bezierCurveTo(side * 155, -118, side * 170, 52, side * 48, 44);
+        ctx.bezierCurveTo(side * 100, 12, side * 86, -34, side * 36, -28);
+        ctx.fill(); ctx.stroke();
+      }
+    } else if (e.bossKind === 'ember') {
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * 28, -72);
+        ctx.lineTo(side * 62, -142);
+        ctx.lineTo(side * 74, -58);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+    } else if (e.bossKind === 'eclipse') {
+      ctx.beginPath();
+      ctx.arc(0, -24, 132, .18, Math.PI * 1.82);
+      ctx.arc(0, -24, 78, Math.PI * 1.82, .18, true);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
     ctx.globalCompositeOperation = 'lighter';
     if (e.bossKind === 'root') {
       ctx.strokeStyle = bp.crack + 'cc'; ctx.lineWidth = 7; ctx.lineCap = 'round';
@@ -1094,6 +1143,17 @@ const Art = {
     ctx.globalCompositeOperation = 'lighter';
     this.glow(ctx, 0, -10, 120, dying > 0 ? '#ff9fce' : bp.aura, .4 + Math.sin(t * 2) * .1);
     ctx.globalCompositeOperation = 'source-over';
+    if (e.shieldT > 0 && dying === 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = bp.shardGlow + 'dd';
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(0, -12, 110 + Math.sin(t * 12) * 4, 0, U.TAU); ctx.stroke();
+      ctx.strokeStyle = '#ffffff99';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, -12, 128, -Math.PI / 2, -Math.PI / 2 + U.TAU * U.clamp(e.shieldT / 2.2, 0, 1)); ctx.stroke();
+      ctx.restore();
+    }
     // orbiting dark shards
     for (let i = 0; i < 3; i++) {
       const an = t * 1.2 + i * 2.094;
@@ -1312,7 +1372,7 @@ const Art = {
 
   /* ================= ITEMS ================= */
   drawItem(ctx, it, t) {
-    const bob = it.kind === 'weapon' && !it.grounded ? 0 : Math.sin(t * 2.6 + it.x * .05) * 4;
+    const bob = it.kind === 'weapon' ? 0 : Math.sin(t * 2.6 + it.x * .05) * 4;
     const y = it.y + bob;
     switch (it.kind) {
       case 'orb': {

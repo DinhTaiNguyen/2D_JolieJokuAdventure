@@ -17,7 +17,7 @@ const G = {
   loadout: { joku: null, jolie: null },
   paused: false, bossActive: false, netLost: false, ended: false, nextLevelT: 0,
   netT: { p: 0, w: 0, seq: 0, wseq: 0 }, mateNet: null, mateBuf: [], lastMateSeq: 0, lastWorldSeq: 0, _dropId: 0, _comboToastT: 0,
-  demo: null, _lockHintT: 0, _uiSyncT: 0,
+  demo: null, _lockHintT: 0, _uiSyncT: 0, _freshOnlineStart: false,
 };
 
 const Game = {
@@ -834,34 +834,34 @@ const Game = {
       default:
         this.loveAdd(18); this.hugHearts(p.x); p.hp = Math.min(p.maxHp, p.hp + 14); break;
     }
+    this.weaponBondBonus(p, w);
     this.weaponBurst(p.x, p.y - 45, p.weapon, .75);
     this.emitFx('weapon', p.x, p.y, { special: w.special, weapon: p.weapon });
   },
 
-  characterSkill2(p) {
-    const mine = !p.remote;
-    const dir = p.dir || 1;
-    if (p.char === 'joku') {
-      SND.sfx('shootJ');
-      Ptc.text(p.x, p.y - 105, 'Tide Breaker', '#7fd8ff');
-      Ptc.add({ kind: 'ring', x: p.x + dir * 55, y: p.y - 34, vx: 0, vy: 0, r: 120, life: .65, color: 'rgba(120,216,255,.9)' });
-      for (let i = -1; i <= 1; i++) {
-        this.addProj({ kind: 'bolt', color: '#7fd8ff', x: p.x + dir * 24, y: p.y - 42 + i * 14, vx: dir * (760 - Math.abs(i) * 70), vy: i * 85, dmg: 26 - Math.abs(i) * 4, life: 1.05, mine, owner: p.char });
+  weaponBondBonus(p, w) {
+    const mate = p === G.me ? G.mate : G.me;
+    if (!mate || mate.down || U.dist(p.x, p.y, mate.x, mate.y) > 260) return;
+    const role = (w.role || '').toLowerCase();
+    if (role.includes('defense')) {
+      p.invuln = Math.max(p.invuln, .8);
+      mate.invuln = Math.max(mate.invuln, .8);
+    } else if (role.includes('love') || role.includes('support')) {
+      p.hp = Math.min(p.maxHp, p.hp + 10);
+      mate.hp = Math.min(mate.maxHp, mate.hp + 14);
+      p.mp = Math.min(p.maxMp, p.mp + 8);
+      mate.mp = Math.min(mate.maxMp, mate.mp + 10);
+    } else if (role.includes('control')) {
+      for (const e of this.enemiesAll()) {
+        if (!e.dead && U.dist(e.x, e.y, mate.x, mate.y) < 260) e.atkT = Math.max(e.atkT, 1.1);
       }
-      this.emitFx('skill2', p.x, p.y, { char: p.char, atk: 'tide' });
+      mate.mp = Math.min(mate.maxMp, mate.mp + 10);
     } else {
-      SND.sfx('heal');
-      Ptc.text(p.x, p.y - 105, 'Love Guard', '#ffa9d8');
-      for (const q of [G.me, G.mate]) {
-        if (!q || q.down || U.dist(q.x, q.y, p.x, p.y) > 280) continue;
-        q.invuln = Math.max(q.invuln, 2.1);
-        q.hp = Math.min(q.maxHp, q.hp + 18);
-        Ptc.add({ kind: 'ring', x: q.x, y: q.y - 34, vx: 0, vy: 0, r: 74, life: .8, color: 'rgba(255,169,216,.86)' });
-        Ptc.burst('heart', q.x, q.y - 48, 8, { sp: 105, r: 6, life: 1 });
-      }
-      this.loveAdd(8);
-      this.emitFx('skill2', p.x, p.y, { char: p.char, guard: true });
+      mate.mp = Math.min(mate.maxMp, mate.mp + 12);
     }
+    this.loveAdd(4, true);
+    Ptc.text((p.x + mate.x) / 2, Math.min(p.y, mate.y) - 88, 'Bond Bonus', '#ff9fce');
+    Ptc.burst('heart', (p.x + mate.x) / 2, Math.min(p.y, mate.y) - 58, 7, { sp: 95, r: 5, life: .9 });
   },
 
   updateAuras(dt) {
@@ -895,6 +895,14 @@ const Game = {
 
   hitEnemy(e, dmg, by, fromNet) {
     if (e.dead || e.dying > 0) return;
+    if (e.type === 'boss' && e.shieldT > 0) {
+      dmg = Math.max(1, Math.round(dmg * .35));
+      if (!fromNet) {
+        Ptc.text(e.x, e.y - 92, 'GUARD', '#bff7ff');
+        Ptc.add({ kind: 'ring', x: e.x, y: e.y - 12, vx: 0, vy: 0, r: 120, life: .35, color: this.bossColor(e.bossKind) + 'cc' });
+        SND.sfx('orb');
+      }
+    }
     if (G.mode === 'guest' && !fromNet) {
       // optimistic hit + tell the host
       e.hp = Math.max(1, e.hp - dmg);
@@ -910,10 +918,17 @@ const Game = {
     // combo of love: both heroes hit the same foe within 1.2s
     if (by === 'joku' || by === 'jolie') {
       if (e._lastBy && e._lastBy !== by && G.time - e._lastByT < 1.2) {
-        this.loveAdd(6);
+        this.loveAdd(8);
+        if (!G.me.down && !G.mate.down && U.dist(G.me.x, G.me.y, G.mate.x, G.mate.y) < 220) {
+          G.me.invuln = Math.max(G.me.invuln, .55);
+          G.mate.invuln = Math.max(G.mate.invuln, .55);
+          G.me.mp = Math.min(G.me.maxMp, G.me.mp + 8);
+          G.mate.mp = Math.min(G.mate.maxMp, G.mate.mp + 8);
+          Ptc.burst('heart', (G.me.x + G.mate.x) / 2, Math.min(G.me.y, G.mate.y) - 56, 6, { sp: 100, r: 5, life: .8 });
+        }
         if (G._comboToastT <= 0) {
           G._comboToastT = 2.5;
-          Ptc.text(e.x, e.y - 58, 'COMBO OF LOVE! 💞', '#ff9fce');
+          Ptc.text(e.x, e.y - 58, 'TOGETHER STRIKE! 💞', '#ff9fce');
           SND.sfx('heart');
         }
       }
@@ -1037,13 +1052,13 @@ const Game = {
   },
 
   /* ================= pickups ================= */
-  weaponDropItem(weapon, x, y, vx = 0, vy = -170, id = null) {
+  weaponDropItem(weapon, x, y, vx = 0, vy = -90, id = null) {
     return {
       id: id || 'w' + (G._dropId++),
       kind: 'weapon',
       weapon,
       x, y,
-      vx, vy,
+      vx: 0, vy,
       rot: Math.random() * U.TAU,
       vr: (Math.random() - .5) * 4,
       grounded: false,
@@ -1060,8 +1075,16 @@ const Game = {
       if (it.rot == null) it.rot = 0;
       if (it.vr == null) it.vr = 0;
 
+      const topNow = World.topAt(G.level, it.x, it.y - 80);
+      const groundNow = topNow == null ? null : topNow - 32;
+      if (it.grounded && groundNow != null) {
+        it.x = it._staticX != null ? it._staticX : it.x;
+        it.y = groundNow;
+        it.vx = it.vy = it.vr = 0;
+        continue;
+      }
+
       it.vy += 1700 * dt;
-      it.x += it.vx * dt;
       it.y += it.vy * dt;
       it.rot += it.vr * dt;
 
@@ -1075,19 +1098,19 @@ const Game = {
         it.y = groundY;
         it.vy = 0;
         it.grounded = true;
-        it.vx *= Math.max(0, 1 - 8 * dt);
-        it.vr *= Math.max(0, 1 - 10 * dt);
-        if (Math.abs(it.vx) < 4) it.vx = 0;
-        if (Math.abs(it.vr) < .1) it.vr = 0;
+        it._staticX = it.x;
+        it.vx = 0;
+        it.vr = 0;
       } else {
         it.grounded = false;
-        it.vx *= Math.max(0, 1 - 1.2 * dt);
+        it.vx = 0;
       }
 
       if (it.y > World.DEATH_Y + 160) {
         const safeTop = World.topAt(G.level, U.clamp(it.x, 60, G.level.width - 60)) || 620;
         it.y = safeTop - 32;
         it.vx = it.vy = it.vr = 0;
+        it._staticX = it.x;
         it.grounded = true;
       }
     }
@@ -1138,7 +1161,7 @@ const Game = {
         const p = this.byChar(by);
         if (!fromNet && p.weapon && p.weapon !== weapon) {
           const old = p.weapon;
-          const oldIt = this.weaponDropItem(old, it.x + (p.dir || 1) * 34, it.y - 4, (p.dir || 1) * 85, -145);
+          const oldIt = this.weaponDropItem(old, it.x + (p.dir || 1) * 34, it.y - 4, 0, -70);
           G.level.items.push(oldIt);
           this.emit('drop', { id: oldIt.id, kind: oldIt.kind, weapon: old, x: oldIt.x, y: oldIt.y, vx: oldIt.vx, vy: oldIt.vy });
           this.weaponBurst(oldIt.x, oldIt.y, old, .75);
@@ -1172,7 +1195,7 @@ const Game = {
     for (let i = 0; i < n; i++) {
       const weapon = this.randomWeapon();
       const side = i % 2 ? 1 : -1;
-      const it = this.weaponDropItem(weapon, x + side * (38 + i * 8), y - 62, side * (115 + i * 18), -220 - i * 24);
+      const it = this.weaponDropItem(weapon, x + side * (38 + i * 8), y - 62, 0, -105 - i * 16);
       G.level.items.push(it);
       this.weaponBurst(it.x, it.y, weapon, .9);
       this.emit('drop', { id: it.id, kind: it.kind, weapon, x: it.x, y: it.y, vx: it.vx, vy: it.vy });
@@ -1190,7 +1213,7 @@ const Game = {
     if (!p.weapon) { this.toastMsg('Stand near a weapon to pick it.'); return; }
     const weapon = p.weapon;
     this.setWeapon(p.char, null);
-    const it = this.weaponDropItem(weapon, p.x + p.dir * 34, p.y - 46, p.dir * 100, -160);
+    const it = this.weaponDropItem(weapon, p.x + p.dir * 34, p.y - 46, 0, -70);
     G.level.items.push(it);
     this.emit('drop', { id: it.id, kind: it.kind, weapon, x: it.x, y: it.y, vx: it.vx, vy: it.vy });
     SND.sfx('weaponDrop');
@@ -1254,22 +1277,28 @@ const Game = {
     };
     switch (b.bossKind) {
       case 'root':
+        b.shieldT = Math.max(b.shieldT || 0, 1.4 + b.phase * .35);
         for (let i = -3; i <= 3; i++) shoot(mid + i * 95, 520, 0, -360 - Math.abs(i) * 22, 17 + b.phase * 2, 1.4, 620);
         break;
       case 'tide':
+        b.shieldT = Math.max(b.shieldT || 0, .85 + b.phase * .25);
         for (let i = 0; i < 6 + b.phase; i++) shoot(b.x - 260 + i * 104, b.y - 60, Math.sin(i) * 80, 260, 16, 2.4, 80);
         break;
       case 'briar':
+        b.shieldT = Math.max(b.shieldT || 0, 1.15 + b.phase * .3);
         for (let i = 0; i < 10; i++) { const a = -Math.PI + i * Math.PI / 9; shoot(b.x, b.y - 20, Math.cos(a) * 360, Math.sin(a) * 360, 15, 2.2); }
         break;
       case 'ember':
+        b.shieldT = Math.max(b.shieldT || 0, .7 + b.phase * .2);
         for (let i = 0; i < 5 + b.phase; i++) shoot(mid - 260 + i * 130, b.y - 360, (Math.random() - .5) * 90, 120, 22, 3.4, 520);
         break;
       case 'eclipse':
+        b.shieldT = Math.max(b.shieldT || 0, 1.7 + b.phase * .45);
         for (let i = 0; i < 12; i++) { const a = i * U.TAU / 12 + b.t * .2; shoot(b.x, b.y - 15, Math.cos(a) * 300, Math.sin(a) * 300, 16, 2.2); }
         break;
       case 'gloom':
       default:
+        b.shieldT = Math.max(b.shieldT || 0, 1.0 + b.phase * .3);
         b.x = U.clamp(mid + (Math.random() < .5 ? -210 : 210), 320, G.level.width - 320);
         for (const p of [G.me, G.mate]) if (!p.down) shoot(p.x, p.y - 240, 0, 220, 19, 2.2, 180);
         break;
@@ -1441,11 +1470,12 @@ const Game = {
   },
 
   /* ================= dialog ================= */
-  dlgOpen(key) {
+  dlgOpen(key, fromNet = false) {
     const src = Story.DLG[key];
     if (!src) { return; }
     const lines = src.map(line => [line[0], typeof line[1] === 'function' ? line[1]() : line[1]]);
     G.dialog = { key, lines, i: 0, chars: 0 };
+    if (G.mode === 'host' && !fromNet) this.emit('dlg', { key, i: 0, open: true });
   },
 
   dlgAdvance(fromNet) {
@@ -1453,7 +1483,7 @@ const Game = {
     if (!d) return;
     if (G.mode === 'guest' && !fromNet) { this.emit('dlgReq', {}); return; }
     const full = d.lines[d.i][1].length;
-    if (d.chars < full && !fromNet) {
+    if (d.chars < full) {
       d.chars = full;
       if (G.mode === 'host') this.emit('dlg', { key: d.key, i: d.i, full: true });
       return;
@@ -1467,7 +1497,7 @@ const Game = {
 
   applyDlg(data) { // guest applies host's dialog position
     if (!G.dialog || G.dialog.key !== data.key) {
-      if (data.i < (Story.DLG[data.key] || []).length) this.dlgOpen(data.key);
+      if (data.i < (Story.DLG[data.key] || []).length) this.dlgOpen(data.key, true);
       else return;
     }
     if (data.full) { G.dialog.chars = 9999; return; }
@@ -1624,11 +1654,13 @@ const Game = {
       case 'hello': // guest arrived — send them the world
         if (NET.mode === 'host') {
           this.resetNetSmoothing();
+          const reconnecting = G.state === 'play' && !G._freshOnlineStart;
           NET.send({
-            t: 'init', lvl: G.levelIndex, started: G.state === 'play', weapons: this.currentLoadout(), diff: G.difficulty,
+            t: 'init', lvl: G.levelIndex, started: reconnecting, weapons: this.currentLoadout(), diff: G.difficulty,
             cp: G.checkpoint ? [Math.round(G.checkpoint.x), Math.round(G.checkpoint.y)] : null,
             hostP: G.me ? [Math.round(G.me.x), Math.round(G.me.y)] : null
           });
+          G._freshOnlineStart = false;
         }
         break;
       case 'init':
@@ -1683,6 +1715,7 @@ const Game = {
             if (local) {
               local.x = it[3]; local.y = it[4];
               local.vx = it[5] || 0; local.vy = it[6] || 0; local.grounded = !!it[7];
+              if (local.grounded) local._staticX = local.x;
               continue;
             }
             G.level.items.push(it[1] === 'weapon'
@@ -1732,7 +1765,7 @@ const Game = {
             G.level.items.push(item);
           } else {
             item.kind = d.kind; item.weapon = d.weapon; item.x = d.x; item.y = d.y; item.taken = false;
-            if (d.kind === 'weapon') { item.vx = d.vx || 0; item.vy = d.vy || 40; item.grounded = false; }
+            if (d.kind === 'weapon') { item.vx = 0; item.vy = d.vy || 40; item.grounded = false; item._staticX = d.x; }
           }
         }
         if (d.kind === 'weapon') { SND.sfx('weaponDrop'); this.weaponBurst(d.x, d.y, d.weapon, .85); }
@@ -1779,16 +1812,6 @@ const Game = {
       case 'fx':
         if (d.kind === 'dash') { SND.sfx('dash'); }
         if (d.kind === 'bloom') { SND.sfx('bloom'); this.addAura(d.x, d.y, false); }
-        if (d.kind === 'skill2') {
-          SND.sfx(d.char === 'jolie' ? 'heal' : 'dash');
-          Ptc.add({ kind: 'ring', x: d.x, y: d.y - 30, vx: 0, vy: 0, r: 180, life: .8, color: d.char === 'jolie' ? 'rgba(255,169,216,.9)' : 'rgba(120,216,255,.9)' });
-          if (d.guard && !G.me.down && U.dist(G.me.x, G.me.y, d.x, d.y) < 300) {
-            G.me.invuln = Math.max(G.me.invuln, 2.1);
-            G.me.hp = Math.min(G.me.maxHp, G.me.hp + 18);
-            if (G.mode !== 'guest') this.loveAdd(8);
-            Ptc.burst('heart', G.me.x, G.me.y - 48, 9, { sp: 105, r: 6, life: 1 });
-          }
-        }
         if (d.kind === 'weapon') {
           const def = Weapons[d.weapon] || Weapons.tideSpear;
           SND.sfx('weaponPickup');
@@ -2129,7 +2152,6 @@ const Game = {
     const items = [
       { icon: '⚔', label: 'Atk', cd: Math.max(0, p.atkCd) / (p.char === 'joku' ? .38 : .46), color: '#ffffff' },
       { icon: p.char === 'joku' ? '🌊' : '🌸', label: 'Sp', cd: Math.max(0, p.spCd) / 2.2, color: p.char === 'joku' ? '#7fd8ff' : '#ff9fce' },
-      { icon: p.char === 'joku' ? '🌀' : '🌹', label: '2nd', cd: Math.max(0, p.skill2Cd) / 8, color: p.char === 'joku' ? '#7fd8ff' : '#ff86b8' },
       { icon: w ? w.skillIcon : '✦', label: 'Wpn', cd: w ? Math.max(0, p.weaponCd || 0) / (w.cd || 6) : 1, color: w ? w.color : '#fff3a8' },
     ];
     const r = small ? 12 : 14;
@@ -2156,7 +2178,7 @@ const Game = {
       ctx.fillText(it.icon, x, y + (small ? 4 : 5));
       ctx.font = `600 ${small ? 8 : 9}px Fredoka, sans-serif`;
       ctx.fillStyle = cd > .01 ? 'rgba(220,235,245,.62)' : it.color;
-      const max = it.label === '2nd' ? 8 : it.label === 'Sp' ? 2.2 : it.label === 'Wpn' && w ? (w.cd || 6) : .45;
+      const max = it.label === 'Sp' ? 2.2 : it.label === 'Wpn' && w ? (w.cd || 6) : .45;
       ctx.fillText(cd > .01 ? (it.label === 'Wpn' && !w ? '-' : Math.ceil(cd * max) + 's') : 'ready', x, y + r + 10);
     }
     ctx.restore();

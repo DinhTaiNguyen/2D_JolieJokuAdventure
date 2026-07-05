@@ -15,6 +15,8 @@ const NET = {
     debug: 0,
     config: {
       iceCandidatePoolSize: 6,
+      sdpSemantics: 'unified-plan',
+      bundlePolicy: 'max-bundle',
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
@@ -73,21 +75,24 @@ const NET = {
     this._watchPeer();
     this.peer.on('open', () => { this._peerOpened = true; this._status('code', this.code); });
     this.peer.on('connection', conn => {
-      if (this.conn && this.conn.open) { conn.close(); return; } // room for two only
+      if (this.conn) { try { this.conn.close(); } catch (e) {} }
+      this.connected = false;
       this.conn = conn;
       this._wire(conn);
     });
     this.peer.on('error', err => {
+      if (this._retryUnavailableSoon(err)) return;
       if (err.type === 'unavailable-id') { this._status('err', 'Room code ' + this.code + ' is already in use. Change the code and host again.'); return; }
       this._status('err', 'Portal error: ' + err.type + '. Try again.');
     });
   },
 
-  join(code) {
+  join(code, retrying = false) {
     if (!this.available()) { this._status('err', 'No internet — online play needs a connection.'); return; }
     this.close();
     this.mode = 'guest';
     this.code = this.normalizeCode(code);
+    if (!retrying) this._retryLeft = 2;
     if (!this.validCode(this.code)) {
       this._status('err', 'Enter the 4-character room code from Joku.');
       return;
@@ -103,17 +108,35 @@ const NET = {
       this.conn = conn;
       this._wire(conn);
       setTimeout(() => {
-        if (attempt === this._joinAttempt && !this.connected && this.mode === 'guest') this._status('err', 'Could not find that room. Check the code!');
-      }, 12000);
+        if (attempt === this._joinAttempt && !this.connected && this.mode === 'guest') {
+          if ((this._retryLeft || 0) > 0) {
+            this._retryLeft--;
+            this._status('info', 'Still trying to connect phones...');
+            this.join(this.code, true);
+          } else {
+            this._status('err', 'Could not connect. Keep Joku hosting, use code ' + this.code + ', and try Join/Rejoin again.');
+          }
+        }
+      }, 9000);
     });
     this.peer.on('error', err => {
+      if (this._retryUnavailableSoon(err)) return;
       if (err.type === 'peer-unavailable') this._status('err', 'Room not found — is Joku hosting?');
       else this._status('err', 'Connection error: ' + err.type);
     });
   },
 
+  _retryUnavailableSoon(err) {
+    if (!err || err.type !== 'peer-unavailable' || this.mode !== 'guest' || (this._retryLeft || 0) <= 0) return false;
+    this._retryLeft--;
+    this._status('info', 'Room not ready yet. Retrying...');
+    setTimeout(() => this.join(this.code, true), 1200);
+    return true;
+  },
+
   _wire(conn) {
     conn.on('open', () => {
+      if (conn !== this.conn) return;
       this.connected = true;
       this._status('ok', 'Connected! 💞');
       clearInterval(this._keepAlive);
@@ -122,12 +145,14 @@ const NET = {
     });
     conn.on('data', d => { if (d && d.t === 'ping') return; if (this.onMsg) this.onMsg(d); });
     conn.on('close', () => {
+      if (conn !== this.conn) return;
       const was = this.connected;
       this.connected = false;
       clearInterval(this._keepAlive); this._keepAlive = null;
       if (was && this.onDrop) this.onDrop();
     });
     conn.on('error', () => {
+      if (conn !== this.conn) return;
       clearInterval(this._keepAlive); this._keepAlive = null;
       if (this.connected && this.onDrop) { this.connected = false; this.onDrop(); }
     });

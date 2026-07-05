@@ -8,7 +8,7 @@ const Ent = {
       char, x: 0, y: 0, vx: 0, vy: 0, dir: 1, half: 10,
       onGround: false, coyote: 0, jumps: 0, glide: false,
       hp: 100, maxHp: 100, mp: 100, maxMp: 100,
-      atkCd: 0, spCd: 0, skill2Cd: 0, weaponCd: 0, atkT: 9, dashT: 0, wing: 0,
+      atkCd: 0, spCd: 0, weaponCd: 0, atkT: 9, dashT: 0, wing: 0,
       animT: 0, squash: 0, blink: 0, blinkT: 3,
       pose: null, poseT: 0, down: false, downT: 0,
       invuln: 0, hurtCd: 0, holding: false,
@@ -32,7 +32,6 @@ const Ent = {
       jumpHeld: Input.held('jump'),
       attack: Input.take('attack') || Input.held('attack'),
       special: Input.take('special'),
-      skill2: Input.take('skill2'),
       weaponSkill: Input.take('weaponSkill'),
     };
   },
@@ -129,10 +128,6 @@ const Ent = {
         Game.addProj({ kind, color: w.color, x: p.x + p.dir * 18, y: p.y - 52, vx: p.dir * 500, vy: -140, dmg: 16, life: 1, mine: !p.remote, owner: p.char, g: 220 });
       }
     }
-    if (!locked && inp.skill2 && p.skill2Cd <= 0 && p.mp >= 45) {
-      p.mp -= 45; p.skill2Cd = 8; p.atkT = 0;
-      Game.characterSkill2(p);
-    }
     // character special
     const spCost = 35;
     if (!locked && inp.special && p.spCd <= 0 && p.mp >= spCost) {
@@ -165,7 +160,7 @@ const Ent = {
 
     // timers
     p.atkCd -= dt; p.spCd -= dt; p.atkT += dt;
-    p.skill2Cd -= dt; p.weaponCd -= dt;
+    p.weaponCd -= dt;
     p.invuln -= dt; p.hurtCd -= dt;
     p.weaponPose = Math.max(0, (p.weaponPose || 0) - dt);
     p.wing = Math.max(0, p.wing - dt * (p.dashT > 0 ? 0 : 1.6));
@@ -516,6 +511,7 @@ const Ent = {
     const b = G.level.boss;
     if (!b || b.dead) return;
     b.t += dt; b.flash -= dt; b.hurtShow -= dt;
+    b.shieldT = Math.max(0, (b.shieldT || 0) - dt);
     if (b.dying > 0) { b.dying += dt; b.y += Math.sin(b.t * 2) * dt * 10 - 14 * dt; return; }
 
     b.phase = b.hp < b.maxHp / 3 ? 2 : (b.hp < b.maxHp * 2 / 3 ? 1 : 0);

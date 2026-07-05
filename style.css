@@ -139,8 +139,10 @@ input, textarea {
   font-size:12px; line-height:1.2; padding:5px 0; border-top:1px solid rgba(255,255,255,.08);
 }
 .weaponInfoItem:first-child { border-top:0; }
+.weaponInfoItem.current { border-top:0; grid-template-columns:32px 1fr auto; }
 .weaponInfoItem b { color:#f4fbff; font-size:12px; }
 .weaponInfoRole { color:#9fd8ff; font-size:11px; white-space:nowrap; }
+.weaponInfoEmpty { color:#9fbecd; font-size:12px; line-height:1.35; }
 
 /* ============ Touch controls ============ */
 #touchUI { position:absolute; inset:0; z-index:10; pointer-events:none; }

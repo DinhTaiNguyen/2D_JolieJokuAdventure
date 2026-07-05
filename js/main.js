@@ -91,6 +91,7 @@ const Main = {
     NET.onPeerJoin = () => {
       if (G.state !== 'play') {
         this.hideOverlays();
+        G._freshOnlineStart = true;
         Game.startGame('host');
         this.toast('💗 Jolie has joined your adventure!');
       } else {
@@ -378,8 +379,6 @@ const Main = {
     if (Input.touchMode) {
       this.el('touchUI').classList.remove('hidden');
       this.el('tSp').textContent = myChar === 'joku' ? '🌊' : '🌸';
-      this.el('tSkill2').textContent = myChar === 'joku' ? '🌀' : '🌹';
-      this.el('tSkill2').title = myChar === 'joku' ? 'Tide Breaker' : 'Love Guard';
       this.el('tWeapon').title = 'Weapon skill';
     }
     this.syncWeaponUI();
@@ -449,7 +448,6 @@ const Main = {
       const atkMax = p.char === 'joku' ? .38 : .46;
       this.setCooldownButton('tAtk', Math.max(0, p.atkCd) / atkMax, '#ffffff');
       this.setCooldownButton('tSp', Math.max(0, p.spCd) / 2.2, p.char === 'joku' ? '#7fd8ff' : '#ff9fce');
-      this.setCooldownButton('tSkill2', Math.max(0, p.skill2Cd) / 8, p.char === 'joku' ? '#7fd8ff' : '#ff86b8');
       this.setCooldownButton('tWeapon', w ? Math.max(0, p.weaponCd || 0) / (w.cd || 6) : 1, w ? w.color : '#fff3a8');
     }
     this.syncWeaponInfo();
@@ -458,16 +456,17 @@ const Main = {
   syncWeaponInfo() {
     const box = this.el('weaponInfo');
     if (!box || typeof Weapons === 'undefined') return;
-    const key = Weapons.IDS.map(id => {
-      const w = Weapons[id];
-      return [id, w.name, w.role, w.skill].join('|');
-    }).join('~');
+    const id = G.me && G.me.weapon && Weapons[G.me.weapon] ? G.me.weapon : '';
+    const w = id ? Weapons[id] : null;
+    const key = [id, w && w.name, w && w.role, w && w.skill, G.me && G.me.char].join('|');
     if (box.dataset.key === key) return;
     box.dataset.key = key;
-    box.innerHTML = '<h3>Weapon Skills</h3><div class="weaponInfoGrid">' + Weapons.IDS.map(id => {
-      const w = Weapons[id];
-      return `<div class="weaponInfoItem"><span>${w.icon}</span><div><b>${w.name}</b><br>${w.skill}</div><span class="weaponInfoRole">${w.role || 'Attack'}</span></div>`;
-    }).join('') + '</div>';
+    if (!w) {
+      box.innerHTML = '<h3>Your Weapon</h3><div class="weaponInfoEmpty">No weapon equipped. Stand near a shining weapon and press Pick/Drop to equip it.</div>';
+      return;
+    }
+    const who = G.me.char === 'joku' ? 'Joku' : 'Jolie';
+    box.innerHTML = `<h3>${who}'s Weapon</h3><div class="weaponInfoItem current"><span>${w.icon}</span><div><b>${w.name}</b><br>${w.skill}. Use Weapon Skill (${Input.touchMode ? '✦' : 'U/O/B'}) when you want its extra power. Staying near your partner gives a bond bonus.</div><span class="weaponInfoRole">${w.role || 'Attack'}</span></div>`;
   },
 
   togglePause() {
