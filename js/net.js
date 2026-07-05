@@ -11,19 +11,16 @@ const NET = {
   _keepAlive: null,
 
   ALPHA: 'ABCDEFGHJKMNPQRSTUVWXYZ123456789',
-  PEER_OPTIONS: {
-    debug: 0,
-    config: {
-      iceCandidatePoolSize: 6,
-      sdpSemantics: 'unified-plan',
-      bundlePolicy: 'max-bundle',
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' }
-      ]
-    }
-  },
+  STUN_SERVERS: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
+  ],
+  RELAY_SERVERS: [
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+  ],
 
   _newCode() {
     let c = '';
@@ -44,11 +41,25 @@ const NET = {
   validCode(code) {
     return code.length === 4 && [...code].every(ch => this.ALPHA.includes(ch));
   },
-  _id(code) { return 'joku-jolie-love-' + this.normalizeCode(code).toLowerCase(); },
+  _scope() {
+    const path = location.pathname.replace(/\/index\.html?$/i, '/');
+    const here = (location.host + path).toLowerCase();
+    return here.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'local';
+  },
+  _id(code) { return 'joku-jolie-love-' + this._scope() + '-' + this.normalizeCode(code).toLowerCase(); },
 
   available() { return typeof Peer !== 'undefined'; },
-  _options() {
-    return JSON.parse(JSON.stringify(this.PEER_OPTIONS));
+  _options(relayOnly = false) {
+    const iceServers = relayOnly ? this.RELAY_SERVERS : this.STUN_SERVERS.concat(this.RELAY_SERVERS);
+    return {
+      debug: 0,
+      config: {
+        iceCandidatePoolSize: relayOnly ? 0 : 6,
+        bundlePolicy: 'max-bundle',
+        iceTransportPolicy: relayOnly ? 'relay' : 'all',
+        iceServers: JSON.parse(JSON.stringify(iceServers))
+      }
+    };
   },
   _watchPeer() {
     if (!this.peer) return;
@@ -87,7 +98,7 @@ const NET = {
     });
   },
 
-  join(code, retrying = false) {
+  join(code, retrying = false, relayOnly = false) {
     if (!this.available()) { this._status('err', 'No internet — online play needs a connection.'); return; }
     this.close();
     this.mode = 'guest';
@@ -99,8 +110,9 @@ const NET = {
     }
     const attempt = (this._joinAttempt = (this._joinAttempt || 0) + 1);
     this._peerOpened = false;
-    this._status('info', 'Finding Joku…');
-    this.peer = new Peer(this._options());
+    this._relayOnly = !!relayOnly;
+    this._status('info', relayOnly ? 'Finding Joku through relay mode…' : 'Finding Joku…');
+    this.peer = new Peer(this._options(relayOnly));
     this._watchPeer();
     this.peer.on('open', () => {
       this._peerOpened = true;
@@ -111,8 +123,8 @@ const NET = {
         if (attempt === this._joinAttempt && !this.connected && this.mode === 'guest') {
           if ((this._retryLeft || 0) > 0) {
             this._retryLeft--;
-            this._status('info', 'Still trying to connect phones...');
-            this.join(this.code, true);
+            this._status('info', 'Still trying with backup connection servers...');
+            this.join(this.code, true, false);
           } else {
             this._status('err', 'Could not connect. Keep Joku hosting, use code ' + this.code + ', and try Join/Rejoin again.');
           }
@@ -129,8 +141,8 @@ const NET = {
   _retryUnavailableSoon(err) {
     if (!err || err.type !== 'peer-unavailable' || this.mode !== 'guest' || (this._retryLeft || 0) <= 0) return false;
     this._retryLeft--;
-    this._status('info', 'Room not ready yet. Retrying...');
-    setTimeout(() => this.join(this.code, true), 1200);
+    this._status('info', 'Room not ready yet. Retrying with backup connection servers...');
+    setTimeout(() => this.join(this.code, true, false), 1200);
     return true;
   },
 
