@@ -1698,11 +1698,122 @@ const Art = {
     ctx.restore();
   },
 
+  drawCoopScene(ctx, tr, t) {
+    const type = tr.kind || 'forestBridge';
+    const done = !!tr.done;
+    const charge = U.clamp(tr.charge || 0, 0, 1);
+    const colors = {
+      forestBridge: '#9be27d', oceanPhoenix: '#56d6ff', flowerLift: '#ff9fce',
+      shadowLantern: '#d9b6ff', emberRain: '#ffb36b', starMirror: '#fff3a8'
+    };
+    const col = colors[type] || '#ff9fce';
+
+    ctx.save();
+    for (const s of [-1, 1]) {
+      const active = s < 0 ? tr.padL : tr.padR;
+      ctx.globalCompositeOperation = 'lighter';
+      this.glow(ctx, s * 58, -3, active ? 38 : 24, active ? col : '#9fb6c8', active ? .75 : .28);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = active ? col + '55' : 'rgba(20,35,48,.62)';
+      ctx.beginPath(); ctx.ellipse(s * 58, -2, 31, 10, 0, 0, U.TAU); ctx.fill();
+      ctx.strokeStyle = active ? '#ffffffaa' : 'rgba(200,220,235,.42)';
+      ctx.lineWidth = active ? 2.5 : 1.5;
+      ctx.beginPath(); ctx.ellipse(s * 58, -2, 34, 12, 0, 0, U.TAU); ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(155, -30);
+    ctx.globalAlpha = done ? .85 : 1;
+    if (type === 'oceanPhoenix') {
+      ctx.strokeStyle = done ? '#bdf5ff' : '#56d6ff';
+      ctx.lineWidth = 5;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        for (let x = -90; x <= 90; x += 18) {
+          const y = 24 + i * 13 + Math.sin(t * 3 + x * .05 + i) * 7;
+          ctx[x === -90 ? 'moveTo' : 'lineTo'](x, y);
+        }
+        ctx.stroke();
+      }
+      ctx.save();
+      ctx.translate(0, -28 + Math.sin(t * 2.4) * 5);
+      ctx.globalCompositeOperation = 'lighter';
+      this.glow(ctx, 0, 0, 38 + charge * 30, '#56d6ff', .65 + charge * .25);
+      ctx.globalCompositeOperation = 'source-over';
+      this.drawProj(ctx, { kind: 'phoenix', x: 0, y: 0, vx: 1, vy: 0, t }, t);
+      ctx.restore();
+    } else if (type === 'flowerLift') {
+      ctx.fillStyle = done ? '#9be27d' : 'rgba(70,46,70,.75)';
+      ctx.beginPath(); ctx.moveTo(-72, 36); ctx.lineTo(30, -92); ctx.lineTo(94, 36); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#ffb6e6'; ctx.lineWidth = 4;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const y = 25 - i * 22, w = 24 + i * 8;
+        ctx.moveTo(-w, y); ctx.lineTo(w, y - 7);
+      }
+      ctx.stroke();
+      for (let i = 0; i < 5; i++) this.heart(ctx, -34 + i * 18, 10 - i * 20 + Math.sin(t * 2 + i) * 3, 5, '#ffa9d8');
+    } else if (type === 'shadowLantern') {
+      ctx.fillStyle = done ? 'rgba(60,35,95,.35)' : 'rgba(12,10,28,.78)';
+      ctx.beginPath(); ctx.roundRect(-82, -82, 164, 118, 18); ctx.fill();
+      for (const s of [-1, 1]) {
+        ctx.save(); ctx.translate(s * 38, -24);
+        ctx.globalCompositeOperation = 'lighter'; this.glow(ctx, 0, 0, done ? 54 : 26 + charge * 25, col, done ? .85 : .35 + charge * .45);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#ffe8b8'; ctx.beginPath(); ctx.roundRect(-9, -16, 18, 34, 6); ctx.fill();
+        ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+        ctx.restore();
+      }
+    } else if (type === 'emberRain') {
+      for (let i = 0; i < 7; i++) {
+        const x = -78 + i * 26;
+        ctx.fillStyle = done ? 'rgba(90,160,180,.35)' : '#ff6f3a';
+        ctx.beginPath();
+        ctx.moveTo(x, 34);
+        ctx.quadraticCurveTo(x - 12, 8, x, -24 - Math.sin(t * 5 + i) * 6);
+        ctx.quadraticCurveTo(x + 14, 6, x + 5, 34);
+        ctx.fill();
+      }
+      ctx.strokeStyle = '#7fd8ff'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, -50, 48 + charge * 22, .15, Math.PI - .15); ctx.stroke();
+    } else if (type === 'starMirror') {
+      for (const s of [-1, 1]) {
+        ctx.save(); ctx.translate(s * 45, -24); ctx.rotate(s * .25);
+        ctx.fillStyle = 'rgba(210,230,255,.22)'; ctx.beginPath(); ctx.roundRect(-15, -42, 30, 78, 8); ctx.fill();
+        ctx.strokeStyle = done ? '#fff3a8' : '#d7b7ff'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.restore();
+      }
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 6; i++) {
+        const a = t * 1.2 + i * U.TAU / 6;
+        this.star(ctx, Math.cos(a) * (36 + charge * 35), -26 + Math.sin(a) * 28, 5, '#fff3a8');
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    } else {
+      ctx.strokeStyle = done ? '#d4ffad' : '#9be27d';
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(-88, 24);
+      ctx.bezierCurveTo(-35, -22 - charge * 24, 35, -22 - charge * 24, 88, 24);
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      for (let i = -3; i <= 3; i++) {
+        ctx.beginPath(); ctx.moveTo(i * 24, 14); ctx.lineTo(i * 24 + 10, -5 - charge * 20); ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'lighter'; this.glow(ctx, 0, -38, 25 + charge * 36, col, .35 + charge * .5);
+      ctx.globalCompositeOperation = 'source-over';
+      this.heart(ctx, 0, -39 + Math.sin(t * 2) * 4, 10, '#ffd0e5');
+    }
+    ctx.restore();
+  },
+
   drawLoveTrial(ctx, tr, t) {
     const charge = U.clamp(tr.charge || 0, 0, 1);
     const done = !!tr.done;
     ctx.save();
     ctx.translate(tr.x, tr.y);
+    this.drawCoopScene(ctx, tr, t);
     const glow = done ? .8 : .35 + charge * .55 + Math.sin(t * 3) * .08;
     ctx.globalCompositeOperation = 'lighter';
     this.glow(ctx, 0, -28, 74 + charge * 45, done ? '#fff3a8' : '#ff9fce', glow);

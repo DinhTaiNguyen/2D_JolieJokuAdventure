@@ -389,7 +389,7 @@ const Game = {
     m.hp = s.hp; m.mp = s.mp;
     m.weapon = s.wp || null;
     G.loadout[m.char] = m.weapon;
-    m.glide = s.gl; m.holding = s.hh;
+    m.glide = s.gl; m.holding = s.hh; m.heartHeld = !!s.he;
     m.onGround = s.og;
     if (s.dn && !m.down) { m.down = true; m.pose = 'down'; }
     if (!s.dn && m.down) { m.down = false; m.pose = null; }
@@ -449,15 +449,59 @@ const Game = {
     }
   },
 
+  trialPads(tr) {
+    const r = 64;
+    const leftX = tr.x - 58, rightX = tr.x + 58;
+    const me = G.me, mate = G.mate;
+    const meL = me && U.dist(me.x, me.y, leftX, tr.y) < r;
+    const meR = me && U.dist(me.x, me.y, rightX, tr.y) < r;
+    const mateL = mate && U.dist(mate.x, mate.y, leftX, tr.y) < r;
+    const mateR = mate && U.dist(mate.x, mate.y, rightX, tr.y) < r;
+    return {
+      leftX, rightX,
+      leftOn: meL || mateL,
+      rightOn: meR || mateR,
+      split: (meL && mateR) || (meR && mateL)
+    };
+  },
+
+  assistBotTrial(tr, dt) {
+    if (!G.mate || !G.mate.bot || G.mate.down || G.cut || G.dialog) return;
+    const pads = this.trialPads(tr);
+    if (U.dist(G.me.x, G.me.y, tr.x, tr.y) > 210) return;
+    const targetX = Math.abs(G.me.x - pads.leftX) < Math.abs(G.me.x - pads.rightX) ? pads.rightX : pads.leftX;
+    G.mate.x += (targetX - G.mate.x) * Math.min(1, 5 * dt);
+    G.mate.y += (tr.y - G.mate.y) * Math.min(1, 8 * dt);
+    G.mate.vx *= .4;
+    G.mate.dir = G.me.x > G.mate.x ? 1 : -1;
+  },
+
+  trialCoopPulse(tr, dt) {
+    const colors = {
+      forestBridge: '#9be27d', oceanPhoenix: '#56d6ff', flowerLift: '#ff9fce',
+      shadowLantern: '#d9b6ff', emberRain: '#ffb36b', starMirror: '#fff3a8'
+    };
+    const color = colors[tr.kind] || '#ff9fce';
+    if (Math.random() < dt * 12) {
+      const side = Math.random() < .5 ? -1 : 1;
+      Ptc.add({ kind: tr.kind === 'flowerLift' ? 'petal' : 'star', x: tr.x + side * 58 + (Math.random() - .5) * 20, y: tr.y - 28 - Math.random() * 48, vx: (Math.random() - .5) * 35, vy: -50, r: 4 + Math.random() * 3, life: 1, color });
+    }
+  },
+
   updateLoveTrials(dt) {
     const trials = (G.level && G.level.loveTrials) || [];
     const tr = trials.find(x => !x.done);
     if (!tr) return;
     const me = G.me, mate = G.mate;
+    this.assistBotTrial(tr, dt);
+    const pads = this.trialPads(tr);
+    tr.padL = pads.leftOn;
+    tr.padR = pads.rightOn;
     const nearMe = U.dist(me.x, me.y, tr.x, tr.y) < 135;
     const nearMate = U.dist(mate.x, mate.y, tr.x, tr.y) < 135;
     const together = nearMe && nearMate && !me.down && !mate.down;
-    const holding = G.handHold || (Input.held('heart') && U.dist(me.x, me.y, mate.x, mate.y) < 150);
+    const linked = (G.handHold || me.holding || mate.holding || mate.heartHeld || (Input.held('heart') && U.dist(me.x, me.y, mate.x, mate.y) < 170)) && !me.down && !mate.down;
+    const ready = tr.stage === 1 ? (together && linked) : (pads.split && linked);
 
     if (tr.stage === 2) {
       tr.kissT = (tr.kissT || 1.05) - dt;
@@ -468,14 +512,15 @@ const Game = {
       return;
     }
 
-    if (together && holding) {
-      tr.charge = U.clamp((tr.charge || 0) + dt / (tr.stage === 1 ? 1.35 : 1.05), 0, 1);
+    if (ready) {
+      tr.charge = U.clamp((tr.charge || 0) + dt / (tr.stage === 1 ? 1.35 : 1.25), 0, 1);
       if (!tr.started) {
         tr.started = true;
         const info = Story.trialInfo(G.levelIndex, tr.id);
         G.announce = { txt: info.title, sub: tr.stage === 1 ? 'Tiếp tục giữ trái tim để trao nụ hôn mở khóa.' : info.hint, t: 2.8 };
         SND.sfx('heart');
       }
+      this.trialCoopPulse(tr, dt);
       if (Math.random() < dt * 12) {
         Ptc.add({ kind: 'heart', x: tr.x + (Math.random() - .5) * 90, y: tr.y - 24 - Math.random() * 70, vx: (Math.random() - .5) * 35, vy: -45, r: 4 + Math.random() * 4, life: 1, color: '#ff9fce' });
       }
@@ -483,7 +528,9 @@ const Game = {
         tr.stage = 1; tr.charge = 0; tr.started = false;
         me.pose = mate.pose = 'hug'; me.poseT = mate.poseT = 1.25;
         this.hugHearts(tr.x);
+        G.announce = { txt: 'Phép hợp sức đã thức dậy', sub: 'Lại gần nhau, giữ trái tim, rồi trao nụ hôn mở đường.', t: 2.7 };
         G.announce = { txt: 'Cái ôm đã đánh thức vòng sáng', sub: 'Giữ thêm một chút để hôn và nhận vũ khí.', t: 2.7 };
+        G.announce = { txt: 'Phép hợp sức đã thức dậy', sub: 'Lại gần nhau, giữ trái tim, rồi trao nụ hôn mở đường.', t: 2.7 };
         SND.sfx('heal');
       } else if (tr.charge >= 1) {
         tr.stage = 2; tr.charge = 0; tr.kissT = 1.05;
@@ -493,7 +540,7 @@ const Game = {
     } else {
       tr.started = false;
       tr.charge = Math.max(0, (tr.charge || 0) - dt * .35);
-      if ((nearMe || nearMate) && !G._lockHintT) {
+      if ((nearMe || nearMate || pads.leftOn || pads.rightOn) && !G._lockHintT) {
         const info = Story.trialInfo(G.levelIndex, tr.id);
         G.announce = { txt: info.title, sub: info.hint, t: 2.4 };
         G._lockHintT = 3;
@@ -1685,7 +1732,7 @@ const Game = {
     NET.send({
       t: 'p', q: ++G.netT.seq, x: Math.round(p.x), y: Math.round(p.y), vx: Math.round(p.vx), vy: Math.round(p.vy),
       dir: p.dir, hp: Math.round(p.hp), mp: Math.round(p.mp),
-      gl: p.glide, hh: p.holding, dn: p.down, wg: p.wing > .3, at: p.atkT < .15, og: p.onGround,
+      gl: p.glide, hh: p.holding, he: Input.held('heart'), dn: p.down, wg: p.wing > .3, at: p.atkT < .15, og: p.onGround,
       ht: p.hurtT > .05, ch: p.cheerT > .05, wp: p.weapon || ''
     }, { volatile: true, maxBuffered: 24576 });
   },
@@ -1696,7 +1743,7 @@ const Game = {
       if (!e.dead) foes.push([e.id, Math.round(e.x), Math.round(e.y), e.dir, Math.round(e.hp)]);
     }
     const b = G.level.boss;
-    const trials = (G.level.loveTrials || []).map(t => [t.id, t.done ? 1 : 0, Math.round((t.charge || 0) * 100)]);
+    const trials = (G.level.loveTrials || []).map(t => [t.id, t.done ? 1 : 0, Math.round((t.charge || 0) * 100), t.stage || 0]);
     const dead = G.level.foes.filter(e => e.dead).map(e => e.id);
     const items = G.level.items
       .filter(it => !it.taken && (it.id[0] === 'w' || it.id[0] === 'd'))
@@ -1798,7 +1845,7 @@ const Game = {
         if (m.trials) {
           for (const tr of m.trials) {
             const local = (G.level.loveTrials || []).find(x => x.id === tr[0]);
-            if (local) { local.done = !!tr[1]; local.charge = (tr[2] || 0) / 100; }
+            if (local) { local.done = !!tr[1]; local.charge = (tr[2] || 0) / 100; local.stage = tr[3] || 0; }
           }
         }
         if (m.boss && G.level.boss) {

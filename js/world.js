@@ -11,6 +11,7 @@ const World = {
   ],
 
   DEATH_Y: 860,
+  COOP_CHALLENGES: ['forestBridge', 'oceanPhoenix', 'flowerLift', 'shadowLantern', 'emberRain', 'starMirror'],
 
   gen(idx) {
     const cfg = this.LEVELS[idx];
@@ -177,7 +178,7 @@ const World = {
     };
     const loveTrials = [cfg.width * .48].map((tx, i) => {
       const g = groundNear(tx);
-      return { id: 'trial' + i, x: g.x, y: g.pl.y, done: false, charge: 0 };
+      return { id: 'trial' + i, kind: World.COOP_CHALLENGES[idx % World.COOP_CHALLENGES.length], x: g.x, y: g.pl.y, done: false, charge: 0, stage: 0 };
     });
 
     return this._pack(cfg, idx, plats, items, foes, {

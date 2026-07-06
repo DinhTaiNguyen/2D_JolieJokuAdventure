@@ -37,8 +37,17 @@ const Story = {
       { title: 'Chòm sao của bốn người bạn', hint: 'Joku, Jolie, Lulu và Biscuit cần cùng một nhịp yêu thương.', done: 'Chòm sao tình yêu đã sáng trọn vẹn!' }
     ],
   ],
+  COOP_TRIALS: [
+    { title: 'Nàng tiên hoa và cây cầu rừng', hint: 'Mỗi người đứng trên một dấu sáng, nắm tay bằng trái tim để nàng tiên mọc cầu dây leo.', done: 'Cây cầu hoa đã mở. Hai bạn đã qua được khe rừng!' },
+    { title: 'Phượng hoàng biển gọi sóng', hint: 'Đứng hai bên vòng sáng, giữ trái tim để Joku gọi nước và Jolie giữ nhịp hoa băng qua đại dương.', done: 'Phượng hoàng biển đã hạ cánh, sóng mở thành lối đi!' },
+    { title: 'Tiên hoa nâng núi', hint: 'Chia nhau giữ hai dấu sáng để hoa tiên dựng bậc thang lên sườn núi.', done: 'Những bậc hoa đã nâng hai bạn vượt qua vách núi!' },
+    { title: 'Đèn đôi trong hang tối', hint: 'Hai người thắp hai ngọn đèn cùng lúc bằng trái tim, đừng để bóng tối tách ra.', done: 'Hai ngọn đèn đã nhập một, hang tối nhường đường!' },
+    { title: 'Mưa tình yêu dập lửa', hint: 'Joku giữ dấu nước, Jolie giữ dấu hoa, cùng nắm tay để gọi cơn mưa dịu lửa.', done: 'Ngọn lửa đã tắt, tro nóng biến thành đường an toàn!' },
+    { title: 'Gương sao của bốn trái tim', hint: 'Đứng trên hai gương sao và giữ trái tim để Lulu, Biscuit nối chòm sao còn thiếu.', done: 'Chòm sao đã thẳng hàng, con đường cuối cùng sáng lên!' },
+  ],
 
   trialInfo(levelIdx, id) {
+    if (String(id || '') === 'trial0' && this.COOP_TRIALS[levelIdx]) return this.COOP_TRIALS[levelIdx];
     const set = this.TRIALS[levelIdx] || this.TRIALS[0];
     const n = U.clamp(parseInt(String(id || '0').replace(/\D/g, ''), 10) || 0, 0, set.length - 1);
     return set[n] || this.TRIALS[0][0];
