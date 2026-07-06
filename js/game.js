@@ -106,7 +106,7 @@ const Game = {
     }
 
     G.fade = 1; G.fadeDir = -1;
-    G.announce = { txt: G.level.name, sub: 'Chapter ' + (n + 1) + ' of ' + World.LEVELS.length, t: 3.2 };
+    G.announce = { txt: Story.levelName(n), sub: Story.t('chapterSub', { n: n + 1, total: World.LEVELS.length }), t: 3.2 };
     SND.startMusic(n);
 
     // level-start scenes run locally on BOTH devices (deterministic), no network needed
@@ -129,12 +129,12 @@ const Game = {
     G.difficulty = diff;
     if (G.level) this.applyDifficulty(G.level);
     if (Main.syncSettings) Main.syncSettings();
-    Main.toast('Difficulty: ' + diff);
+    Main.toast(Story.t('difficultySet', { diff: Story.t(diff) }));
   },
 
   gotoChapter(n) {
     n = U.clamp(n | 0, 0, World.LEVELS.length - 1);
-    if (G.mode === 'guest') { Main.toast('Only the host can change chapters online.'); return; }
+    if (G.mode === 'guest') { Main.toast(Story.t('hostOnlyChapter')); return; }
     if (G.state !== 'play') { this.startGame(G.mode || 'solo', n); return; }
     this.hidePauseIfOpen();
     this.emit('lvl', { n });
@@ -435,7 +435,7 @@ const Game = {
     if (threat && threat.bossTier) {
       if (!threat.announced) {
         threat.announced = true;
-        G.announce = { txt: threat.bossName || 'Strong Boss', sub: 'get ready together', t: 2.8 };
+        G.announce = { txt: threat.bossName || Story.t('strongBoss'), sub: Story.t('readyTogether'), t: 2.8 };
         SND.sfx('boss');
       }
       if (G.activeMiniBoss !== threat.id) {
@@ -519,6 +519,7 @@ const Game = {
         const info = Story.trialInfo(G.levelIndex, tr.id);
         G.announce = { txt: info.title, sub: tr.stage === 1 ? 'Tiếp tục giữ trái tim để trao nụ hôn mở khóa.' : info.hint, t: 2.8 };
         SND.sfx('heart');
+        G.announce = { txt: info.title, sub: tr.stage === 1 ? Story.t('trialKissPrompt') : info.hint, t: 2.8 };
       }
       this.trialCoopPulse(tr, dt);
       if (Math.random() < dt * 12) {
@@ -532,6 +533,7 @@ const Game = {
         G.announce = { txt: 'Cái ôm đã đánh thức vòng sáng', sub: 'Giữ thêm một chút để hôn và nhận vũ khí.', t: 2.7 };
         G.announce = { txt: 'Phép hợp sức đã thức dậy', sub: 'Lại gần nhau, giữ trái tim, rồi trao nụ hôn mở đường.', t: 2.7 };
         SND.sfx('heal');
+        G.announce = { txt: Story.t('trialHugAwake'), sub: Story.t('trialHugSub'), t: 2.7 };
       } else if (tr.charge >= 1) {
         tr.stage = 2; tr.charge = 0; tr.kissT = 1.05;
         SND.sfx('kiss');
@@ -555,10 +557,11 @@ const Game = {
     tr.charge = 1;
     tr.stage = 3;
     tr._celebrated = true;
-    this.setCheckpoint(tr.x, tr.y, 'Love Trial', true);
+    this.setCheckpoint(tr.x, tr.y, Story.t('loveTrial'), true);
     const info = Story.trialInfo(G.levelIndex, tr.id);
     G.announce = { txt: info.done, sub: 'Vũ khí sáng đã xuất hiện. Hãy chọn món phù hợp!', t: 3.2 };
     SND.sfx('gate');
+    G.announce = { txt: info.done, sub: Story.t('trialRewardSub'), t: 3.2 };
     Ptc.add({ kind: 'ring', x: tr.x, y: tr.y - 24, vx: 0, vy: 0, r: 180, life: .9, color: 'rgba(255,170,210,.9)' });
     Ptc.burst('heart', tr.x, tr.y - 60, 18, { sp: 170, r: 7, life: 1.3 });
     if (!fromNet && G.mode !== 'guest') {
@@ -577,7 +580,7 @@ const Game = {
     const trial = (L.loveTrials || []).find(t => !t.done);
     if (trial) {
       const info = Story.trialInfo(G.levelIndex, trial.id);
-      locks.push({ x: trial.x, limit: trial.x + 190, txt: info.title, sub: info.hint });
+      locks.push({ x: trial.x, limit: trial.lockLimit || trial.x + 190, txt: info.title, sub: Story.t('trialExtremeLock') });
     }
     for (const e of L.foes) {
       if (e.bossTier && !e.dead && !(e.dying > 0)) {
@@ -589,6 +592,12 @@ const Game = {
     }
     if (L.boss && G.bossActive && !L.boss.dead && !(L.boss.dying > 0)) {
       locks.push({ x: L.boss.x, limit: L.boss.x + 420, txt: L.boss.bossName || 'Final Boss', sub: 'Đánh bại boss cuối để kết thúc chương.' });
+    }
+    for (const lock of locks) {
+      const span = Math.round(lock.limit - lock.x);
+      if (span === 330) lock.sub = Story.t('strongBossLock');
+      else if (span === 135) { lock.txt = Story.t('heartGate'); lock.sub = Story.t('heartGateSub'); }
+      else if (span === 420) lock.sub = Story.t('finalBossLock');
     }
     return locks.sort((a, b) => a.x - b.x);
   },
@@ -616,7 +625,7 @@ const Game = {
     if (!G.level) return;
     const top = World.topAt(G.level, x, y - 120) || World.topAt(G.level, x) || y || 520;
     G.checkpoint = { x, y: top };
-    if (!quiet && label) this.toastMsg('Save point: ' + label);
+    if (!quiet && label) this.toastMsg(Story.t('savePoint', { label }));
     Ptc.add({ kind: 'ring', x, y: top - 20, vx: 0, vy: 0, r: 95, life: .7, color: 'rgba(170,230,255,.8)' });
   },
 
@@ -644,7 +653,7 @@ const Game = {
     if (pet.hp <= 0) {
       pet.mode = 'follow';
       pet.downT = 0;
-      this.toastMsg(Story.NAMES[pet.kind] + ' needs a moment to recover!');
+      this.toastMsg(Story.t('petRecover', { name: Story.NAMES[pet.kind] }));
     }
   },
 
@@ -701,7 +710,7 @@ const Game = {
       this.emit('love', { kind });
       this.applyLove(kind);
     } else if (d >= 110) {
-      this.toastMsg('💗 Get closer to your love!');
+      this.toastMsg('💗 ' + Story.t('getCloser'));
     }
   },
 
@@ -712,7 +721,7 @@ const Game = {
         G.handHold = true; me.holding = mate.holding = true;
         SND.sfx('heart');
         Ptc.burst('heart', (me.x + mate.x) / 2, Math.min(me.y, mate.y) - 50, 6, { sp: 90, r: 6, life: 1 });
-        this.toastMsg('🤝 Holding hands — stronger together!');
+        this.toastMsg('🤝 ' + Story.t('holdingHands'));
         break;
       case 'unhold':
         G.handHold = false; me.holding = mate.holding = false;
@@ -799,6 +808,7 @@ const Game = {
       SND.sfx('heart');
       G.announce = { txt: '💋 KISS READY!', sub: 'get close & press ❤', t: 2.4 };
     }
+    if (G.love >= 100 && was < 100) G.announce = { txt: '💋 ' + Story.t('kissReady'), sub: Story.t('kissReadySub'), t: 2.4 };
   },
 
   /* ================= combat ================= */
@@ -824,6 +834,21 @@ const Game = {
     const shoot = (kind, vx, vy, dmg, life = 1.2, g = 0, x = p.x + dir * 20, y = p.y - 40) => {
       this.addProj({ kind, color, x, y, vx, vy, dmg, life, g, mine, owner: p.char });
     };
+    const team = [G.me, G.mate].filter(q => q && !q.down && U.dist(q.x, q.y, p.x, p.y) < 320);
+    const healTeam = (hp, mp = 0) => {
+      for (const q of team) {
+        q.hp = Math.min(q.maxHp, q.hp + hp);
+        q.mp = Math.min(q.maxMp, q.mp + mp);
+      }
+    };
+    const areaHit = (dmg, radius, slow = 0) => {
+      for (const e of this.enemiesAll()) {
+        if (!e.dead && !(e.dying > 0) && U.dist(e.x, e.y, p.x, p.y) < radius) {
+          this.hitEnemy(e, dmg, p.char);
+          if (slow) e.atkT = Math.max(e.atkT, slow);
+        }
+      }
+    };
     SND.sfx('weaponPickup');
     switch (w.special) {
       case 'tideDash':
@@ -844,14 +869,20 @@ const Game = {
         for (let i = 0; i < 4; i++) shoot('bolt', dir * (400 + i * 80), -230 - i * 35, 22, 1.15, 620);
         break;
       case 'thunderSlam':
-        this.bossSlam(p.x, 22); break;
+        this.shake(9);
+        Ptc.add({ kind: 'ring', x: p.x, y: p.y - 18, vx: 0, vy: 0, r: 170, life: .55, color: color + 'dd' });
+        areaHit(28, 230, 1.1);
+        for (const side of [-1, 1]) shoot('shock', side * 390, 0, 24, 1.8, 0, p.x + side * 42, p.y);
+        break;
       case 'crystalBurst':
         for (let i = 0; i < 8; i++) { const a = i * U.TAU / 8; shoot('bolt', Math.cos(a) * 420, Math.sin(a) * 420, 14, .9); }
         break;
       case 'shadowBlink':
         p.x += dir * 180; p.invuln = Math.max(p.invuln, 1); Ptc.burst('dot', p.x, p.y - 35, 18, { color, sp: 160, r: 7, life: .7 }); break;
       case 'sunGuard':
-        p.invuln = Math.max(p.invuln, 2.4); if (G.mate.bot) G.mate.invuln = Math.max(G.mate.invuln, 1.6); Ptc.add({ kind: 'ring', x: p.x, y: p.y - 32, vx: 0, vy: 0, r: 150, life: .8, color: color + 'dd' }); break;
+        for (const q of team) q.invuln = Math.max(q.invuln, q === p ? 2.6 : 1.9);
+        areaHit(14, 190, .8);
+        Ptc.add({ kind: 'ring', x: p.x, y: p.y - 32, vx: 0, vy: 0, r: 170, life: .8, color: color + 'dd' }); break;
       case 'lotusWind':
         for (const a of [-.45, -.22, 0, .22, .45]) shoot('petal', dir * 560 * Math.cos(a), 560 * Math.sin(a), 13, 1.2);
         this.addAura(p.x + dir * 90, p.y, mine); break;
@@ -861,25 +892,32 @@ const Game = {
       case 'cometDash':
         p.dashT = .34; p.invuln = Math.max(p.invuln, .7); shoot('starshot', dir * 820, -80, 30, .9, 0); break;
       case 'pandaGift':
-        p.hp = Math.min(p.maxHp, p.hp + 22); p.mp = Math.min(p.maxMp, p.mp + 35); this.dropWeapons(p.x, p.y, 1); break;
+        healTeam(24, 34);
+        this.loveAdd(8);
+        for (let i = -1; i <= 1; i++) {
+          G.level.items.push({ id: 'd' + (G._dropId++), kind: i === 0 ? 'heartDrop' : 'mote', x: p.x + i * 34, y: p.y - 48, taken: false });
+        }
+        break;
       case 'luluHowl':
-        for (const e of this.enemiesAll()) if (!e.dead && Math.abs(e.x - p.x) < 280) this.hitEnemy(e, 26, p.char);
+        areaHit(28, 330, 1.4);
         Ptc.text(p.x, p.y - 88, 'HOWL!', color); break;
       case 'phoenixNova':
         for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * U.TAU / 10; shoot('phoenix', Math.cos(a) * 430, Math.sin(a) * 430, 18, 1.1); }
         break;
       case 'dreamSong':
-        this.loveAdd(14); for (const e of this.enemiesAll()) if (!e.dead && Math.abs(e.x - p.x) < 360) { e.atkT = Math.max(e.atkT, 2.2); e.flash = .2; }
+        this.loveAdd(16); areaHit(16, 380, 2.4); healTeam(8, 10);
         Ptc.text(p.x, p.y - 82, '♪', color); break;
       case 'vineSnare':
-        for (const e of this.enemiesAll()) if (!e.dead && Math.abs(e.x - p.x) < 420) { this.hitEnemy(e, 20, p.char); e.atkT = Math.max(e.atkT, 1.2); }
+        areaHit(22, 440, 1.7);
         break;
       case 'auroraShield':
         p.invuln = Math.max(p.invuln, 1.4); for (let i = 0; i < 6; i++) { const a = i * U.TAU / 6; shoot('bolt', Math.cos(a) * 330, Math.sin(a) * 330, 12, 1); }
         break;
       case 'loveBeacon':
       default:
-        this.loveAdd(18); this.hugHearts(p.x); p.hp = Math.min(p.maxHp, p.hp + 14); break;
+        this.loveAdd(20); this.hugHearts(p.x); healTeam(18, 14);
+        Ptc.add({ kind: 'ring', x: p.x, y: p.y - 35, vx: 0, vy: 0, r: 145, life: .75, color: color + 'dd' });
+        break;
     }
     this.weaponBondBonus(p, w);
     this.weaponBurst(p.x, p.y - 45, p.weapon, .75);
@@ -907,7 +945,7 @@ const Game = {
       mate.mp = Math.min(mate.maxMp, mate.mp + 12);
     }
     this.loveAdd(4, true);
-    Ptc.text((p.x + mate.x) / 2, Math.min(p.y, mate.y) - 88, 'Bond Bonus', '#ff9fce');
+    Ptc.text((p.x + mate.x) / 2, Math.min(p.y, mate.y) - 88, Story.t('bondBonus'), '#ff9fce');
     Ptc.burst('heart', (p.x + mate.x) / 2, Math.min(p.y, mate.y) - 58, 7, { sp: 95, r: 5, life: .9 });
   },
 
@@ -975,7 +1013,7 @@ const Game = {
         }
         if (G._comboToastT <= 0) {
           G._comboToastT = 2.5;
-          Ptc.text(e.x, e.y - 58, 'TOGETHER STRIKE! 💞', '#ff9fce');
+          Ptc.text(e.x, e.y - 58, Story.t('togetherStrike'), '#ff9fce');
           SND.sfx('heart');
         }
       }
@@ -1001,7 +1039,7 @@ const Game = {
     if (G.mode !== 'guest') {
       if (e.bossTier) {
         this.dropWeapons(e.x, e.y, 2);
-        G.announce = { txt: 'Strong Boss Defeated!', sub: 'two weapons dropped', t: 2.8 };
+        G.announce = { txt: Story.t('bossDefeated'), sub: Story.t('bossDropSub'), t: 2.8 };
         SND.startMusic(G.levelIndex, false);
       }
       // loot
@@ -1037,7 +1075,7 @@ const Game = {
       me.hp = 0; me.down = true; me.downT = 0; me.pose = 'down';
       SND.sfx('down');
       this.emit('down', {});
-      this.toastMsg(me.char === 'joku' ? '💔 Joku is down! Jolie, hug him back up!' : '💔 Jolie is down! Joku, hug her back up!');
+      this.toastMsg('💔 ' + Story.t(me.char === 'joku' ? 'downJoku' : 'downJolie'));
     }
   },
 
@@ -1046,7 +1084,7 @@ const Game = {
       G.me.hp = Math.max(5, G.me.hp - 12);
       SND.sfx('hit');
       this.shake(5);
-      this.toastMsg('🌫 The mist caught you… careful!');
+      this.toastMsg('🌫 ' + Story.t('mist'));
     }
     Ptc.burst('drop', p.x, World.DEATH_Y - 80, 12, { sp: 200, up: 300, g: 700, r: 5, life: .8 });
     p.x = p.safeX; p.y = p.safeY - 4; p.vx = 0; p.vy = 0;
@@ -1062,7 +1100,7 @@ const Game = {
     SND.sfx('revive');
     Ptc.burst('heart', G.me.x, G.me.y - 40, 12, { sp: 140, r: 7, life: 1.2 });
     this.reviveKiss((G.me.x + G.mate.x) / 2);
-    this.toastMsg('💞 Love Surge! Revived by love.');
+    this.toastMsg('💞 ' + Story.t('revive'));
   },
 
   reviveKiss(x) {
@@ -1233,7 +1271,7 @@ const Game = {
         this.setWeapon(by, weapon);
         p.weaponPose = .9;
         p.cheerT = Math.max(p.cheerT || 0, .55);
-        if (forMe) this.toastMsg('Equipped ' + Weapons[weapon].name + '. Use Weapon Skill (U/O/B) or Pick/Drop to change it.');
+        if (forMe) this.toastMsg(Story.t('equipped', { weapon: Story.weaponText(weapon, 'name') || Weapons[weapon].name, keys: Input.touchMode ? '✦' : 'U/O/B' }));
         if (!fromNet) SND.sfx('weaponPickup');
         this.weaponBurst(it.x, it.y, weapon, 1.15);
         break;
@@ -1274,7 +1312,7 @@ const Game = {
       this.pickup(near, p.char, false);
       return;
     }
-    if (!p.weapon) { this.toastMsg('Stand near a weapon to pick it.'); return; }
+    if (!p.weapon) { this.toastMsg(Story.t('noWeapon')); return; }
     const weapon = p.weapon;
     this.setWeapon(p.char, null);
     const it = this.weaponDropItem(weapon, p.x + p.dir * 34, p.y - 46, 0, -70);
@@ -1282,7 +1320,7 @@ const Game = {
     this.emit('drop', { id: it.id, kind: it.kind, weapon, x: it.x, y: it.y, vx: it.vx, vy: it.vy });
     SND.sfx('weaponDrop');
     this.weaponBurst(it.x, it.y, weapon, .9);
-    this.toastMsg('Dropped ' + (Weapons[weapon] ? Weapons[weapon].name : 'weapon') + '.');
+    this.toastMsg(Story.t('dropped', { weapon: (Weapons[weapon] ? (Story.weaponText(weapon, 'name') || Weapons[weapon].name) : 'weapon') }));
   },
 
   /* ================= boss ================= */
@@ -1466,7 +1504,7 @@ const Game = {
     if (G.levelIndex >= World.LEVELS.length - 1) {
       this.cutStart('ending');
     } else {
-      G.announce = { txt: 'Chapter Clear!', sub: 'next adventure opening...', t: 3.2 };
+      G.announce = { txt: Story.t('chapterClear'), sub: Story.t('nextAdventure'), t: 3.2 };
       G.nextLevelT = 4.2;
     }
   },
@@ -1684,7 +1722,13 @@ const Game = {
     }
   },
 
-  toastMsg(txt) { Main.toast(txt); },
+  toastMsg(txt) {
+    const raw = String(txt || '');
+    if (raw.includes('Love never gives up')) txt = '💞 ' + Story.t('shrineReturn');
+    else if (raw.includes('Joku is down')) txt = '💔 ' + Story.t('downJoku');
+    else if (raw.includes('Jolie is down')) txt = '💔 ' + Story.t('downJolie');
+    Main.toast(txt);
+  },
 
   /* ================= networking ================= */
   resetNetSmoothing() {
@@ -1933,7 +1977,7 @@ const Game = {
       }
       case 'down':
         SND.sfx('down');
-        this.toastMsg(G.mate.char === 'joku' ? '💔 Joku is down! Hug him back up!' : '💔 Jolie is down! Hug her back up!');
+        this.toastMsg('💔 ' + Story.t(G.mate.char === 'joku' ? 'downJoku' : 'downJolie'));
         break;
       case 'revive': this.reviveMe(); break;
       case 'wipe': this.applyWipe(); break;
@@ -2010,6 +2054,11 @@ const Game = {
     for (const pl of L.plats) {
       if (pl.x + pl.w < viewL || pl.x > viewR) continue;
       Art.drawPlatform(ctx, pl, pal, t);
+    }
+    for (const ob of (L.coopObstacles || [])) {
+      if (ob.x + ob.w < viewL || ob.x > viewR) continue;
+      const tr = (L.loveTrials || []).find(x => x.id === ob.trialId);
+      Art.drawCoopObstacle(ctx, ob, tr, pal, t);
     }
     // shrine & gate
     if (L.shrineX) Art.drawShrine(ctx, L.shrineX, L.shrineY, t, L.shrineDone);

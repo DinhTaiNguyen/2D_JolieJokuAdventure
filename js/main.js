@@ -12,21 +12,21 @@ const Main = {
     $('btnSolo').onclick = () => { SND.unlock(); SND.sfx('ui'); this.preparePhonePlay(); NET.mode = 'solo'; Game.startGame('solo'); };
     $('btnHost').onclick = () => {
       SND.unlock(); SND.sfx('ui');
-      if (!NET.available()) { this.toast('🌐 Online play needs internet — try Practice Solo!'); return; }
+      if (!NET.available()) { this.toast('🌐 ' + Story.t('onlineNeedsInternet')); return; }
       this.preparePhonePlay();
       this.showConnect('host');
       this.hostFromInput();
     };
     $('btnJoin').onclick = () => {
       SND.unlock(); SND.sfx('ui');
-      if (!NET.available()) { this.toast('🌐 Online play needs internet — try Practice Solo!'); return; }
+      if (!NET.available()) { this.toast('🌐 ' + Story.t('onlineNeedsInternet')); return; }
       this.showConnect('join');
     };
     $('btnConnGo').onclick = () => {
       SND.unlock(); SND.sfx('ui');
       const code = this.cleanCodeInput('codeInput');
-      if (code.length < 4) { $('joinStatus').textContent = 'Enter the 4-letter code 💕'; return; }
-      $('joinStatus').textContent = 'Connecting…';
+      if (code.length < 4) { $('joinStatus').textContent = Story.t('enterCode'); return; }
+      $('joinStatus').textContent = Story.t('openingPortal');
       this.preparePhonePlay();
       NET.join(code);
     };
@@ -60,7 +60,7 @@ const Main = {
     const updSound = () => {
       $('btnSound').textContent = SND.enabled ? '🔊' : '🔇';
       $('btnSound').classList.toggle('off', !SND.enabled);
-      $('btnSound2').textContent = SND.enabled ? '🔊 Sound: on' : '🔇 Sound: off';
+      $('btnSound2').textContent = SND.enabled ? '🔊 ' + Story.t('soundOn') : '🔇 ' + Story.t('soundOff');
     };
     $('btnSound').onclick = () => { SND.unlock(); SND.setEnabled(!SND.enabled); updSound(); };
     $('btnSound2').onclick = () => { SND.unlock(); SND.setEnabled(!SND.enabled); updSound(); };
@@ -82,15 +82,15 @@ const Main = {
     NET.onStatus = (kind, msg) => {
       if (NET.mode === 'host') {
         if (kind === 'code') {
-          $('codeBig').textContent = msg; $('hostCodeInput').value = msg; $('hostStatus').textContent = 'Waiting for Jolie to join… 💗';
-        } else if (kind === 'ok') $('hostStatus').textContent = 'Connected! 💞';
+          $('codeBig').textContent = msg; $('hostCodeInput').value = msg; $('hostStatus').textContent = Story.t('waitingJoin') + ' 💗';
+        } else if (kind === 'ok') $('hostStatus').textContent = Story.t('connectedShort') + ' 💞';
         else if (kind === 'err') $('hostStatus').textContent = msg;
         else if (kind === 'info') $('hostStatus').textContent = msg;
       } else {
         if (kind === 'err') $('joinStatus').textContent = msg;
         else if (kind === 'info') $('joinStatus').textContent = msg;
         else if (kind === 'ok') {
-          $('joinStatus').textContent = 'Connected! Starting… 💞';
+          $('joinStatus').textContent = Story.t('connectedStart') + ' 💞';
           NET.send({ t: 'hello' });
         }
       }
@@ -101,13 +101,13 @@ const Main = {
         this.hideOverlays();
         G._freshOnlineStart = true;
         Game.startGame('host');
-        this.toast('💗 Jolie has joined your adventure!');
+        this.toast('💗 ' + Story.t('joinedAdventure'));
       } else {
-        this.toast('💗 Jolie reconnected!');
+        this.toast('💗 ' + Story.t('reconnectedAdventure'));
       }
     };
     NET.onDrop = () => {
-      this.toast('💔 Connection lost… ' + (NET.mode === 'host' ? 'Jolie can rejoin with the same code.' : 'Rejoin from the menu with the same code.'));
+      this.toast('💔 ' + Story.t(NET.mode === 'host' ? 'connectionLostHost' : 'connectionLostGuest'));
       if (NET.mode === 'guest' && G.state === 'play' && !G.paused) this.togglePause();
       this.syncConnectionSettings();
     };
@@ -125,7 +125,7 @@ const Main = {
       const code = NET.code || this.cleanCodeInput('hostCodeInput') || '1234';
       const url = location.origin + location.pathname + '?join=' + code;
       (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(
-        () => this.toast('💌 Invite link copied — send it to Jolie!'),
+        () => this.toast('💌 ' + Story.t('copiedInvite')),
         () => this.toast(url)
       );
     };
@@ -139,7 +139,7 @@ const Main = {
       const joinCode = NET.normalizeCode(q.get('join'));
       this.showConnect('join');
       $('codeInput').value = joinCode;
-      $('joinStatus').textContent = 'Connecting…';
+      $('joinStatus').textContent = Story.t('openingPortal');
       NET.join(joinCode);
     } else if (q.has('solo')) {
       if (q.has('touch')) Input.touchMode = true;
@@ -195,9 +195,69 @@ const Main = {
     if (typeof Story !== 'undefined' && Story.setLanguage) Story.setLanguage(lang);
     const sel = this.el('languageSelect');
     if (sel) sel.value = lang;
+    this.applyLanguage();
+    if (this.el('chapterSelect') && this.el('chapterSelect').options.length) this.populateSettings();
     this.renderHelp();
     this.syncWeaponInfo(true);
-    if (!quiet) this.toast(lang === 'vi' ? 'Da chuyen sang tieng Viet.' : 'Language set to English.');
+    if (!quiet) this.toast(Story.t(lang === 'vi' ? 'languageVietnamese' : 'languageEnglish'));
+  },
+
+  applyLanguage() {
+    if (typeof Story === 'undefined') return;
+    const set = (id, txt) => { const el = this.el(id); if (el) el.textContent = txt; };
+    const labelFor = (id, txt) => {
+      const el = this.el(id);
+      const label = el && el.closest('label');
+      if (label && label.firstChild) label.firstChild.nodeValue = txt + ' ';
+    };
+    set('btnHost', '💙 ' + Story.t('host'));
+    set('btnJoin', '💗 ' + Story.t('join'));
+    set('btnSolo', '🐾 ' + Story.t('solo'));
+    const subtitle = document.querySelector('#menu .subtitle');
+    if (subtitle) subtitle.textContent = Story.t('subtitle');
+    const credit = document.querySelector('#menu .credit');
+    if (credit) credit.textContent = Story.t('credit') + ' 💞';
+    set('btnHelpSettings', Story.t('help'));
+    set('btnGoChapter', Story.t('goChapter'));
+    set('btnDropWeapon', Story.t('dropWeapon'));
+    set('btnResume', '▶ ' + Story.t('continue'));
+    set('btnReconnectHost', Story.t('hostReopen'));
+    set('btnReconnectJoin', Story.t('joinRejoin'));
+    set('btnQuit', '🚪 ' + Story.t('quitMenu'));
+    set('btnSound2', (SND.enabled ? '🔊 ' : '🔇 ') + Story.t(SND.enabled ? 'soundOn' : 'soundOff'));
+    set('btnHostGo', Story.t('hostRoom'));
+    set('btnConnGo', '💗 ' + Story.t('joinJoku'));
+    set('btnConnCancel', Story.t('back'));
+    set('btnCopyLink', '💌 ' + Story.t('copyInvite'));
+    const pauseTitle = document.querySelector('#pausePanel h2');
+    if (pauseTitle) pauseTitle.textContent = Story.t('pause') + ' 💤';
+    const hostPrompt = document.querySelector('#hostBox p');
+    if (hostPrompt) hostPrompt.textContent = Story.t('hostPrompt');
+    const currentRoom = document.querySelector('#hostBox .dim');
+    if (currentRoom) currentRoom.textContent = Story.t('currentRoom');
+    const joinPrompt = document.querySelector('#joinBox p');
+    if (joinPrompt) joinPrompt.textContent = Story.t('joinPrompt');
+    labelFor('difficultySelect', Story.t('difficulty'));
+    labelFor('chapterSelect', Story.t('chapter'));
+    labelFor('languageSelect', Story.t('language'));
+    labelFor('settingsCodeInput', Story.t('roomCode'));
+    const diff = this.el('difficultySelect');
+    if (diff) {
+      const labels = { easy: Story.t('easy'), normal: Story.t('normal'), hard: Story.t('hard') };
+      for (const opt of diff.options) opt.textContent = labels[opt.value] || opt.value;
+    }
+    const lang = this.el('languageSelect');
+    if (lang) {
+      const en = lang.querySelector('option[value="en"]'), vi = lang.querySelector('option[value="vi"]');
+      if (en) en.textContent = 'English';
+      if (vi) vi.textContent = 'Tiếng Việt';
+    }
+    const help = this.el('btnHelp');
+    if (help) help.title = Story.t('help');
+    const full = this.el('btnFull');
+    if (full) full.title = Story.t('fullscreen');
+    this.updateFullscreenButtons();
+    this.syncSettings();
   },
 
   openHelp() {
@@ -266,7 +326,7 @@ const Main = {
     World.LEVELS.forEach((lvl, i) => {
       const opt = document.createElement('option');
       opt.value = i;
-      opt.textContent = (i + 1) + '. ' + lvl.name;
+      opt.textContent = (i + 1) + '. ' + (typeof Story !== 'undefined' ? Story.levelName(i) : lvl.name);
       sel.appendChild(opt);
     });
     this.syncSettings();
@@ -289,15 +349,15 @@ const Main = {
     const code = NET.code || input.value || this.el('hostCodeInput')?.value || this.el('codeInput')?.value || '1234';
     input.value = NET.normalizeCode(code) || '1234';
     const mode = NET.mode || G.mode || 'solo';
-    const connected = NET.connected ? 'connected' : (NET.peer ? 'waiting' : 'offline');
-    const modeLabel = mode === 'host' ? 'Host as Joku' : mode === 'guest' ? 'Join as Jolie' : 'Solo';
-    this.el('settingsConnMode').textContent = 'Connection: ' + modeLabel + ' / ' + connected;
+    const connected = NET.connected ? Story.t('connected') : (NET.peer ? Story.t('waiting') : Story.t('offline'));
+    const modeLabel = mode === 'host' ? Story.t('hostMode') : mode === 'guest' ? Story.t('guestMode') : Story.t('soloMode');
+    this.el('settingsConnMode').textContent = Story.t('connection') + ': ' + modeLabel + ' / ' + connected;
     const status = this.el('settingsConnStatus');
-    if (status && kind === 'code') status.textContent = 'Hosting room ' + msg + '.';
-    else if (status && kind === 'ok') status.textContent = 'Connected with room ' + (NET.code || input.value) + '.';
+    if (status && kind === 'code') status.textContent = Story.t('hostingRoom', { code: msg });
+    else if (status && kind === 'ok') status.textContent = Story.t('connectedRoom', { code: NET.code || input.value });
     else if (status && msg) status.textContent = msg;
-    else if (status && !NET.connected && mode !== 'solo') status.textContent = 'Use the same code to reconnect and continue.';
-    else if (status && NET.connected) status.textContent = 'Connected with room ' + (NET.code || input.value) + '.';
+    else if (status && !NET.connected && mode !== 'solo') status.textContent = Story.t('reconnectHint');
+    else if (status && NET.connected) status.textContent = Story.t('connectedRoom', { code: NET.code || input.value });
   },
 
   cleanCodeInput(id = 'codeInput') {
@@ -310,8 +370,8 @@ const Main = {
   hostFromInput() {
     const code = this.cleanCodeInput('hostCodeInput') || '1234';
     this.el('hostCodeInput').value = code;
-    if (!NET.validCode(code)) { this.el('hostStatus').textContent = 'Enter a 4-character room code.'; return; }
-    this.el('hostStatus').textContent = 'Opening the magic portal...';
+    if (!NET.validCode(code)) { this.el('hostStatus').textContent = Story.t('enterCode'); return; }
+    this.el('hostStatus').textContent = Story.t('openingPortal');
     this.el('codeBig').textContent = code;
     this.el('settingsCodeInput').value = code;
     NET.host(code);
@@ -319,22 +379,22 @@ const Main = {
   },
 
   reconnectAsHost() {
-    if (G.state === 'play' && G.mode === 'guest') { this.toast('Jolie should use Join/Rejoin. Joku hosts the room.'); return; }
-    if (G.state === 'play' && G.mode === 'solo') { this.toast('Start from Host as Joku to play online.'); return; }
+    if (G.state === 'play' && G.mode === 'guest') { this.toast(Story.t('hostShouldHost')); return; }
+    if (G.state === 'play' && G.mode === 'solo') { this.toast(Story.t('soloStartHost')); return; }
     const code = this.cleanCodeInput('settingsCodeInput') || '1234';
-    if (!NET.validCode(code)) { this.el('settingsConnStatus').textContent = 'Enter a 4-character room code.'; return; }
+    if (!NET.validCode(code)) { this.el('settingsConnStatus').textContent = Story.t('enterCode'); return; }
     NET.host(code);
-    this.el('settingsConnStatus').textContent = 'Hosting room ' + code + '...';
+    this.el('settingsConnStatus').textContent = Story.t('hostingRoom', { code });
     this.syncConnectionSettings();
   },
 
   reconnectAsJoin() {
-    if (G.state === 'play' && G.mode === 'host') { this.toast('Joku should keep hosting. Jolie joins this code.'); return; }
-    if (G.state === 'play' && G.mode === 'solo') { this.toast('Start from Join as Jolie to play online.'); return; }
+    if (G.state === 'play' && G.mode === 'host') { this.toast(Story.t('jokuKeepHosting')); return; }
+    if (G.state === 'play' && G.mode === 'solo') { this.toast(Story.t('soloStartJoin')); return; }
     const code = this.cleanCodeInput('settingsCodeInput') || '1234';
-    if (!NET.validCode(code)) { this.el('settingsConnStatus').textContent = 'Enter a 4-character room code.'; return; }
+    if (!NET.validCode(code)) { this.el('settingsConnStatus').textContent = Story.t('enterCode'); return; }
     NET.join(code);
-    this.el('settingsConnStatus').textContent = 'Joining room ' + code + '...';
+    this.el('settingsConnStatus').textContent = Story.t('openingPortal');
     this.syncConnectionSettings();
   },
 
@@ -374,7 +434,7 @@ const Main = {
       const el = this.el(id);
       if (el) {
         el.textContent = on ? '↙' : '⛶';
-        el.title = on ? 'Exit fullscreen' : 'Fullscreen';
+        el.title = on ? Story.t('exitFullscreen') : Story.t('fullscreen');
         el.setAttribute('aria-label', el.title);
       }
     }
@@ -406,7 +466,7 @@ const Main = {
         setTimeout(() => scrollTo(0, 1), 60);
         this.updateFullscreenButtons();
         this.checkRotate();
-        if (!opt.quiet && !ok && !locked) this.toast('Rotate sideways; this browser limits fullscreen.');
+        if (!opt.quiet && !ok && !locked) this.toast(Story.t('rotate'));
       });
     });
   },
@@ -440,12 +500,12 @@ const Main = {
     this.el('connect').classList.remove('hidden');
     this.el('hostBox').classList.toggle('hidden', mode !== 'host');
     this.el('joinBox').classList.toggle('hidden', mode !== 'join');
-    this.el('connTitle').textContent = mode === 'host' ? '💙 Hosting as Joku' : '💗 Joining as Jolie';
+    this.el('connTitle').textContent = mode === 'host' ? '💙 ' + Story.t('hostMode') : '💗 ' + Story.t('guestMode');
     if (mode === 'host') {
       const code = NET.normalizeCode(NET.code || this.el('hostCodeInput').value || '1234') || '1234';
       this.el('hostCodeInput').value = code;
       this.el('codeBig').textContent = code;
-      this.el('hostStatus').textContent = 'Opening the magic portal…';
+      this.el('hostStatus').textContent = Story.t('openingPortal');
       this.el('settingsCodeInput').value = code;
       setTimeout(() => this.el('hostCodeInput').focus(), 100);
     }
@@ -494,11 +554,12 @@ const Main = {
   syncWeaponUI() {
     if (!G.me) return;
     const w = G.me.weapon && Weapons[G.me.weapon] ? Weapons[G.me.weapon] : null;
+    const weaponName = id => (typeof Story !== 'undefined' && Story.weaponText ? Story.weaponText(id, 'name') : (Weapons[id] && Weapons[id].name)) || (Weapons[id] && Weapons[id].name) || 'weapon';
     const base = G.me.char === 'joku' ? '🌊' : '🌸';
     const sp = this.el('tSp');
     if (sp) {
       sp.textContent = base;
-      sp.title = G.me.char === 'joku' ? 'Ocean dash' : 'Healing bloom';
+      sp.title = G.me.char === 'joku' ? Story.t('oceanDash') : Story.t('healingBloom');
       sp.setAttribute('aria-label', sp.title);
       sp.style.borderColor = '';
       sp.style.boxShadow = '';
@@ -506,7 +567,7 @@ const Main = {
     const wp = this.el('tWeapon');
     if (wp) {
       wp.textContent = w ? w.skillIcon : '✦';
-      wp.title = w ? w.name + ': ' + w.skill : 'Equip a weapon to unlock this skill';
+      wp.title = w ? weaponName(G.me.weapon) + ': ' + Story.weaponText(G.me.weapon, 'skill') : Story.t('equipWeaponUnlock');
       wp.setAttribute('aria-label', wp.title);
       wp.style.borderColor = w ? w.color : '';
       wp.style.boxShadow = w ? '0 0 18px ' + w.color + '88, 0 4px 14px rgba(0,0,0,.4)' : '';
@@ -514,19 +575,19 @@ const Main = {
     const near = (typeof Game !== 'undefined' && Game.nearestWeapon) ? Game.nearestWeapon(G.me) : null;
     const drop = this.el('btnDropWeapon');
     if (drop) {
-      drop.textContent = near && Weapons[near.weapon] ? 'Pick ' + Weapons[near.weapon].name : (w ? 'Drop ' + w.name : 'Pick / Drop Weapon');
+      drop.textContent = near && Weapons[near.weapon] ? Story.t('pickWeapon', { weapon: weaponName(near.weapon) }) : (w ? Story.t('dropNamed', { weapon: weaponName(G.me.weapon) }) : Story.t('pickDropWeapon'));
     }
     const tDrop = this.el('tDrop');
     if (tDrop) {
       if (near && Weapons[near.weapon]) {
         tDrop.textContent = '⬆';
-        tDrop.title = 'Pick ' + Weapons[near.weapon].name;
+        tDrop.title = Story.t('pickWeapon', { weapon: weaponName(near.weapon) });
       } else if (w) {
         tDrop.textContent = '⇩';
-        tDrop.title = 'Drop ' + w.name;
+        tDrop.title = Story.t('dropNamed', { weapon: weaponName(G.me.weapon) });
       } else {
         tDrop.textContent = '◇';
-        tDrop.title = 'Stand near a weapon to pick it';
+        tDrop.title = Story.t('standNearWeapon');
       }
       tDrop.setAttribute('aria-label', tDrop.title);
     }
@@ -566,17 +627,16 @@ const Main = {
     if (box.dataset.key === key) return;
     box.dataset.key = key;
     if (!w) {
-      box.innerHTML = vi
-        ? '<h3>Vu khi cua ban</h3><div class="weaponInfoEmpty">Chua co vu khi. Dung gan vu khi dang sang tren mat dat va bam Nhat/Tha de trang bi.</div>'
-        : '<h3>Your Weapon</h3><div class="weaponInfoEmpty">No weapon equipped. Stand near a shining weapon on the ground and press Pick/Drop to equip it.</div>';
+      box.innerHTML = `<h3>${Story.t('yourWeapon')}</h3><div class="weaponInfoEmpty">${Story.t('noWeaponInfo')}</div>`;
       return;
     }
     const who = G.me.char === 'joku' ? 'Joku' : 'Jolie';
     const trigger = Input.touchMode ? 'Weapon Skill button' : 'U/O/B';
-    const text = vi
-      ? `${w.skill}. Dung ${trigger} de kich hoat suc manh cua vu khi. O gan ban doi se giup ca hai manh hon.`
-      : `${w.skill}. Use ${trigger} when you want its extra power. Staying near your partner gives a bond bonus.`;
-    box.innerHTML = `<h3>${vi ? 'Vu khi cua ' + who : who + "'s Weapon"}</h3><div class="weaponInfoItem current"><span>${w.icon}</span><div><b>${w.name}</b><br>${text}</div><span class="weaponInfoRole">${w.role || 'Attack'}</span></div>`;
+    const skill = Story.weaponText(id, 'skill') || w.skill;
+    const desc = Story.weaponText(id, 'desc') || '';
+    const role = Story.weaponText(id, 'role') || w.role || 'Attack';
+    const text = Story.t('weaponUse', { skill, desc, trigger });
+    box.innerHTML = `<h3>${Story.t('weaponOwner', { name: who })}</h3><div class="weaponInfoItem current"><span>${w.icon}</span><div><b>${Story.weaponText(id, 'name') || w.name}</b><br>${text}</div><span class="weaponInfoRole">${role}</span></div>`;
   },
 
   togglePause() {

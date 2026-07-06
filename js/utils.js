@@ -67,29 +67,128 @@ const WeaponRoles = {
   loveLantern: 'Love / support'
 };
 for (const id in WeaponRoles) if (Weapons[id]) Weapons[id].role = WeaponRoles[id];
+const WeaponRolesVI = {
+  tideSpear: 'Tan cong / di chuyen',
+  roseScepter: 'Tan cong / hoi mau',
+  starBlade: 'Tan cong',
+  heartStaff: 'Tinh yeu / hoi mau',
+  moonBow: 'Tan cong',
+  emberAxe: 'Tan cong',
+  thunderHammer: 'Tan cong / lam choang',
+  crystalDagger: 'Tan cong',
+  shadowKatana: 'Phong thu / di chuyen',
+  sunShield: 'Phong thu',
+  lotusFan: 'Tan cong / ho tro',
+  riverBow: 'Phong thu / tan cong',
+  cometSword: 'Tan cong / di chuyen',
+  pandaBell: 'Ho tro / hoi phuc',
+  luluClaw: 'Tan cong / ho tro',
+  phoenixWand: 'Tan cong',
+  dreamLyre: 'Tinh yeu / khong che',
+  vineScythe: 'Khong che / tan cong',
+  auroraOrb: 'Phong thu / tan cong',
+  loveLantern: 'Tinh yeu / ho tro'
+};
+for (const id in WeaponRolesVI) if (Weapons[id]) Weapons[id].roleVi = WeaponRolesVI[id];
 const WeaponSkillText = {
-  tideSpear: 'tide dash strike',
-  roseScepter: 'rose healing field',
-  starBlade: 'falling star rain',
-  heartStaff: 'nearby heart heal',
-  moonBow: 'wide moon arrow volley',
-  emberAxe: 'heavy flame arc',
-  thunderHammer: 'ground thunder slam',
-  crystalDagger: 'eight-way crystal burst',
-  shadowKatana: 'safe shadow blink',
-  sunShield: 'strong sun guard',
-  lotusFan: 'lotus wind and field',
-  riverBow: 'river wall barrage',
-  cometSword: 'comet dash shot',
+  tideSpear: 'Tide dash strike',
+  roseScepter: 'Rose healing field',
+  starBlade: 'Falling star rain',
+  heartStaff: 'Nearby heart heal',
+  moonBow: 'Wide moon arrow volley',
+  emberAxe: 'Heavy flame arc',
+  thunderHammer: 'Friendly thunder slam',
+  crystalDagger: 'Eight-way crystal burst',
+  shadowKatana: 'Safe shadow blink',
+  sunShield: 'Team sun guard',
+  lotusFan: 'Lotus wind and field',
+  riverBow: 'River wall barrage',
+  cometSword: 'Comet dash shot',
   pandaBell: 'Biscuit snack blessing',
   luluClaw: 'Lulu loyal howl',
-  phoenixWand: 'phoenix nova circle',
-  dreamLyre: 'love sleep song',
-  vineScythe: 'vine snare control',
-  auroraOrb: 'aurora guard burst',
-  loveLantern: 'love beacon heal'
+  phoenixWand: 'Phoenix nova circle',
+  dreamLyre: 'Love sleep song',
+  vineScythe: 'Vine snare control',
+  auroraOrb: 'Aurora guard burst',
+  loveLantern: 'Love beacon heal'
 };
 for (const id in WeaponSkillText) if (Weapons[id]) Weapons[id].skill = WeaponSkillText[id];
+const WeaponSkillTextVI = {
+  tideSpear: 'Luot song dam xuyen',
+  roseScepter: 'Vung hoa hoi mau',
+  starBlade: 'Mua sao roi',
+  heartStaff: 'Hoi mau trai tim gan ben',
+  moonBow: 'Loat ten trang rong',
+  emberAxe: 'Vong lua nang',
+  thunderHammer: 'Sam than dong minh',
+  crystalDagger: 'Pha le no tam huong',
+  shadowKatana: 'Luot bong toi an toan',
+  sunShield: 'Khien mat troi cho doi',
+  lotusFan: 'Gio sen va vung hoa',
+  riverBow: 'Tuong song ban pha',
+  cometSword: 'Kiem sao choi luot toi',
+  pandaBell: 'Phuc lanh do an Biscuit',
+  luluClaw: 'Tieng hua trung thanh Lulu',
+  phoenixWand: 'Vong lua phuong hoang',
+  dreamLyre: 'Khuc ru tinh yeu',
+  vineScythe: 'Day leo troi chan',
+  auroraOrb: 'Khien cuc quang bung no',
+  loveLantern: 'Den tinh yeu hoi mau'
+};
+for (const id in WeaponSkillTextVI) if (Weapons[id]) Weapons[id].skillVi = WeaponSkillTextVI[id];
+const WeaponDesc = {
+  tideSpear: 'Dash forward safely and strike through a line of enemies.',
+  roseScepter: 'Creates a healing flower field that also hurts nearby monsters.',
+  starBlade: 'Drops five arcing stars, useful against flying and tall enemies.',
+  heartStaff: 'Heals both nearby players and adds Love Meter safely.',
+  moonBow: 'Fires a wide fan of fast arrows for crowd control.',
+  emberAxe: 'Throws heavy flaming arcs that hit hard and fall onto enemies.',
+  thunderHammer: 'Creates friendly shockwaves and stuns enemies around you.',
+  crystalDagger: 'Bursts in every direction, excellent when surrounded.',
+  shadowKatana: 'Blinks forward with invulnerability and damages nearby shadows.',
+  sunShield: 'Protects both players and pushes back nearby enemies.',
+  lotusFan: 'Fires petals and places a short healing/damage field ahead.',
+  riverBow: 'Builds a vertical river barrage to cover both players.',
+  cometSword: 'Dashes and fires a high-damage comet shot straight ahead.',
+  pandaBell: 'Biscuit restores HP/MP and drops recovery items for the team.',
+  luluClaw: 'Lulu howls, damaging and slowing enemies near both players.',
+  phoenixWand: 'Explodes phoenix shots in a full circle for large fights.',
+  dreamLyre: 'Adds love, damages weak enemies, and delays enemy attacks.',
+  vineScythe: 'Roots a wide area, damages enemies, and slows their attacks.',
+  auroraOrb: 'Gives a shield and fires orbiting bolts around the player.',
+  loveLantern: 'Heals both players, adds love, and creates a safe beacon.'
+};
+const WeaponDescVI = {
+  tideSpear: 'Luot toi an toan va dam xuyen mot hang quai.',
+  roseScepter: 'Tao vung hoa hoi mau va gay sat thuong quai o gan.',
+  starBlade: 'Thả nam ngoi sao vong cung, rat tot de danh quai bay va quai cao.',
+  heartStaff: 'Hoi mau cho ca hai nguoi o gan va tang thanh Love an toan.',
+  moonBow: 'Ban loat ten nhanh va rong de don nhieu quai.',
+  emberAxe: 'Nem vong lua nang, sat thuong cao va roi xuong dau quai.',
+  thunderHammer: 'Tao song sam cua dong minh va lam choang quai quanh ban.',
+  crystalDagger: 'No pha le tam huong, rat tot khi bi vay quanh.',
+  shadowKatana: 'Luot toi co bat tu ngan va danh quai gan do.',
+  sunShield: 'Bao ve ca hai nguoi va day lui quai o gan.',
+  lotusFan: 'Ban canh hoa va dat vung hoi mau/gay sat thuong phia truoc.',
+  riverBow: 'Dung tuong song de che chan va tan cong cho ca doi.',
+  cometSword: 'Luot toi va ban sao choi sat thuong cao theo duong thang.',
+  pandaBell: 'Biscuit hoi HP/MP va tha vat pham hoi phuc cho doi.',
+  luluClaw: 'Lulu hua vang, gay sat thuong va lam cham quai gan ca hai.',
+  phoenixWand: 'Ban phuong hoang vong tron, manh trong tran danh lon.',
+  dreamLyre: 'Tang tinh yeu, gay sat thuong nhe, va lam cham don tan cong cua quai.',
+  vineScythe: 'Troi chan vung rong, gay sat thuong va lam cham quai.',
+  auroraOrb: 'Tao khien va ban tia sang quay quanh nguoi choi.',
+  loveLantern: 'Hoi mau ca hai, tang tinh yeu, va tao diem an toan.'
+};
+for (const id in WeaponDesc) if (Weapons[id]) Weapons[id].desc = WeaponDesc[id];
+for (const id in WeaponDescVI) if (Weapons[id]) Weapons[id].descVi = WeaponDescVI[id];
+const WeaponCooldowns = {
+  tideSpear: 5.2, roseScepter: 6.4, starBlade: 6.2, heartStaff: 7.2, moonBow: 5.6,
+  emberAxe: 6.2, thunderHammer: 6.8, crystalDagger: 5.1, shadowKatana: 5.4, sunShield: 7.2,
+  lotusFan: 6.0, riverBow: 6.1, cometSword: 5.8, pandaBell: 7.5, luluClaw: 6.4,
+  phoenixWand: 7.0, dreamLyre: 6.8, vineScythe: 6.2, auroraOrb: 6.5, loveLantern: 7.0
+};
+for (const id in WeaponCooldowns) if (Weapons[id]) Weapons[id].cd = WeaponCooldowns[id];
 Weapons.IDS = Object.keys(Weapons);
 
 // surface uncaught errors on screen (helps debugging on phones too)

@@ -178,12 +178,27 @@ const World = {
     };
     const loveTrials = [cfg.width * .48].map((tx, i) => {
       const g = groundNear(tx);
-      return { id: 'trial' + i, kind: World.COOP_CHALLENGES[idx % World.COOP_CHALLENGES.length], x: g.x, y: g.pl.y, done: false, charge: 0, stage: 0 };
+      const kind = World.COOP_CHALLENGES[idx % World.COOP_CHALLENGES.length];
+      return {
+        id: 'trial' + i, kind, x: g.x, y: g.pl.y, done: false, charge: 0, stage: 0,
+        lockLimit: g.x + 150, extreme: true
+      };
+    });
+    const coopObstacles = loveTrials.map(tr => {
+      const spec = {
+        forestBridge: { w: 860, h: 230 },
+        oceanPhoenix: { w: 1180, h: 260 },
+        flowerLift: { w: 760, h: 430 },
+        shadowLantern: { w: 920, h: 320 },
+        emberRain: { w: 980, h: 310 },
+        starMirror: { w: 1040, h: 340 },
+      }[tr.kind] || { w: 880, h: 260 };
+      return { id: tr.id + '_obstacle', trialId: tr.id, kind: tr.kind, x: tr.x + 230, y: tr.y, w: spec.w, h: spec.h };
     });
 
     return this._pack(cfg, idx, plats, items, foes, {
       shrineX, shrineY: this._topAtList(plats, shrineX), gateX, gateY: y,
-      loveTrials,
+      loveTrials, coopObstacles,
       startX: 140, checkpoints: [{ x: 140, y: 520 }, ...loveTrials.map(t => ({ x: t.x, y: t.y })), { x: shrineX, y: this._topAtList(plats, shrineX) }],
       boss: {
         id: 'boss', type: 'boss', bossName: cfg.bossName, bossKind: cfg.bossKind,

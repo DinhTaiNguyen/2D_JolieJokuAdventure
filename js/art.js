@@ -1863,6 +1863,101 @@ const Art = {
     ctx.restore();
   },
 
+  drawCoopObstacle(ctx, ob, tr, pal, t) {
+    const done = !!(tr && tr.done);
+    const charge = U.clamp((tr && tr.charge) || 0, 0, 1);
+    const x = ob.x, y = ob.y, w = ob.w, h = ob.h;
+    const type = ob.kind || 'forestBridge';
+    ctx.save();
+    ctx.globalAlpha = done ? .78 : 1;
+    if (type === 'oceanPhoenix') {
+      const sea = ctx.createLinearGradient(0, y - h * .45, 0, y + 40);
+      sea.addColorStop(0, 'rgba(30,150,210,.72)');
+      sea.addColorStop(1, 'rgba(10,65,115,.92)');
+      ctx.fillStyle = sea;
+      ctx.fillRect(x, y - h * .45, w, h * .5);
+      ctx.strokeStyle = done ? '#bdf5ff' : '#fff3a8';
+      ctx.lineWidth = done ? 5 : 7;
+      for (let i = 0; i < 8; i++) {
+        ctx.beginPath();
+        for (let xx = x; xx <= x + w; xx += 30) {
+          const yy = y - 28 - i * 20 + Math.sin(t * 3 + xx * .025 + i) * 10;
+          ctx[xx === x ? 'moveTo' : 'lineTo'](xx, yy);
+        }
+        ctx.stroke();
+      }
+      if (!done) {
+        ctx.fillStyle = 'rgba(255,85,42,.55)';
+        for (let i = 0; i < 14; i++) {
+          const fx = x + 30 + i * (w - 60) / 13;
+          ctx.beginPath();
+          ctx.moveTo(fx, y - 8);
+          ctx.quadraticCurveTo(fx - 24, y - 90 - Math.sin(t * 4 + i) * 18, fx + 4, y - h * .42);
+          ctx.quadraticCurveTo(fx + 28, y - 92, fx + 18, y - 8);
+          ctx.fill();
+        }
+      }
+    } else if (type === 'flowerLift') {
+      ctx.fillStyle = done ? 'rgba(130,210,130,.45)' : 'rgba(46,36,58,.92)';
+      ctx.beginPath(); ctx.moveTo(x, y + 8); ctx.lineTo(x + w * .48, y - h); ctx.lineTo(x + w, y + 8); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = done ? '#ffb6e6' : 'rgba(255,180,225,.4)';
+      ctx.lineWidth = 5;
+      for (let i = 0; i < 9; i++) {
+        const yy = y - 35 - i * 38;
+        ctx.beginPath(); ctx.moveTo(x + w * .24, yy); ctx.lineTo(x + w * .72, yy - 12); ctx.stroke();
+      }
+    } else if (type === 'shadowLantern') {
+      ctx.fillStyle = done ? 'rgba(65,45,110,.42)' : 'rgba(5,6,22,.92)';
+      ctx.beginPath(); ctx.roundRect(x, y - h, w, h + 25, 24); ctx.fill();
+      for (let i = 0; i < 7; i++) {
+        const lx = x + 70 + i * (w - 140) / 6;
+        ctx.globalCompositeOperation = 'lighter';
+        this.glow(ctx, lx, y - h + 70 + Math.sin(t * 2 + i) * 12, done ? 42 : 13 + charge * 22, done ? '#d9b6ff' : '#665080', done ? .78 : .35);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+    } else if (type === 'emberRain') {
+      ctx.fillStyle = done ? 'rgba(70,130,150,.35)' : 'rgba(200,54,30,.38)';
+      ctx.fillRect(x, y - h, w, h + 20);
+      for (let i = 0; i < 18; i++) {
+        const fx = x + i * w / 17;
+        ctx.fillStyle = done ? 'rgba(110,210,255,.36)' : '#ff7442';
+        ctx.beginPath();
+        ctx.moveTo(fx, y + 4);
+        ctx.quadraticCurveTo(fx - 22, y - h * .45, fx + Math.sin(t * 5 + i) * 16, y - h);
+        ctx.quadraticCurveTo(fx + 24, y - h * .42, fx + 10, y + 4);
+        ctx.fill();
+      }
+    } else if (type === 'starMirror') {
+      ctx.fillStyle = done ? 'rgba(80,92,140,.35)' : 'rgba(6,10,28,.9)';
+      ctx.beginPath(); ctx.roundRect(x, y - h, w, h + 20, 28); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 18; i++) {
+        const a = t * .9 + i;
+        this.star(ctx, x + 50 + (i * 97) % (w - 90), y - 45 - (i * 53) % (h - 70) + Math.sin(a) * 8, 5, done ? '#fff3a8' : '#d7b7ff');
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    } else {
+      ctx.fillStyle = done ? 'rgba(80,155,95,.35)' : 'rgba(24,70,42,.84)';
+      ctx.beginPath(); ctx.roundRect(x, y - h * .45, w, h * .52, 22); ctx.fill();
+      ctx.strokeStyle = done ? '#d4ffad' : '#9be27d';
+      ctx.lineWidth = 8;
+      for (let i = 0; i < 7; i++) {
+        const bx = x + i * w / 6;
+        ctx.beginPath();
+        ctx.moveTo(bx, y - 5);
+        ctx.bezierCurveTo(bx + 50, y - h * .55, bx + 115, y - h * .25, bx + 190, y - h * .48);
+        ctx.stroke();
+      }
+    }
+    if (done) {
+      ctx.globalCompositeOperation = 'lighter';
+      const col = type === 'oceanPhoenix' ? '#56d6ff' : type === 'emberRain' ? '#7fd8ff' : '#ff9fce';
+      this.glow(ctx, x + w * .5, y - h * .45, Math.min(220, w * .28), col, .45);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.restore();
+  },
+
   /* ================= contact shadow & bloom aura ================= */
   shadow(ctx, x, gy, r, h) { // h = height above the ground
     const k = U.clamp(1 - h / 260, 0, 1);
