@@ -1109,8 +1109,11 @@ const Game = {
       rot: Math.random() * U.TAU,
       vr: (Math.random() - .5) * 4,
       grounded: false,
+      anchored: false,
       _staticX: null,
       _staticY: null,
+      owner: null,
+      follow: false,
       taken: false
     };
   },
@@ -1122,6 +1125,9 @@ const Game = {
     it.vy = 0;
     it.vr = 0;
     it.grounded = true;
+    it.anchored = true;
+    it.owner = null;
+    it.follow = false;
     return it;
   },
 
@@ -1134,7 +1140,7 @@ const Game = {
       if (it.rot == null) it.rot = 0;
       if (it.vr == null) it.vr = 0;
 
-      if (it.grounded) {
+      if (it.grounded || it.anchored) {
         const sx = it._staticX != null ? it._staticX : it.x;
         const sy = it._staticY != null ? it._staticY : it.y;
         this.freezeWeaponItem(it, sx, sy);
@@ -1156,6 +1162,7 @@ const Game = {
         this.freezeWeaponItem(it, it.x, groundY);
       } else {
         it.grounded = false;
+        it.anchored = false;
         it._staticX = null;
         it._staticY = null;
         it.vx = 0;
@@ -1173,6 +1180,7 @@ const Game = {
     let best = null, bd = radius * radius;
     for (const it of G.level.items) {
       if (it.taken || it.kind !== 'weapon') continue;
+      if (!it.grounded && !it.anchored) continue;
       const dx = it.x - p.x, dy = it.y - (p.y - 28);
       const d = dx * dx + dy * dy;
       if (d < bd) { bd = d; best = it; }
@@ -1211,6 +1219,10 @@ const Game = {
       case 'weapon': {
         const weapon = Weapons[it.weapon] ? it.weapon : 'tideSpear';
         const p = this.byChar(by);
+        if (!fromNet && !it.grounded && !it.anchored) {
+          it.taken = false;
+          return;
+        }
         if (!fromNet && p.weapon && p.weapon !== weapon) {
           const old = p.weapon;
           const oldIt = this.weaponDropItem(old, p.x + (p.dir || 1) * 34, p.y - 46, 0, -70);
@@ -1582,8 +1594,8 @@ const Game = {
 
   /* ================= dialog ================= */
   dlgOpen(key, fromNet = false) {
-    const src = Story.DLG[key];
-    if (!src) { return; }
+    const src = Story.dialog ? Story.dialog(key) : Story.DLG[key];
+    if (!src || !src.length) { return; }
     const lines = src.map(line => [line[0], typeof line[1] === 'function' ? line[1]() : line[1]]);
     G.dialog = { key, lines, i: 0, chars: 0 };
     if (G.mode === 'host' && !fromNet) this.emit('dlg', { key, i: 0, open: true });
@@ -1608,7 +1620,8 @@ const Game = {
 
   applyDlg(data) { // guest applies host's dialog position
     if (!G.dialog || G.dialog.key !== data.key) {
-      if (data.i < (Story.DLG[data.key] || []).length) this.dlgOpen(data.key, true);
+      const src = Story.dialog ? Story.dialog(data.key) : (Story.DLG[data.key] || []);
+      if (data.i < src.length) this.dlgOpen(data.key, true);
       else return;
     }
     if (data.full) { G.dialog.chars = 9999; return; }
@@ -1747,7 +1760,13 @@ const Game = {
     const dead = G.level.foes.filter(e => e.dead).map(e => e.id);
     const items = G.level.items
       .filter(it => !it.taken && (it.id[0] === 'w' || it.id[0] === 'd'))
-      .map(it => [it.id, it.kind, it.weapon || '', Math.round(it.x), Math.round(it.y), Math.round(it.vx || 0), Math.round(it.vy || 0), it.grounded ? 1 : 0]);
+      .map(it => [
+        it.id, it.kind, it.weapon || '',
+        Math.round((it.grounded || it.anchored) && it._staticX != null ? it._staticX : it.x),
+        Math.round((it.grounded || it.anchored) && it._staticY != null ? it._staticY : it.y),
+        Math.round(it.vx || 0), Math.round(it.vy || 0),
+        (it.grounded || it.anchored) ? 1 : 0
+      ]);
     NET.send({
       t: 'w', q: ++G.netT.wseq, love: Math.round(G.love), foes,
       dead, items, trials, gate: G.level.gateOpen ? 1 : 0, shrine: G.level.shrineDone ? 1 : 0,
@@ -1827,7 +1846,7 @@ const Game = {
               local.x = it[3]; local.y = it[4];
               local.vx = it[5] || 0; local.vy = it[6] || 0; local.grounded = !!it[7];
               if (local.grounded) this.freezeWeaponItem(local, local.x, local.y);
-              else { local._staticX = null; local._staticY = null; }
+              else { local.anchored = false; local._staticX = null; local._staticY = null; local.owner = null; local.follow = false; }
               continue;
             }
             if (it[1] === 'weapon') {
@@ -1881,7 +1900,7 @@ const Game = {
             G.level.items.push(item);
           } else {
             item.kind = d.kind; item.weapon = d.weapon; item.x = d.x; item.y = d.y; item.taken = false;
-            if (d.kind === 'weapon') { item.vx = 0; item.vy = d.vy || 40; item.grounded = false; item._staticX = null; item._staticY = null; }
+            if (d.kind === 'weapon') { item.vx = 0; item.vy = d.vy || 40; item.grounded = false; item.anchored = false; item._staticX = null; item._staticY = null; item.owner = null; item.follow = false; }
           }
         }
         if (d.kind === 'weapon') { SND.sfx('weaponDrop'); this.weaponBurst(d.x, d.y, d.weapon, .85); }

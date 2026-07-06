@@ -46,8 +46,16 @@ const Main = {
     });
     $('btnConnCancel').onclick = () => { SND.sfx('ui'); NET.close(); this.showMenu(); };
 
-    $('btnHelp').onclick = () => { SND.unlock(); SND.sfx('ui'); $('helpPanel').classList.remove('hidden'); };
-    $('helpClose').onclick = () => { SND.sfx('ui'); $('helpPanel').classList.add('hidden'); };
+    this.setLanguage(this.storedLanguage(), true);
+    $('helpPanel').addEventListener('click', e => {
+      if (e.target && e.target.id === 'helpClose') {
+        SND.sfx('ui');
+        $('helpPanel').classList.add('hidden');
+      }
+    });
+    $('btnHelp').onclick = () => this.openHelp();
+    $('btnHelpSettings').onclick = () => this.openHelp();
+    $('languageSelect').onchange = () => this.setLanguage($('languageSelect').value);
 
     const updSound = () => {
       $('btnSound').textContent = SND.enabled ? '🔊' : '🔇';
@@ -175,6 +183,83 @@ const Main = {
     }
   },
 
+  storedLanguage() {
+    try { return localStorage.getItem('jjLang') || 'en'; }
+    catch (e) { return 'en'; }
+  },
+
+  setLanguage(lang, quiet = false) {
+    lang = lang === 'vi' ? 'vi' : 'en';
+    try { localStorage.setItem('jjLang', lang); } catch (e) {}
+    document.documentElement.lang = lang;
+    if (typeof Story !== 'undefined' && Story.setLanguage) Story.setLanguage(lang);
+    const sel = this.el('languageSelect');
+    if (sel) sel.value = lang;
+    this.renderHelp();
+    this.syncWeaponInfo(true);
+    if (!quiet) this.toast(lang === 'vi' ? 'Da chuyen sang tieng Viet.' : 'Language set to English.');
+  },
+
+  openHelp() {
+    SND.unlock();
+    SND.sfx('ui');
+    this.renderHelp();
+    this.el('helpPanel').classList.remove('hidden');
+  },
+
+  renderHelp() {
+    const panel = this.el('helpPanel') && this.el('helpPanel').querySelector('.panel');
+    if (!panel) return;
+    const vi = typeof Story !== 'undefined' && Story.isVietnamese && Story.isVietnamese();
+    panel.innerHTML = vi ? `
+      <h2>Huong dan choi</h2>
+      <div class="helpCols">
+        <div>
+          <h3>Ban phim</h3>
+          <p><b>Di chuyen</b> - A/D hoac mui ten trai/phai<br>
+          <b>Nhay</b> - W / mui ten len / Space, bam lan nua de nhay doi<br>
+          <b>Tan cong</b> - J hoac Z<br>
+          <b>Ky nang dac biet</b> - K hoac X, dung MP<br>
+          <b>Ky nang vu khi</b> - U, O, hoac B khi da cam vu khi<br>
+          <b>Trai tim</b> - L, C, hoac E<br>
+          <b>Nhat / tha vu khi</b> - Q</p>
+        </div>
+        <div>
+          <h3>Cam ung</h3>
+          <p>Ben trai la can dieu khien. Ben phai co cac nut Nhay, Tan cong, Dac biet, Ky nang vu khi, Trai tim, va Nhat/Tha.</p>
+        </div>
+      </div>
+      <h3>Trai tim va hop tac</h3>
+      <p>Dung gan nhau roi bam Trai tim de nam tay. Giu Trai tim de om va hoi mau. Khi thanh Love day, bam Trai tim de hon va tao bung sang tinh yeu.</p>
+      <p class="dim">Vu khi khong tu dong nhat. Hay di den dung vi tri vu khi dang sang tren dat va bam Nhat/Tha. Vu khi da roi se nam yen tai vi tri do. Trong moi chuong, hay cung nhau dung tren cac dau sang, nam tay, om, va hon de mo duong hoac nhan qua tot hon.</p>
+      <button id="helpClose" class="mbtn">Da hieu</button>
+    ` : `
+      <h2>How to Play</h2>
+      <div class="helpCols">
+        <div>
+          <h3>Keyboard</h3>
+          <p><b>Move</b> - A/D or Left/Right arrows<br>
+          <b>Jump</b> - W / Up / Space, press again to double-jump<br>
+          <b>Attack</b> - J or Z<br>
+          <b>Special</b> - K or X, uses MP<br>
+          <b>Weapon Skill</b> - U, O, or B after equipping a weapon<br>
+          <b>Heart</b> - L, C, or E<br>
+          <b>Pick / Drop Weapon</b> - Q</p>
+        </div>
+        <div>
+          <h3>Touch</h3>
+          <p>Left side is the joystick. Right side has Jump, Attack, Special, Weapon Skill, Heart, and Pick/Drop buttons.</p>
+        </div>
+      </div>
+      <h3>Heart and Co-op</h3>
+      <p>Stand close and tap Heart to hold hands. Hold Heart to hug and heal. When the Love Meter is full, press Heart for a kiss burst that heals and clears danger.</p>
+      <p class="dim">Weapons do not auto-pickup. Move to the shining weapon on the ground and press Pick/Drop. Dropped weapons stay fixed exactly where they land. In each chapter, cooperate on glowing marks, hold hands, hug, and kiss to open paths or earn better rewards.</p>
+      <button id="helpClose" class="mbtn">Got it</button>
+    `;
+    const close = this.el('helpClose');
+    if (close) close.onclick = () => { SND.sfx('ui'); this.el('helpPanel').classList.add('hidden'); };
+  },
+
   populateSettings() {
     const sel = this.el('chapterSelect');
     sel.innerHTML = '';
@@ -190,8 +275,10 @@ const Main = {
   syncSettings() {
     const ch = this.el('chapterSelect');
     const diff = this.el('difficultySelect');
+    const lang = this.el('languageSelect');
     if (ch) ch.value = String(G.levelIndex || 0);
     if (diff) diff.value = G.difficulty || 'normal';
+    if (lang && typeof Story !== 'undefined') lang.value = Story.LANG || 'en';
     this.syncConnectionSettings();
     this.syncWeaponUI();
   },
@@ -469,6 +556,29 @@ const Main = {
     box.innerHTML = `<h3>${who}'s Weapon</h3><div class="weaponInfoItem current"><span>${w.icon}</span><div><b>${w.name}</b><br>${w.skill}. Use Weapon Skill (${Input.touchMode ? '✦' : 'U/O/B'}) when you want its extra power. Staying near your partner gives a bond bonus.</div><span class="weaponInfoRole">${w.role || 'Attack'}</span></div>`;
   },
 
+  syncWeaponInfo() {
+    const box = this.el('weaponInfo');
+    if (!box || typeof Weapons === 'undefined') return;
+    const vi = typeof Story !== 'undefined' && Story.isVietnamese && Story.isVietnamese();
+    const id = G.me && G.me.weapon && Weapons[G.me.weapon] ? G.me.weapon : '';
+    const w = id ? Weapons[id] : null;
+    const key = [typeof Story !== 'undefined' && Story.LANG, id, w && w.name, w && w.role, w && w.skill, G.me && G.me.char].join('|');
+    if (box.dataset.key === key) return;
+    box.dataset.key = key;
+    if (!w) {
+      box.innerHTML = vi
+        ? '<h3>Vu khi cua ban</h3><div class="weaponInfoEmpty">Chua co vu khi. Dung gan vu khi dang sang tren mat dat va bam Nhat/Tha de trang bi.</div>'
+        : '<h3>Your Weapon</h3><div class="weaponInfoEmpty">No weapon equipped. Stand near a shining weapon on the ground and press Pick/Drop to equip it.</div>';
+      return;
+    }
+    const who = G.me.char === 'joku' ? 'Joku' : 'Jolie';
+    const trigger = Input.touchMode ? 'Weapon Skill button' : 'U/O/B';
+    const text = vi
+      ? `${w.skill}. Dung ${trigger} de kich hoat suc manh cua vu khi. O gan ban doi se giup ca hai manh hon.`
+      : `${w.skill}. Use ${trigger} when you want its extra power. Staying near your partner gives a bond bonus.`;
+    box.innerHTML = `<h3>${vi ? 'Vu khi cua ' + who : who + "'s Weapon"}</h3><div class="weaponInfoItem current"><span>${w.icon}</span><div><b>${w.name}</b><br>${text}</div><span class="weaponInfoRole">${w.role || 'Attack'}</span></div>`;
+  },
+
   togglePause() {
     if (G.state !== 'play') return;
     G.paused = !G.paused;
@@ -548,6 +658,54 @@ Main.showEnd = function(stats, seconds) {
       <p class="dim">dành cho Joku 💙 &amp; Jolie 💗</p>
       <button id="btnAgain" class="mbtn join">💕 Chơi lại</button>
       <button id="btnEndMenu" class="mbtn ghost">🏠 Menu</button>
+    </div>`;
+  this.el('ui').appendChild(ep);
+  this.el('btnAgain').onclick = () => location.reload();
+  this.el('btnEndMenu').onclick = () => { ep.remove(); Game.quitToMenu(); };
+};
+
+Main.showEnd = function(stats, seconds) {
+  let ep = this.el('endPanel');
+  if (ep) ep.remove();
+  const vi = typeof Story !== 'undefined' && Story.isVietnamese && Story.isVietnamese();
+  const loveLines = (typeof Story !== 'undefined' && Story.loveLines && Story.loveLines().length)
+    ? Story.loveLines()
+    : ['Joku and Jolie brought the light back together.'];
+  const loveLine = loveLines[(Math.random() * loveLines.length) | 0];
+  const finalBoss = (G.level && G.level.boss && G.level.boss.bossName) || (vi ? 'boss cuoi' : 'the final boss');
+  ep = document.createElement('div');
+  ep.id = 'endPanel';
+  ep.className = 'overlay';
+  ep.innerHTML = vi ? `
+    <div class="panel">
+      <h2>Tinh yeu da tro lai!</h2>
+      <p style="font-size:17px"><b>Chuc mung Joku va Jolie!</b></p>
+      <p>${loveLine}</p>
+      <p style="font-size:16px">${finalBoss} da diu lai, anh sang rung bung len lan nua,<br>
+      va Joku &amp; Jolie tiep tuc yeu nhau qua tung cuoc phieu luu.</p>
+      <p style="font-size:15px; line-height:2">
+        Water orbs: <b>${stats.orbs}</b> &nbsp; Flowers: <b>${stats.flowers}</b><br>
+        Hearts: <b>${stats.hearts}</b> &nbsp; Hugs: <b>${stats.hugs}</b> &nbsp; Kisses: <b>${stats.kisses}</b><br>
+        Shadows cleared: <b>${stats.kills}</b> &nbsp; Time: <b>${U.fmtTime(seconds)}</b>
+      </p>
+      <p class="dim">danh cho Joku &amp; Jolie</p>
+      <button id="btnAgain" class="mbtn join">Choi lai</button>
+      <button id="btnEndMenu" class="mbtn ghost">Menu</button>
+    </div>` : `
+    <div class="panel">
+      <h2>Love has returned!</h2>
+      <p style="font-size:17px"><b>Congratulations, Joku and Jolie!</b></p>
+      <p>${loveLine}</p>
+      <p style="font-size:16px">${finalBoss} softened, the forest lights shone again,<br>
+      and Joku &amp; Jolie kept loving each other through every adventure.</p>
+      <p style="font-size:15px; line-height:2">
+        Water orbs: <b>${stats.orbs}</b> &nbsp; Flowers: <b>${stats.flowers}</b><br>
+        Hearts: <b>${stats.hearts}</b> &nbsp; Hugs: <b>${stats.hugs}</b> &nbsp; Kisses: <b>${stats.kisses}</b><br>
+        Shadows cleared: <b>${stats.kills}</b> &nbsp; Time: <b>${U.fmtTime(seconds)}</b>
+      </p>
+      <p class="dim">made for Joku &amp; Jolie</p>
+      <button id="btnAgain" class="mbtn join">Play Again</button>
+      <button id="btnEndMenu" class="mbtn ghost">Menu</button>
     </div>`;
   this.el('ui').appendChild(ep);
   this.el('btnAgain').onclick = () => location.reload();
