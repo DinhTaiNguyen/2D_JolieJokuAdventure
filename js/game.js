@@ -2028,7 +2028,7 @@ const Game = {
     ctx.fillStyle = pal.skyB;
     ctx.fillRect(0, 0, W, H);
     for (const layer of L.bg.layers) {
-      const drawH = H, drawW = 1920 * (H / 1080);
+      const drawH = H, drawW = (layer.w || 1920) * (H / 1080);
       let off = (-G.cam.x * layer.speed * s) % drawW;
       if (off > 0) off -= drawW;
       for (let x = off; x < W; x += drawW) {
@@ -2541,7 +2541,7 @@ const Game = {
     const s = this.scale;
     ctx.fillStyle = pal.skyB; ctx.fillRect(0, 0, W, H);
     for (const layer of D.level.bg.layers) {
-      const drawW = 1920 * (H / 1080);
+      const drawW = (layer.w || 1920) * (H / 1080);
       let off = (-D.camX * layer.speed * s) % drawW;
       if (off > 0) off -= drawW;
       for (let x = off; x < W; x += drawW) ctx.drawImage(layer.cv, x, 0, drawW + 1, H);
