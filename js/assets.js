@@ -18,11 +18,17 @@ const ASSETS = {
     float_falls: { trim: 1 }, float_blossom: { trim: 1 }, float_shadow: { trim: 1 },
     float_ember: { trim: 1 }, float_star: { trim: 1 },
     prop_mushroom: { trim: 1 }, prop_gate: { trim: 1 }, prop_shrine: { trim: 1 },
-    // heroes & supporters (pose sheets)
+    // heroes & supporters — legacy 8-pose sheets (fallback)
     joku_sheet: { cols: 4, rows: 2, trim: 1 },
     jolie_sheet: { cols: 4, rows: 2, trim: 1 },
     lulu_sheet: { cols: 4, rows: 1, trim: 1 },
     biscuit_sheet: { cols: 4, rows: 1, trim: 1 },
+    // heroes & supporters — animation strips (preferred when present)
+    joku_run: { cols: 6, rows: 1, trim: 1 }, jolie_run: { cols: 6, rows: 1, trim: 1 },
+    joku_idle: { cols: 4, rows: 1, trim: 1 }, jolie_idle: { cols: 4, rows: 1, trim: 1 },
+    joku_actions: { cols: 8, rows: 1, trim: 1 }, jolie_actions: { cols: 8, rows: 1, trim: 1 },
+    lulu_run: { cols: 6, rows: 1, trim: 1 }, biscuit_run: { cols: 6, rows: 1, trim: 1 },
+    lulu_actions: { cols: 4, rows: 1, trim: 1 }, biscuit_actions: { cols: 4, rows: 1, trim: 1 },
     // devils
     enemies_sheet: { cols: 4, rows: 1, trim: 1 },
     enemies_elite_sheet: { cols: 4, rows: 1, trim: 1 },
@@ -221,22 +227,103 @@ const ASSETS = {
     return true;
   },
 
-  /* ---------------- heroes ---------------- */
-  // sheet frames: 0 idle, 1 runA, 2 runB, 3 jump, 4 cast, 5 hurt, 6 hug, 7 kiss
-  drawChar(ctx, p, t, who) {
-    const sheet = who + '_sheet';
-    if (!this.has(sheet)) return false;
-    const atk = p.atkT != null && p.atkT < .28;
-    let idx = 0;
-    if (p.pose === 'kiss') idx = 7;
-    else if (p.pose === 'hug') idx = 6;
-    else if (p.down || p.hurtT > 0) idx = 5;
-    else if (atk) idx = 4;
-    else if (!p.onGround) idx = 3;
-    else if (Math.abs(p.vx) > 30) idx = (Math.sin(p.animT * 13) > 0) ? 1 : 2;
+  frameCount(name) {
+    const d = this.data[name];
+    return d && d.ok ? d.frames.length : 0;
+  },
 
-    const run = Math.abs(p.vx) > 30 && p.onGround;
-    const bounce = run ? Math.abs(Math.sin(p.animT * 13)) * 2.2 : Math.sin(t * 2.3) * 1.1;
+  loopFrame(name, phase) {
+    const n = this.frameCount(name);
+    return n ? (((phase | 0) % n) + n) % n : 0;
+  },
+
+  heroActionIndex(p) {
+    const w = p && p.weapon && typeof Weapons !== 'undefined' ? Weapons[p.weapon] : null;
+    const shape = (w && w.shape) || '';
+    const special = (w && w.special) || '';
+    if (special === 'heartHeal' || special === 'loveBeacon' || special === 'dreamSong' || special === 'pandaGift') return 6;
+    if (special === 'sunGuard' || special === 'auroraShield' || special === 'riverWall') return 4;
+    if (shape === 'axe' || shape === 'hammer') return 1;
+    if (shape === 'sword' || shape === 'katana' || shape === 'dagger' || shape === 'claw') return 0;
+    if (shape === 'spear' || shape === 'staff' || shape === 'scythe') return 2;
+    if (shape === 'bow') return 3;
+    if (shape === 'shield') return 4;
+    if (shape === 'wand' || shape === 'orb' || shape === 'bell' || shape === 'lantern' || shape === 'lyre' || shape === 'fan') return 5;
+    return 5;
+  },
+
+  heroWeaponGrip(p, src, idx) {
+    const w = p && p.weapon && typeof Weapons !== 'undefined' ? Weapons[p.weapon] : null;
+    const shape = (w && w.shape) || '';
+    const base = { x: 17, y: -35, rot: -.22, size: 22, front: true };
+    if (src && src.indexOf('_run') > 0) {
+      const a = idx * U.TAU / Math.max(1, this.frameCount(src));
+      return { x: 17 + Math.cos(a) * 3, y: -36 + Math.sin(a) * 2, rot: -.18 + Math.sin(a) * .08, size: 21 };
+    }
+    if (src && src.indexOf('_actions') > 0) {
+      const byFrame = [
+        { x: 22, y: -38, rot: -.62, size: 25 },
+        { x: 15, y: -43, rot: -.92, size: 28 },
+        { x: 24, y: -42, rot: -.38, size: 27 },
+        { x: 27, y: -38, rot: -.04, size: 26 },
+        { x: 19, y: -39, rot: -.08, size: 27 },
+        { x: 24, y: -42, rot: -.18, size: 24 },
+        { x: 18, y: -39, rot: -.24, size: 23 },
+        { x: 16, y: -35, rot: -.36, size: 23 }
+      ];
+      return byFrame[Math.min(idx, byFrame.length - 1)] || base;
+    }
+    if (shape === 'bow') return { x: 22, y: -36, rot: -.04, size: 23 };
+    if (shape === 'shield') return { x: 18, y: -37, rot: -.02, size: 24 };
+    if (shape === 'axe' || shape === 'hammer') return { x: 17, y: -39, rot: -.65, size: 26 };
+    if (shape === 'spear' || shape === 'staff' || shape === 'scythe') return { x: 19, y: -39, rot: -.38, size: 25 };
+    return base;
+  },
+
+  drawHeroWeapon(ctx, p, t, src, idx, attacking) {
+    if (!p.weapon || typeof Weapons === 'undefined' || !Weapons[p.weapon]) return;
+    const def = Weapons[p.weapon];
+    const g = this.heroWeaponGrip(p, src, idx);
+    const flash = U.clamp(p.weaponPose || 0, 0, 1);
+    ctx.save();
+    ctx.scale(p.dir || 1, 1);
+    ctx.translate(g.x, g.y);
+    ctx.rotate((g.rot || 0) + (attacking ? -.18 : 0) + Math.sin(t * 3.2) * .025);
+    if (flash > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      if (typeof Art !== 'undefined' && Art.glow) Art.glow(ctx, 0, 0, 28 + flash * 28, def.color, .25 + flash * .35);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.scale(1 + flash * .16, 1 + flash * .16);
+    }
+    if (!this.drawWeaponGlyph(ctx, p.weapon, 0, 0, g.size || 22, t) && typeof Art !== 'undefined' && Art.drawWeaponGlyph) {
+      Art.drawWeaponGlyph(ctx, p.weapon, 0, 0, g.size || 22, t);
+    }
+    ctx.restore();
+  },
+
+  /* ---------------- heroes ---------------- */
+  // base sheet frames: 0 idle, 1 runA, 2 runB, 3 jump, 4 cast, 5 hurt, 6 hug, 7 kiss
+  // action strip frames: 0 slash, 1 heavy, 2 spear/staff, 3 bow, 4 shield, 5 magic, 6 love/support, 7 revive/protect
+  drawChar(ctx, p, t, who) {
+    const sheet = who + '_sheet', runSheet = who + '_run', idleSheet = who + '_idle', actionSheet = who + '_actions';
+    if (!this.has(sheet) && !this.has(runSheet) && !this.has(actionSheet)) return false;
+    const atk = p.atkT != null && p.atkT < .28;
+    const actionHot = (atk || (p.weaponPose || 0) > .03 || ((p.cheerT || 0) > .18 && p.weapon)) && this.has(actionSheet);
+    const running = Math.abs(p.vx) > 30 && p.onGround;
+    let src = sheet;
+    let idx = 0;
+    if (p.pose === 'kiss' && this.has(sheet)) idx = 7;
+    else if (p.pose === 'hug' && this.has(sheet)) idx = 6;
+    else if ((p.down || p.hurtT > 0) && this.has(sheet)) idx = 5;
+    else if (actionHot) { src = actionSheet; idx = this.heroActionIndex(p); }
+    else if (!p.onGround && this.has(sheet)) idx = 3;
+    else if (running && this.has(runSheet)) { src = runSheet; idx = this.loopFrame(runSheet, p.animT * 12); }
+    else if (running && this.has(sheet)) idx = (Math.sin(p.animT * 13) > 0) ? 1 : 2;
+    else if (!running && this.has(idleSheet)) { src = idleSheet; idx = this.loopFrame(idleSheet, t * 2); }
+    else if (!this.has(src)) { src = this.has(sheet) ? sheet : (this.has(runSheet) ? runSheet : actionSheet); idx = 0; }
+
+    const run = running && src === runSheet;
+    const bounce = run ? Math.abs(Math.sin(p.animT * 12)) * .7 : (running ? Math.abs(Math.sin(p.animT * 13)) * 1.4 : Math.sin(t * 2.3) * 1.1);
     const H = 74;
 
     ctx.save();
@@ -278,18 +365,12 @@ const ASSETS = {
 
     // invulnerability flicker
     const flick = (p.invuln > .1 && !p.down && Math.sin(t * 22) > 0) ? .55 : 1;
-    this.draw(ctx, sheet, idx, 0, -bounce * .45, {
+    this.draw(ctx, src, idx, 0, -bounce * .45, {
       h: H, flip: p.dir < 0, sq: p.squash || 0, alpha: flick,
       filter: p.hurtT > .3 ? 'brightness(1.5) saturate(1.3)' : 'none'
     });
 
-    // held weapon (drawWeaponGlyph is image-backed too)
-    if (p.weapon && typeof Art !== 'undefined' && Art.drawHeldWeapon) {
-      ctx.save();
-      ctx.scale(p.dir, 1);
-      Art.drawHeldWeapon(ctx, p, t, 17, -34 - bounce * .4, atk);
-      ctx.restore();
-    }
+    this.drawHeroWeapon(ctx, p, t, src, idx, actionHot || atk);
     // Joku dash crescent
     if (p.dashT > 0) {
       this.draw(ctx, 'fx_projectiles', 2, p.dir * 26, -30, { h: 62, anchor: 'center', add: 1, alpha: .9, flip: p.dir < 0 });
@@ -305,10 +386,10 @@ const ASSETS = {
   /* ---------------- supporters ---------------- */
   // lulu: 0 stand, 1 run, 2 bite, 3 howl | biscuit: 0 stand, 1 waddle, 2 toss, 3 cheer
   drawPet(ctx, pet, t, name) {
-    const sheet = name + '_sheet';
-    if (!this.has(sheet)) return false;
+    const sheet = name + '_sheet', runSheet = name + '_run', actionSheet = name + '_actions';
+    if (!this.has(sheet) && !this.has(runSheet) && !this.has(actionSheet)) return false;
     const run = Math.abs(pet.vx) > 25;
-    let idx = run ? 1 : 0;
+    let src = sheet, idx = run ? 1 : 0;
     if (name === 'lulu') {
       if (pet.mode === 'dash') idx = 2;
       else if (pet.owner && pet.owner.down) idx = 3;
@@ -316,10 +397,14 @@ const ASSETS = {
       if (pet.healFx) idx = 2;
       else if (pet.owner && pet.owner.cheerT > 0) idx = 3;
     }
-    const bob = run ? Math.abs(Math.sin(pet.animT * 15)) * 2.4 : Math.sin(t * 3) * 1;
-    this.draw(ctx, sheet, idx, pet.x, pet.y - bob, {
+    const action = idx > 1;
+    if (action && this.has(actionSheet)) { src = actionSheet; idx = Math.min(idx - 2, this.frameCount(actionSheet) - 1); }
+    else if (run && this.has(runSheet)) { src = runSheet; idx = this.loopFrame(runSheet, pet.animT * 14); }
+    else if (!this.has(src)) { src = this.has(sheet) ? sheet : (this.has(runSheet) ? runSheet : actionSheet); idx = 0; }
+    const bob = run && src === runSheet ? Math.abs(Math.sin(pet.animT * 14)) * .8 : (run ? Math.abs(Math.sin(pet.animT * 15)) * 1.6 : Math.sin(t * 3) * 1);
+    this.draw(ctx, src, idx, pet.x, pet.y - bob, {
       h: name === 'lulu' ? 40 : 46, flip: pet.dir < 0,
-      rot: run ? Math.sin(pet.animT * 15) * .06 : 0
+      rot: run ? Math.sin(pet.animT * 14) * .035 : 0
     });
     return true;
   },
