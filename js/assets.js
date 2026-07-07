@@ -19,8 +19,8 @@ const ASSETS = {
     float_ember: { trim: 1 }, float_star: { trim: 1 },
     prop_mushroom: { trim: 1 }, prop_gate: { trim: 1 }, prop_shrine: { trim: 1 },
     // heroes & supporters — legacy 8-pose sheets (fallback)
-    joku_sheet: { cols: 4, rows: 2, trim: 1, bleed: .025 },
-    jolie_sheet: { cols: 4, rows: 2, trim: 1, bleed: .025 },
+    joku_sheet: { cols: 4, rows: 2, trim: 1, bleed: .05, stableX: 1 },
+    jolie_sheet: { cols: 4, rows: 2, trim: 1, bleed: .05, stableX: 1 },
     lulu_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1 },
     biscuit_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1 },
     // heroes & supporters — animation strips (preferred when present)
@@ -111,10 +111,10 @@ const ASSETS = {
           const b = this._bbox(src, scan.sx, scan.sy, scan.sw, scan.sh, cfg.black);
           if (b) f = this._clampFrame(b, scan);
         }
-        frames.push(f);
+        frames.push(this._anchorFrame(f, cell));
       }
     }
-    this.data[name] = { ok: true, img: src, frames, black: !!cfg.black, basisH: cfg.lockScale ? this._basisHeight(frames) : 0 };
+    this.data[name] = { ok: true, img: src, frames, black: !!cfg.black, basisH: cfg.lockScale ? this._basisHeight(frames) : 0, stableX: !!(cfg.lockScale || cfg.stableX) };
     if (name.indexOf('portrait_') === 0) this._makePortrait(name, src);
     if (name === 'title_art') this._menuArt(img);
     if (name.indexOf('bg_') === 0) this._refreshLevelBg(name.slice(3));
@@ -150,6 +150,12 @@ const ASSETS = {
     const hs = frames.map(f => f.sh).filter(Boolean).sort((a, b) => a - b);
     if (!hs.length) return 0;
     return hs[Math.min(hs.length - 1, Math.max(0, Math.floor(hs.length * .55)))];
+  },
+
+  _anchorFrame(f, cell) {
+    return Object.assign(f, {
+      ox: (f.sx + f.sw / 2) - (cell.sx + cell.sw / 2)
+    });
   },
 
   _scale(img, sc) {
@@ -252,6 +258,7 @@ const ASSETS = {
     const basisH = o.basisH || d.basisH || f.sh;
     const s = o.h ? o.h / basisH : (o.w ? o.w / f.sw : 1);
     const dw = f.sw * s, dh = f.sh * s;
+    const dx = (o.stableX || d.stableX) ? (f.ox || 0) * s : 0;
     ctx.save();
     ctx.translate(x, y);
     if (o.rot) ctx.rotate(o.rot);
@@ -261,7 +268,7 @@ const ASSETS = {
     if (o.add) ctx.globalCompositeOperation = 'lighter';
     if (o.filter !== undefined && 'filter' in ctx) ctx.filter = o.filter;
     const ay = o.anchor === 'center' ? -dh / 2 : (o.anchor === 'top' ? 0 : -dh);
-    ctx.drawImage(d.img, f.sx, f.sy, f.sw, f.sh, -dw / 2, ay, dw, dh);
+    ctx.drawImage(d.img, f.sx, f.sy, f.sw, f.sh, -dw / 2 + dx, ay, dw, dh);
     ctx.restore();
     return true;
   },
@@ -274,6 +281,16 @@ const ASSETS = {
   loopFrame(name, phase) {
     const n = this.frameCount(name);
     return n ? (((phase | 0) % n) + n) % n : 0;
+  },
+
+  groundSnapY(x, y, below = 120, limit = 28) {
+    try {
+      if (typeof G === 'undefined' || typeof World === 'undefined' || !G.level) return y;
+      const top = World.topAt(G.level, x, y - below);
+      return top !== null && Math.abs(top - y) <= limit ? top : y;
+    } catch (e) {
+      return y;
+    }
   },
 
   heroActionIndex(p) {
@@ -319,12 +336,13 @@ const ASSETS = {
     return base;
   },
 
-  drawHeroWeapon(ctx, p, t, src, idx, attacking) {
+  drawHeroWeapon(ctx, p, t, src, idx, attacking, alpha = 1) {
     if (!p.weapon || typeof Weapons === 'undefined' || !Weapons[p.weapon]) return;
     const def = Weapons[p.weapon];
     const g = this.heroWeaponGrip(p, src, idx);
     const flash = U.clamp(p.weaponPose || 0, 0, 1);
     ctx.save();
+    ctx.globalAlpha *= alpha;
     ctx.scale(p.dir || 1, 1);
     ctx.translate(g.x, g.y);
     ctx.rotate((g.rot || 0) + (attacking ? -.14 : 0) + Math.sin(t * 3.2) * .02);
@@ -337,6 +355,22 @@ const ASSETS = {
     if (!this.drawWeaponGlyph(ctx, p.weapon, 0, 0, g.size || 22, t) && typeof Art !== 'undefined' && Art.drawWeaponGlyph) {
       Art.drawWeaponGlyph(ctx, p.weapon, 0, 0, g.size || 22, t);
     }
+    ctx.restore();
+  },
+
+  drawHeroEquipFx(ctx, p, t, src, idx) {
+    if (!p.weapon || typeof Weapons === 'undefined' || !Weapons[p.weapon] || typeof Art === 'undefined' || !Art.glow) return;
+    const def = Weapons[p.weapon];
+    const g = this.heroWeaponGrip(p, src, idx);
+    const pulse = .55 + Math.sin(t * 5.5) * .18;
+    ctx.save();
+    ctx.scale(p.dir || 1, 1);
+    ctx.globalCompositeOperation = 'lighter';
+    Art.glow(ctx, g.x, g.y, 7 + pulse * 5, def.color, .18);
+    ctx.fillStyle = def.color + 'cc';
+    ctx.beginPath();
+    ctx.arc(g.x, g.y, 1.8 + pulse * .8, 0, U.TAU);
+    ctx.fill();
     ctx.restore();
   },
 
@@ -365,8 +399,9 @@ const ASSETS = {
     const bounce = run ? Math.abs(Math.sin(p.animT * 12)) * .7 : (running ? Math.abs(Math.sin(p.animT * 13)) * 1.4 : Math.sin(t * 2.3) * 1.1);
     const H = 74;
 
+    const drawY = p.onGround ? this.groundSnapY(p.x, p.y, 130, 34) : p.y;
     ctx.save();
-    ctx.translate(p.x, p.y);
+    ctx.translate(p.x, drawY);
     if (p.pose === 'down') { ctx.rotate(-1.15 * p.dir); ctx.translate(0, -6); }
 
     // phoenix wings behind (double jump / dash)
@@ -404,12 +439,15 @@ const ASSETS = {
 
     // invulnerability flicker
     const flick = (p.invuln > .1 && !p.down && Math.sin(t * 22) > 0) ? .55 : 1;
+    const weaponFront = actionHot || atk || (p.weaponPose || 0) > .18;
+    if (p.weapon && !weaponFront) this.drawHeroWeapon(ctx, p, t, src, idx, false, .88);
     this.draw(ctx, src, idx, 0, -bounce * .45, {
       h: H, flip: p.dir < 0, sq: p.squash || 0, alpha: flick,
       filter: p.hurtT > .3 ? 'brightness(1.5) saturate(1.3)' : 'none'
     });
 
-    this.drawHeroWeapon(ctx, p, t, src, idx, actionHot || atk);
+    if (p.weapon && weaponFront) this.drawHeroWeapon(ctx, p, t, src, idx, true, .96);
+    else this.drawHeroEquipFx(ctx, p, t, src, idx);
     // Joku dash crescent
     if (p.dashT > 0) {
       this.draw(ctx, 'fx_projectiles', 2, p.dir * 26, -30, { h: 62, anchor: 'center', add: 1, alpha: .9, flip: p.dir < 0 });
@@ -440,8 +478,9 @@ const ASSETS = {
     if (action && this.has(actionSheet)) { src = actionSheet; idx = Math.min(idx - 2, this.frameCount(actionSheet) - 1); }
     else if (run && this.has(runSheet)) { src = runSheet; idx = this.loopFrame(runSheet, pet.animT * 14); }
     else if (!this.has(src)) { src = this.has(sheet) ? sheet : (this.has(runSheet) ? runSheet : actionSheet); idx = 0; }
+    const drawY = this.groundSnapY(pet.x, pet.y, 130, 48);
     const bob = run && src === runSheet ? Math.abs(Math.sin(pet.animT * 14)) * .8 : (run ? Math.abs(Math.sin(pet.animT * 15)) * 1.6 : Math.sin(t * 3) * 1);
-    this.draw(ctx, src, idx, pet.x, pet.y - bob, {
+    this.draw(ctx, src, idx, pet.x, drawY - bob, {
       h: name === 'lulu' ? 40 : 46, flip: pet.dir < 0,
       rot: run ? Math.sin(pet.animT * 14) * .035 : 0
     });
