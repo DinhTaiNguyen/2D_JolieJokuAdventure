@@ -19,16 +19,21 @@ const ASSETS = {
     float_ember: { trim: 1 }, float_star: { trim: 1 },
     prop_mushroom: { trim: 1 }, prop_gate: { trim: 1 }, prop_shrine: { trim: 1 },
     // heroes & supporters — legacy 8-pose sheets (fallback)
-    joku_sheet: { cols: 4, rows: 2, trim: 1 },
-    jolie_sheet: { cols: 4, rows: 2, trim: 1 },
-    lulu_sheet: { cols: 4, rows: 1, trim: 1 },
-    biscuit_sheet: { cols: 4, rows: 1, trim: 1 },
+    joku_sheet: { cols: 4, rows: 2, trim: 1, bleed: .025 },
+    jolie_sheet: { cols: 4, rows: 2, trim: 1, bleed: .025 },
+    lulu_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1 },
+    biscuit_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1 },
     // heroes & supporters — animation strips (preferred when present)
-    joku_run: { cols: 6, rows: 1, trim: 1 }, jolie_run: { cols: 6, rows: 1, trim: 1 },
-    joku_idle: { cols: 4, rows: 1, trim: 1 }, jolie_idle: { cols: 4, rows: 1, trim: 1 },
-    joku_actions: { cols: 8, rows: 1, trim: 1 }, jolie_actions: { cols: 8, rows: 1, trim: 1 },
-    lulu_run: { cols: 6, rows: 1, trim: 1 }, biscuit_run: { cols: 6, rows: 1, trim: 1 },
-    lulu_actions: { cols: 4, rows: 1, trim: 1 }, biscuit_actions: { cols: 4, rows: 1, trim: 1 },
+    joku_run: { cols: 6, rows: 1, trim: 1, bleed: .08, lockScale: 1 },
+    jolie_run: { cols: 6, rows: 1, trim: 1, bleed: .08, lockScale: 1 },
+    joku_idle: { cols: 4, rows: 1, trim: 1, bleed: .04, lockScale: 1 },
+    jolie_idle: { cols: 4, rows: 1, trim: 1, bleed: .04, lockScale: 1 },
+    joku_actions: { cols: 8, rows: 1, trim: 1, bleed: .06, lockScale: 1 },
+    jolie_actions: { cols: 8, rows: 1, trim: 1, bleed: .06, lockScale: 1 },
+    lulu_run: { cols: 6, rows: 1, trim: 1, lockScale: 1 },
+    biscuit_run: { cols: 6, rows: 1, trim: 1, lockScale: 1 },
+    lulu_actions: { cols: 4, rows: 1, trim: 1, lockScale: 1 },
+    biscuit_actions: { cols: 4, rows: 1, trim: 1, lockScale: 1 },
     // devils
     enemies_sheet: { cols: 4, rows: 1, trim: 1 },
     enemies_elite_sheet: { cols: 4, rows: 1, trim: 1 },
@@ -100,15 +105,16 @@ const ASSETS = {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const cell = this._cell(src, cols, rows, c, r);
+        const scan = cfg.bleed ? this._expandCell(cell, src, cfg.bleed) : cell;
         let f = cell;
         if (cfg.trim || cfg.black || cols * rows > 1) {
-          const b = this._bbox(src, f.sx, f.sy, f.sw, f.sh, cfg.black);
-          if (b) f = this._clampFrame(b, cell);
+          const b = this._bbox(src, scan.sx, scan.sy, scan.sw, scan.sh, cfg.black);
+          if (b) f = this._clampFrame(b, scan);
         }
         frames.push(f);
       }
     }
-    this.data[name] = { ok: true, img: src, frames, black: !!cfg.black };
+    this.data[name] = { ok: true, img: src, frames, black: !!cfg.black, basisH: cfg.lockScale ? this._basisHeight(frames) : 0 };
     if (name.indexOf('portrait_') === 0) this._makePortrait(name, src);
     if (name === 'title_art') this._menuArt(img);
     if (name.indexOf('bg_') === 0) this._refreshLevelBg(name.slice(3));
@@ -122,12 +128,28 @@ const ASSETS = {
     return { sx: x0, sy: y0, sw: Math.max(1, x1 - x0), sh: Math.max(1, y1 - y0) };
   },
 
+  _expandCell(cell, img, bleed) {
+    const padX = Math.round(cell.sw * bleed);
+    const padY = Math.round(cell.sh * bleed * .35);
+    const x0 = Math.max(0, cell.sx - padX);
+    const y0 = Math.max(0, cell.sy - padY);
+    const x1 = Math.min(img.width, cell.sx + cell.sw + padX);
+    const y1 = Math.min(img.height, cell.sy + cell.sh + padY);
+    return { sx: x0, sy: y0, sw: Math.max(1, x1 - x0), sh: Math.max(1, y1 - y0) };
+  },
+
   _clampFrame(b, cell) {
     const x0 = U.clamp(Math.round(b.x), cell.sx, cell.sx + cell.sw - 1);
     const y0 = U.clamp(Math.round(b.y), cell.sy, cell.sy + cell.sh - 1);
     const x1 = U.clamp(Math.round(b.x + b.w), x0 + 1, cell.sx + cell.sw);
     const y1 = U.clamp(Math.round(b.y + b.h), y0 + 1, cell.sy + cell.sh);
     return { sx: x0, sy: y0, sw: x1 - x0, sh: y1 - y0 };
+  },
+
+  _basisHeight(frames) {
+    const hs = frames.map(f => f.sh).filter(Boolean).sort((a, b) => a - b);
+    if (!hs.length) return 0;
+    return hs[Math.min(hs.length - 1, Math.max(0, Math.floor(hs.length * .55)))];
   },
 
   _scale(img, sc) {
@@ -155,12 +177,12 @@ const ASSETS = {
     for (const [cx, cy] of [[2, 2], [w - 3, 2], [2, h - 3], [w - 3, h - 3]]) {
       const i = (cy * w + cx) * 4;
       const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
-      if (d[i + 3] > 200 && mx >= 205 && mx - mn <= 26) lightCorners++;
+      if (d[i + 3] > 200 && mx >= 188 && mx - mn <= 36) lightCorners++;
     }
     if (lightCorners < 3) return cv; // real transparency — keep the downscaled copy as-is
     const bgish = i => {
       const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
-      return mx >= 206 && (mx - mn) <= 26;
+      return mx >= 188 && (mx - mn) <= 36;
     };
     const visited = new Uint8Array(w * h);
     const stack = new Int32Array(w * h);
@@ -227,7 +249,8 @@ const ASSETS = {
     const d = this.data[name];
     if (!d || !d.ok) return false;
     const f = d.frames[Math.min(idx, d.frames.length - 1)];
-    const s = o.h ? o.h / f.sh : (o.w ? o.w / f.sw : 1);
+    const basisH = o.basisH || d.basisH || f.sh;
+    const s = o.h ? o.h / basisH : (o.w ? o.w / f.sw : 1);
     const dw = f.sw * s, dh = f.sh * s;
     ctx.save();
     ctx.translate(x, y);
@@ -271,28 +294,28 @@ const ASSETS = {
   heroWeaponGrip(p, src, idx) {
     const w = p && p.weapon && typeof Weapons !== 'undefined' ? Weapons[p.weapon] : null;
     const shape = (w && w.shape) || '';
-    const base = { x: 17, y: -35, rot: -.22, size: 22, front: true };
+    const base = { x: 16, y: -29, rot: -.22, size: 16, front: true };
     if (src && src.indexOf('_run') > 0) {
       const a = idx * U.TAU / Math.max(1, this.frameCount(src));
-      return { x: 17 + Math.cos(a) * 3, y: -36 + Math.sin(a) * 2, rot: -.18 + Math.sin(a) * .08, size: 21 };
+      return { x: 16 + Math.cos(a) * 2.5, y: -29 + Math.sin(a) * 1.5, rot: -.18 + Math.sin(a) * .06, size: 15 };
     }
     if (src && src.indexOf('_actions') > 0) {
       const byFrame = [
-        { x: 22, y: -38, rot: -.62, size: 25 },
-        { x: 15, y: -43, rot: -.92, size: 28 },
-        { x: 24, y: -42, rot: -.38, size: 27 },
-        { x: 27, y: -38, rot: -.04, size: 26 },
-        { x: 19, y: -39, rot: -.08, size: 27 },
-        { x: 24, y: -42, rot: -.18, size: 24 },
-        { x: 18, y: -39, rot: -.24, size: 23 },
-        { x: 16, y: -35, rot: -.36, size: 23 }
+        { x: 21, y: -34, rot: -.62, size: 19 },
+        { x: 15, y: -35, rot: -.92, size: 20 },
+        { x: 23, y: -34, rot: -.38, size: 19 },
+        { x: 24, y: -32, rot: -.04, size: 18 },
+        { x: 16, y: -30, rot: -.08, size: 19 },
+        { x: 22, y: -33, rot: -.18, size: 17 },
+        { x: 17, y: -30, rot: -.24, size: 16 },
+        { x: 16, y: -29, rot: -.36, size: 16 }
       ];
       return byFrame[Math.min(idx, byFrame.length - 1)] || base;
     }
-    if (shape === 'bow') return { x: 22, y: -36, rot: -.04, size: 23 };
-    if (shape === 'shield') return { x: 18, y: -37, rot: -.02, size: 24 };
-    if (shape === 'axe' || shape === 'hammer') return { x: 17, y: -39, rot: -.65, size: 26 };
-    if (shape === 'spear' || shape === 'staff' || shape === 'scythe') return { x: 19, y: -39, rot: -.38, size: 25 };
+    if (shape === 'bow') return { x: 20, y: -29, rot: -.04, size: 17 };
+    if (shape === 'shield') return { x: 15, y: -28, rot: -.02, size: 18 };
+    if (shape === 'axe' || shape === 'hammer') return { x: 16, y: -31, rot: -.65, size: 19 };
+    if (shape === 'spear' || shape === 'staff' || shape === 'scythe') return { x: 18, y: -30, rot: -.38, size: 18 };
     return base;
   },
 
@@ -304,13 +327,13 @@ const ASSETS = {
     ctx.save();
     ctx.scale(p.dir || 1, 1);
     ctx.translate(g.x, g.y);
-    ctx.rotate((g.rot || 0) + (attacking ? -.18 : 0) + Math.sin(t * 3.2) * .025);
-    if (flash > 0) {
+    ctx.rotate((g.rot || 0) + (attacking ? -.14 : 0) + Math.sin(t * 3.2) * .02);
+    if (typeof Art !== 'undefined' && Art.glow) {
       ctx.globalCompositeOperation = 'lighter';
-      if (typeof Art !== 'undefined' && Art.glow) Art.glow(ctx, 0, 0, 28 + flash * 28, def.color, .25 + flash * .35);
+      Art.glow(ctx, 0, 0, 17 + flash * 24, def.color, .12 + flash * .32);
       ctx.globalCompositeOperation = 'source-over';
-      ctx.scale(1 + flash * .16, 1 + flash * .16);
     }
+    if (flash > 0) ctx.scale(1 + flash * .1, 1 + flash * .1);
     if (!this.drawWeaponGlyph(ctx, p.weapon, 0, 0, g.size || 22, t) && typeof Art !== 'undefined' && Art.drawWeaponGlyph) {
       Art.drawWeaponGlyph(ctx, p.weapon, 0, 0, g.size || 22, t);
     }
