@@ -57,7 +57,7 @@ const ASSETS = {
     portrait_joku: {}, portrait_jolie: {}, portrait_lulu: {}, portrait_biscuit: {},
     chapter_badges: { cols: 3, rows: 2, trim: 1 },
     title_art: {},
-    cg_intro: {}, cg_hug: {}, cg_kiss: {}, cg_victory: {}, cg_ending: {},
+    cg_intro: {}, cg_ending: {},
   },
 
   TRIAL_MAP: {
@@ -96,14 +96,14 @@ const ASSETS = {
     else src = img;
 
     const cols = cfg.cols || 1, rows = cfg.rows || 1;
-    const cw = src.width / cols, ch = src.height / rows;
     const frames = [];
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        let f = { sx: c * cw, sy: r * ch, sw: cw, sh: ch };
+        const cell = this._cell(src, cols, rows, c, r);
+        let f = cell;
         if (cfg.trim || cfg.black || cols * rows > 1) {
           const b = this._bbox(src, f.sx, f.sy, f.sw, f.sh, cfg.black);
-          if (b) f = { sx: b.x, sy: b.y, sw: b.w, sh: b.h };
+          if (b) f = this._clampFrame(b, cell);
         }
         frames.push(f);
       }
@@ -112,6 +112,22 @@ const ASSETS = {
     if (name.indexOf('portrait_') === 0) this._makePortrait(name, src);
     if (name === 'title_art') this._menuArt(img);
     if (name.indexOf('bg_') === 0) this._refreshLevelBg(name.slice(3));
+  },
+
+  _cell(img, cols, rows, c, r) {
+    const x0 = Math.round(c * img.width / cols);
+    const x1 = Math.round((c + 1) * img.width / cols);
+    const y0 = Math.round(r * img.height / rows);
+    const y1 = Math.round((r + 1) * img.height / rows);
+    return { sx: x0, sy: y0, sw: Math.max(1, x1 - x0), sh: Math.max(1, y1 - y0) };
+  },
+
+  _clampFrame(b, cell) {
+    const x0 = U.clamp(Math.round(b.x), cell.sx, cell.sx + cell.sw - 1);
+    const y0 = U.clamp(Math.round(b.y), cell.sy, cell.sy + cell.sh - 1);
+    const x1 = U.clamp(Math.round(b.x + b.w), x0 + 1, cell.sx + cell.sw);
+    const y1 = U.clamp(Math.round(b.y + b.h), y0 + 1, cell.sy + cell.sh);
+    return { sx: x0, sy: y0, sw: x1 - x0, sh: y1 - y0 };
   },
 
   _scale(img, sc) {
@@ -759,11 +775,6 @@ const ASSETS = {
   _cgAlpha: 0, _cgName: null,
   _overlay(ctx, W, H) {
     let want = null;
-    if (typeof G !== 'undefined' && G.state === 'play') {
-      if (G.kissCin > 0 && this.has('cg_kiss')) want = 'cg_kiss';
-      else if (G.cut && G.cut.name === 'ending' && G.me && G.me.pose === 'kiss' && this.has('cg_victory')) want = 'cg_victory';
-      else if (G.cut && G.cut.name === 'gate' && G.me && G.me.pose === 'hug' && this.has('cg_hug')) want = 'cg_hug';
-    }
     if (want) this._cgName = want;
     this._cgAlpha = U.clamp(this._cgAlpha + (want ? .045 : -.05), 0, 1);
     if (this._cgAlpha <= 0 || !this._cgName) { if (!want) this._cgName = null; return; }
