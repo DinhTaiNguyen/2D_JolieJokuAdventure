@@ -62,7 +62,7 @@ const ASSETS = {
     portrait_joku: {}, portrait_jolie: {}, portrait_lulu: {}, portrait_biscuit: {},
     chapter_badges: { cols: 3, rows: 2, trim: 1 },
     title_art: {},
-    cg_intro: {}, cg_ending: {},
+    cg_intro: {}, cg_victory: {}, cg_ending: {},
   },
 
   TRIAL_MAP: {
@@ -144,6 +144,11 @@ const ASSETS = {
     const x1 = U.clamp(Math.round(b.x + b.w), x0 + 1, cell.sx + cell.sw);
     const y1 = U.clamp(Math.round(b.y + b.h), y0 + 1, cell.sy + cell.sh);
     return { sx: x0, sy: y0, sw: x1 - x0, sh: y1 - y0 };
+  },
+
+  _bgLikeData(d, i) {
+    const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+    return mx >= 188 && (mx - mn) <= 36;
   },
 
   _basisHeight(frames) {
@@ -242,7 +247,7 @@ const ASSETS = {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const i = (y * w + x) * 4;
-        const hit = black ? (d[i] + d[i + 1] + d[i + 2] > 48) : d[i + 3] > 26;
+        const hit = black ? (d[i] + d[i + 1] + d[i + 2] > 48) : (d[i + 3] > 26 && !this._bgLikeData(d, i));
         if (hit) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
       }
     }
@@ -837,6 +842,9 @@ const ASSETS = {
   _cgAlpha: 0, _cgName: null,
   _overlay(ctx, W, H) {
     let want = null;
+    if (typeof G !== 'undefined' && G.state === 'play') {
+      if (G.cut && G.cut.name === 'ending' && G.me && G.me.pose === 'kiss' && this.has('cg_victory')) want = 'cg_victory';
+    }
     if (want) this._cgName = want;
     this._cgAlpha = U.clamp(this._cgAlpha + (want ? .045 : -.05), 0, 1);
     if (this._cgAlpha <= 0 || !this._cgName) { if (!want) this._cgName = null; return; }
