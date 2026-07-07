@@ -19,21 +19,21 @@ const ASSETS = {
     float_ember: { trim: 1 }, float_star: { trim: 1 },
     prop_mushroom: { trim: 1 }, prop_gate: { trim: 1 }, prop_shrine: { trim: 1 },
     // heroes & supporters — legacy 8-pose sheets (fallback)
-    joku_sheet: { cols: 4, rows: 2, trim: 1, bleed: .05, stableX: 1 },
-    jolie_sheet: { cols: 4, rows: 2, trim: 1, bleed: .05, stableX: 1 },
-    lulu_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1 },
-    biscuit_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1 },
+    joku_sheet: { cols: 4, rows: 2, trim: 1, bleed: .05, stableX: 1, groundPad: 2 },
+    jolie_sheet: { cols: 4, rows: 2, trim: 1, bleed: .05, stableX: 1, groundPad: 9 },
+    lulu_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
+    biscuit_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
     // heroes & supporters — animation strips (preferred when present)
-    joku_run: { cols: 6, rows: 1, trim: 1, bleed: .08, lockScale: 1 },
-    jolie_run: { cols: 6, rows: 1, trim: 1, bleed: .08, lockScale: 1 },
-    joku_idle: { cols: 4, rows: 1, trim: 1, bleed: .04, lockScale: 1 },
-    jolie_idle: { cols: 4, rows: 1, trim: 1, bleed: .04, lockScale: 1 },
-    joku_actions: { cols: 8, rows: 1, trim: 1, bleed: .06, lockScale: 1 },
-    jolie_actions: { cols: 8, rows: 1, trim: 1, bleed: .06, lockScale: 1 },
-    lulu_run: { cols: 6, rows: 1, trim: 1, lockScale: 1 },
-    biscuit_run: { cols: 6, rows: 1, trim: 1, lockScale: 1 },
-    lulu_actions: { cols: 4, rows: 1, trim: 1, lockScale: 1 },
-    biscuit_actions: { cols: 4, rows: 1, trim: 1, lockScale: 1 },
+    joku_run: { cols: 6, rows: 1, trim: 1, bleed: .08, lockScale: 1, groundPad: 2 },
+    jolie_run: { cols: 6, rows: 1, trim: 1, bleed: .08, lockScale: 1, groundPad: 9 },
+    joku_idle: { cols: 4, rows: 1, trim: 1, bleed: .04, lockScale: 1, groundPad: 2 },
+    jolie_idle: { cols: 4, rows: 1, trim: 1, bleed: .04, lockScale: 1, groundPad: 9 },
+    joku_actions: { cols: 8, rows: 1, trim: 1, bleed: .06, lockScale: 1, groundPad: 2 },
+    jolie_actions: { cols: 8, rows: 1, trim: 1, bleed: .06, lockScale: 1, groundPad: 9 },
+    lulu_run: { cols: 6, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
+    biscuit_run: { cols: 6, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
+    lulu_actions: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
+    biscuit_actions: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
     // devils
     enemies_sheet: { cols: 4, rows: 1, trim: 1 },
     enemies_elite_sheet: { cols: 4, rows: 1, trim: 1 },
@@ -114,7 +114,12 @@ const ASSETS = {
         frames.push(this._anchorFrame(f, cell));
       }
     }
-    this.data[name] = { ok: true, img: src, frames, black: !!cfg.black, basisH: cfg.lockScale ? this._basisHeight(frames) : 0, stableX: !!(cfg.lockScale || cfg.stableX) };
+    this.data[name] = {
+      ok: true, img: src, frames, black: !!cfg.black,
+      basisH: cfg.lockScale ? this._basisHeight(frames) : 0,
+      stableX: !!(cfg.lockScale || cfg.stableX),
+      groundPad: cfg.groundPad || 0
+    };
     if (name.indexOf('portrait_') === 0) this._makePortrait(name, src);
     if (name === 'title_art') this._menuArt(img);
     if (name.indexOf('bg_') === 0) this._refreshLevelBg(name.slice(3));
@@ -272,7 +277,8 @@ const ASSETS = {
     if (o.alpha != null) ctx.globalAlpha *= o.alpha;
     if (o.add) ctx.globalCompositeOperation = 'lighter';
     if (o.filter !== undefined && 'filter' in ctx) ctx.filter = o.filter;
-    const ay = o.anchor === 'center' ? -dh / 2 : (o.anchor === 'top' ? 0 : -dh);
+    const groundPad = o.groundPad != null ? o.groundPad : (d.groundPad || 0);
+    const ay = o.anchor === 'center' ? -dh / 2 : (o.anchor === 'top' ? 0 : -dh + groundPad);
     ctx.drawImage(d.img, f.sx, f.sy, f.sw, f.sh, -dw / 2 + dx, ay, dw, dh);
     ctx.restore();
     return true;
