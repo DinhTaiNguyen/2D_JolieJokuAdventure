@@ -19,21 +19,21 @@ const ASSETS = {
     float_ember: { trim: 1 }, float_star: { trim: 1 },
     prop_mushroom: { trim: 1 }, prop_gate: { trim: 1 }, prop_shrine: { trim: 1 },
     // heroes & supporters — legacy 8-pose sheets (fallback)
-    joku_sheet: { cols: 4, rows: 2, trim: 1, bleed: .05, stableX: 1, groundPad: 2 },
-    jolie_sheet: { cols: 4, rows: 2, trim: 1, bleed: .05, stableX: 1, groundPad: 9 },
-    lulu_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
-    biscuit_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
+    joku_sheet: { cols: 4, rows: 2, trim: 1, lockScale: 1, bleed: .06,  stableX: 1, groundPad: 2 },
+    jolie_sheet: { cols: 4, rows: 2, trim: 1, lockScale: 1, bleed: .05,  stableX: 1, groundPad: 2 },
+    lulu_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 2 },
+    biscuit_sheet: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 2 },
     // heroes & supporters — animation strips (preferred when present)
     joku_run: { cols: 6, rows: 1, trim: 1, bleed: .08, lockScale: 1, groundPad: 2 },
-    jolie_run: { cols: 6, rows: 1, trim: 1, bleed: .08, lockScale: 1, groundPad: 9 },
+    jolie_run: { cols: 6, rows: 1, trim: 1, bleed: .07, lockScale: 1, groundPad: 2 },
     joku_idle: { cols: 4, rows: 1, trim: 1, bleed: .04, lockScale: 1, groundPad: 2 },
-    jolie_idle: { cols: 4, rows: 1, trim: 1, bleed: .04, lockScale: 1, groundPad: 9 },
-    joku_actions: { cols: 8, rows: 1, trim: 1, bleed: .06, lockScale: 1, groundPad: 2 },
-    jolie_actions: { cols: 8, rows: 1, trim: 1, bleed: .06, lockScale: 1, groundPad: 9 },
-    lulu_run: { cols: 6, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
-    biscuit_run: { cols: 6, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
-    lulu_actions: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
-    biscuit_actions: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 5 },
+    jolie_idle: { cols: 4, rows: 1, trim: 1, bleed: .04, lockScale: 1, groundPad: 2 },
+    joku_actions: { cols: 8, rows: 1, trim: 1, bleed: .08, lockScale: 1, groundPad: 2 },
+    jolie_actions: { cols: 8, rows: 1, trim: 1, bleed: .06, lockScale: 1, groundPad: 2 },
+    lulu_run: { cols: 6, rows: 1, trim: 1, lockScale: 1, groundPad: 2 },
+    biscuit_run: { cols: 6, rows: 1, trim: 1, lockScale: 1, groundPad: 2 },
+    lulu_actions: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 2 },
+    biscuit_actions: { cols: 4, rows: 1, trim: 1, lockScale: 1, groundPad: 2 },
     // devils
     enemies_sheet: { cols: 4, rows: 1, trim: 1 },
     enemies_elite_sheet: { cols: 4, rows: 1, trim: 1 },
@@ -408,7 +408,9 @@ const ASSETS = {
 
     const run = running && src === runSheet;
     const bounce = run ? Math.abs(Math.sin(p.animT * 12)) * .7 : (running ? Math.abs(Math.sin(p.animT * 13)) * 1.4 : Math.sin(t * 2.3) * 1.1);
-    const H = 74;
+    const HERO_H = { joku: 74, jolie: 63 };
+    const H = HERO_H[who] || 74;
+    
 
     const drawY = p.onGround ? this.groundSnapY(p.x, p.y, 130, 34) : p.y;
     ctx.save();
@@ -608,7 +610,17 @@ const ASSETS = {
     if (!name) return false;
     const d = this.data[name], f = d.frames[0];
     const H = 185, s = H / f.sh;
-    const topY = pl.y - 13; // grass tufts poke above the walk line
+
+    const GROUND_SURFACE = {
+      forest: 30,
+      falls: 40,
+      blossom: 13,
+      shadow: 20,
+      ember: 50,
+      star: 20
+    };
+    const topY = pl.y - (GROUND_SURFACE[th] || 13);// grass tufts poke above the walk line
+
     const capW = Math.round(f.sw * .18);
     const capDW = capW * s;
     const midSW = f.sw - capW * 2;
