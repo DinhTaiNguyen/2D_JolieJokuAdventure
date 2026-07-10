@@ -61,6 +61,8 @@ const ASSETS = {
     // portraits, story CGs, ui
     portrait_joku: {}, portrait_jolie: {}, portrait_lulu: {}, portrait_biscuit: {},
     chapter_badges: { cols: 3, rows: 2, trim: 1 },
+    // decorative HUD icons and frames supplied as a single atlas
+    ui_kit: { maxW: 1152 },
     title_art: {},
     cg_intro: {}, cg_victory: {}, cg_ending: {},
   },
@@ -74,7 +76,39 @@ const ASSETS = {
     gloom: 'boss_NightmareGloomheart', ember: 'boss_CinderCrown', eclipse: 'boss_EclipseHeart'
   },
 
+  /* The menu needs only a handful of files.  Everything else is loaded when a
+     chapter needs it so mobile browsers do not decode the whole art library up front. */
+  BOOT_ASSETS: [
+    'title_art', 'ui_kit', 'bg_forest', 'tile_forest', 'prop_mushroom',
+    'joku_sheet', 'jolie_sheet', 'lulu_sheet', 'biscuit_sheet'
+  ],
+  PLAY_ASSETS: [
+    'prop_gate', 'prop_shrine',
+    'joku_sheet', 'jolie_sheet', 'lulu_sheet', 'biscuit_sheet',
+    'joku_run', 'jolie_run', 'lulu_run', 'biscuit_run',
+    'portrait_joku', 'portrait_jolie', 'portrait_lulu', 'portrait_biscuit',
+    'enemies_sheet', 'enemy_golem', 'enemy_bat',
+    'items_sheet', 'weapons_1', 'weapons_2',
+    'fx_projectiles', 'fx_rings'
+  ],
+  DEFERRED_ASSETS: [
+    'joku_idle', 'jolie_idle', 'joku_actions', 'jolie_actions', 'lulu_actions', 'biscuit_actions',
+    'enemies_elite_sheet', 'enemy_golem_elite', 'enemy_bat_elite',
+    'fx_impacts', 'fx_enemy', 'fx_loveburst', 'fx_phoenixnova', 'fx_thunderslam'
+  ],
+
+  // Atlas coordinates are based on the 2304 x 1296 UI-kit source image.
+  UI_RECTS: {
+    move: [72, 18, 330, 342],
+    attack: [450, 18, 350, 342],
+    water: [830, 18, 350, 342],
+    star: [1215, 18, 350, 342],
+    heart: [1590, 18, 350, 342],
+    gift: [1960, 18, 330, 342]
+  },
+
   data: {}, _bgCache: {}, fbs: [], _kb: false,
+  _queue: [], _loadState: Object.create(null), _active: 0, _loadStarted: false, _mobile: false,
 
   has(n) { const d = this.data[n]; return !!(d && d.ok); },
   fr(n, i = 0) { const d = this.data[n]; return (d && d.ok) ? d.frames[Math.min(i, d.frames.length - 1)] : null; },
@@ -82,10 +116,72 @@ const ASSETS = {
 
   /* ---------------- loading & slicing ---------------- */
   load() {
-    for (const [name, cfg] of Object.entries(this.MAN)) {
+    if (this._loadStarted) return;
+    this._loadStarted = true;
+    this._mobile = !!(
+      (window.matchMedia && window.matchMedia('(pointer:coarse)').matches) ||
+      (navigator.deviceMemory && navigator.deviceMemory <= 4)
+    );
+    this.request(this.BOOT_ASSETS, true);
+
+    // Let the first paint and the main menu settle before decoding battle art.
+    const warmFirstChapter = () => this.prefetchChapter(0, false);
+    if ('requestIdleCallback' in window) window.requestIdleCallback(warmFirstChapter, { timeout: 1400 });
+    else setTimeout(warmFirstChapter, 700);
+  },
+
+  request(names, urgent = false) {
+    for (const name of names || []) {
+      if (!this.MAN[name] || this.data[name]?.ok) continue;
+      const state = this._loadState[name];
+      if (state === 'loading' || state === 'done') continue;
+      if (state === 'queued') {
+        if (urgent) {
+          const i = this._queue.indexOf(name);
+          if (i >= 0) { this._queue.splice(i, 1); this._queue.unshift(name); }
+        }
+        continue;
+      }
+      this._loadState[name] = 'queued';
+      if (urgent) this._queue.unshift(name);
+      else this._queue.push(name);
+    }
+    this._pump();
+  },
+
+  prefetchChapter(index, urgent = false) {
+    if (typeof World === 'undefined' || !World.LEVELS || !World.LEVELS[index]) return;
+    const cfg = World.LEVELS[index];
+    const themed = [
+      'bg_' + cfg.theme, 'tile_' + cfg.theme, 'trial_' + cfg.theme,
+      this.BOSS_MAP[cfg.bossKind]
+    ];
+    if (cfg.theme !== 'forest') themed.push('float_' + cfg.theme);
+    this.request(this.PLAY_ASSETS, urgent);
+    this.request(themed, urgent);
+    const lateArt = () => this.request(this.DEFERRED_ASSETS, false);
+    if ('requestIdleCallback' in window) window.requestIdleCallback(lateArt, { timeout: 2600 });
+    else setTimeout(lateArt, 1400);
+  },
+
+  _pump() {
+    const limit = this._mobile ? 2 : 4;
+    while (this._active < limit && this._queue.length) {
+      const name = this._queue.shift();
+      const cfg = this.MAN[name];
+      if (!cfg || this._loadState[name] !== 'queued') continue;
+      this._loadState[name] = 'loading';
+      this._active++;
       const img = new Image();
-      img.onload = () => { try { this._prep(name, cfg, img); } catch (e) { /* stays procedural */ } };
-      img.onerror = () => { /* stays procedural */ };
+      img.decoding = 'async';
+      if ('fetchPriority' in img) img.fetchPriority = this._active <= 2 ? 'high' : 'low';
+      const finish = () => {
+        this._active--;
+        this._loadState[name] = 'done';
+        this._pump();
+      };
+      img.onload = () => { try { this._prep(name, cfg, img); } catch (e) { /* procedural fallback remains */ } finally { finish(); } };
+      img.onerror = finish;
       img.src = this.DIR + name + '.png';
     }
   },
@@ -93,7 +189,8 @@ const ASSETS = {
   _prep(name, cfg, img) {
     // downscale at load — phones can't hold 60+ full-res decoded images in RAM
     const fullBleed = name.indexOf('bg_') === 0 || name.indexOf('cg_') === 0 || name === 'title_art';
-    const sc = Math.min(1, (fullBleed ? 2048 : 1152) / img.width);
+    const cap = cfg.maxW || (fullBleed ? (this._mobile ? 1536 : 2048) : (this._mobile ? 960 : 1152));
+    const sc = Math.min(1, cap / img.width);
     // many AI generators bake a fake white/checkerboard "transparency" — strip it
     let src;
     if (!cfg.black && !fullBleed) src = this._key(img, sc);
@@ -280,6 +377,23 @@ const ASSETS = {
     const groundPad = o.groundPad != null ? o.groundPad : (d.groundPad || 0);
     const ay = o.anchor === 'center' ? -dh / 2 : (o.anchor === 'top' ? 0 : -dh + groundPad);
     ctx.drawImage(d.img, f.sx, f.sy, f.sw, f.sh, -dw / 2 + dx, ay, dw, dh);
+    ctx.restore();
+    return true;
+  },
+
+  /* Draw a decorative medallion from ui_kit without slicing it into extra canvases. */
+  drawUiKit(ctx, key, x, y, w, h, o = {}) {
+    const d = this.data.ui_kit, r = this.UI_RECTS[key];
+    if (!d || !d.ok || !r) return false;
+    const sx = r[0] * d.img.width / 2304;
+    const sy = r[1] * d.img.height / 1296;
+    const sw = r[2] * d.img.width / 2304;
+    const sh = r[3] * d.img.height / 1296;
+    ctx.save();
+    if (o.alpha != null) ctx.globalAlpha *= o.alpha;
+    if (o.add) ctx.globalCompositeOperation = 'lighter';
+    if (o.filter && 'filter' in ctx) ctx.filter = o.filter;
+    ctx.drawImage(d.img, sx, sy, sw, sh, x, y, w, h);
     ctx.restore();
     return true;
   },

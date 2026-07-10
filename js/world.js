@@ -13,11 +13,47 @@ const World = {
   DEATH_Y: 860,
   COOP_CHALLENGES: ['forestBridge', 'oceanPhoenix', 'flowerLift', 'shadowLantern', 'emberRain', 'starMirror'],
 
-  gen(idx) {
+  // Safe but lively post-boss platform routes. Each has different heights and pacing,
+  // so the couple gets a distinct date location instead of an automatic chapter skip.
+  DATE_PATHS: {
+    forest: [
+      ['ground', 105, 300, 0], ['mush', 100, 175, -72], ['mush', 112, 190, -118],
+      ['ground', 100, 285, -38], ['mush', 104, 175, -98], ['ground', 112, 310, -10],
+      ['mush', 96, 185, -78], ['ground', 105, 280, 0]
+    ],
+    falls: [
+      ['mush', 105, 185, -64], ['mush', 100, 170, -138], ['ground', 110, 280, -54],
+      ['mush', 108, 190, -126], ['mush', 98, 165, -42], ['ground', 112, 300, -4],
+      ['mush', 106, 185, -88], ['ground', 96, 280, 0]
+    ],
+    blossom: [
+      ['ground', 98, 295, -18], ['mush', 102, 180, -78], ['ground', 106, 255, -108],
+      ['mush', 95, 190, -142], ['mush', 108, 170, -74], ['ground', 110, 320, -26],
+      ['mush', 100, 185, -92], ['ground', 104, 280, 0]
+    ],
+    shadow: [
+      ['mush', 108, 170, -72], ['ground', 102, 250, -116], ['mush', 110, 180, -150],
+      ['mush', 98, 165, -90], ['ground', 108, 300, -44], ['mush', 105, 175, -118],
+      ['ground', 108, 285, -58], ['ground', 96, 280, 0]
+    ],
+    ember: [
+      ['ground', 102, 275, -42], ['mush', 106, 180, -106], ['mush', 102, 165, -158],
+      ['ground', 108, 265, -88], ['mush', 98, 185, -146], ['ground', 108, 300, -38],
+      ['mush', 104, 180, -82], ['ground', 100, 290, 0]
+    ],
+    star: [
+      ['mush', 98, 190, -86], ['ground', 106, 270, -132], ['mush', 106, 180, -176],
+      ['mush', 100, 170, -104], ['ground', 108, 300, -52], ['mush', 104, 190, -120],
+      ['ground', 110, 290, -66], ['ground', 96, 290, 0]
+    ]
+  },
+
+  gen(idx, difficulty = 'normal') {
     const cfg = this.LEVELS[idx];
     const r = U.rng(cfg.seed);
     const plats = [], items = [], foes = [];
     let itemId = 0, foeId = 0;
+    const monsterMul = ({ easy: .72, normal: 1, hard: 1.55 })[difficulty] || 1;
 
     const mkDeco = (w) => {
       const deco = [];
@@ -133,7 +169,8 @@ const World = {
       if (r() < .25) items.push({ id: 'i' + (itemId++), kind: 'heartDrop', x: x + w * .5, y: y - 120, taken: false });
 
       // enemies
-      const foeCount = Math.min(4, 1 + (r() * cfg.density * 2.4 | 0));
+      const baseFoeCount = 1 + (r() * cfg.density * 2.4 | 0);
+      const foeCount = Math.min(difficulty === 'hard' ? 6 : 4, Math.max(1, Math.round(baseFoeCount * monsterMul)));
       for (let i = 0; i < foeCount; i++) {
         if (x + w < 1200) break; // keep the start peaceful
         const t = r();
@@ -158,6 +195,7 @@ const World = {
     // final gate meadow
     const endW = 800;
     y = U.clamp(lastGroundY, 460, 560);
+    const arenaEnd = x + endW + 1200;
     ground(x, y, endW + 1200);
     while (bossMarkI < bossMarks.length) {
       strongBoss(bossMarkI, x + 180 + bossMarkI * 180, plats[plats.length - 1]);
@@ -195,11 +233,19 @@ const World = {
       }[tr.kind] || { w: 880, h: 260 };
       return { id: tr.id + '_obstacle', trialId: tr.id, kind: tr.kind, x: tr.x + 230, y: tr.y, w: spec.w, h: spec.h };
     });
+    const postBoss = this._addDateJourney(cfg, idx, {
+      ground, mush, row,
+      startX: arenaEnd,
+      baseY: y
+    });
 
     return this._pack(cfg, idx, plats, items, foes, {
       shrineX, shrineY: this._topAtList(plats, shrineX), gateX, gateY: y,
       loveTrials, coopObstacles,
       startX: 140, checkpoints: [{ x: 140, y: 520 }, ...loveTrials.map(t => ({ x: t.x, y: t.y })), { x: shrineX, y: this._topAtList(plats, shrineX) }],
+      postBoss,
+      width: postBoss.end + 420,
+      difficulty,
       boss: {
         id: 'boss', type: 'boss', bossName: cfg.bossName, bossKind: cfg.bossKind,
         x: bossX, y: y - 125, homeX: bossX, homeY: y - 125, vx: 0, vy: 0, dir: -1,
@@ -207,6 +253,44 @@ const World = {
         t: 0, atkT: 3, phase: 0, mode: 'idle', modeT: 2.5, flash: 0, hurtShow: 0, dying: 0, dead: false
       }
     });
+  },
+
+  _addDateJourney(cfg, idx, add) {
+    const path = this.DATE_PATHS[cfg.theme] || this.DATE_PATHS.forest;
+    const lights = [], platforms = [];
+    let x = add.startX;
+    let lastY = add.baseY;
+
+    for (let i = 0; i < path.length; i++) {
+      const [type, gap, w, dy] = path[i];
+      x += gap;
+      const y = U.clamp(add.baseY + dy, 340, 575);
+      const pl = type === 'mush' ? add.mush(x, y, w) : add.ground(x, y, w);
+      const cx = x + w / 2;
+      const loot = i % 3 === 1 ? 'flower' : (i % 3 === 2 ? 'heartDrop' : 'orb');
+      add.row(cx - 42, y - (type === 'mush' ? 48 : 54), 2, loot);
+      lights.push({ x: cx, y: y - 94 - (i % 2) * 28, size: 22 + (i % 3) * 7, phase: i * 1.37 });
+      platforms.push({ x, y, w, type });
+      x += w;
+      lastY = y;
+    }
+
+    x += 108;
+    const terraceY = U.clamp((lastY + add.baseY) / 2 + 16, 410, 570);
+    const terrace = add.ground(x, terraceY, 760);
+    add.row(x + 110, terraceY - 54, 4, 'heartDrop');
+    add.row(x + 395, terraceY - 54, 3, 'flower');
+    const doorX = x + terrace.w - 150;
+
+    return {
+      id: 'date' + idx,
+      theme: cfg.theme,
+      start: add.startX - 90,
+      end: x + terrace.w,
+      doorX, doorY: terraceY,
+      platforms, lights,
+      unlocked: false, ready: 0, completed: false, announced: false
+    };
   },
 
   _topAtList(plats, x) {
@@ -227,7 +311,7 @@ const World = {
       }
     }
     return Object.assign({
-      cfg, idx, name: cfg.name, theme: cfg.theme, width: cfg.width,
+      cfg, idx, name: cfg.name, theme: cfg.theme, width: extra.width || cfg.width,
       plats, items, foes: foes.filter(f => !f.dead), buckets, BS,
       shrineDone: false, gateOpen: false
     }, extra);

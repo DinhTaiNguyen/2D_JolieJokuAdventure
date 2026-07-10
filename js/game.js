@@ -36,7 +36,10 @@ const Game = {
   },
 
   resize() {
-    this.dpr = Math.min(devicePixelRatio || 1, 2);
+    const coarse = !!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches);
+    const lowMemory = !!(navigator.deviceMemory && navigator.deviceMemory <= 4);
+    const cap = lowMemory ? 1.25 : (coarse ? 1.5 : 2);
+    this.dpr = Math.min(devicePixelRatio || 1, cap);
     this.cssW = innerWidth; this.cssH = innerHeight;
     this.canvas.width = Math.round(this.cssW * this.dpr);
     this.canvas.height = Math.round(this.cssH * this.dpr);
@@ -77,7 +80,11 @@ const Game = {
 
   loadLevel(n) {
     G.levelIndex = n;
-    G.level = World.gen(n);
+    if (typeof ASSETS !== 'undefined' && ASSETS.prefetchChapter) {
+      ASSETS.prefetchChapter(n, true);
+      if (n + 1 < World.LEVELS.length) ASSETS.prefetchChapter(n + 1, false);
+    }
+    G.level = World.gen(n, G.difficulty);
     this.applyDifficulty(G.level);
     G.level.bg = Art.makeBackground(G.level.theme, G.level.cfg.seed);
     G.projs = []; G.auras = []; G.cut = null; G.dialog = null;
@@ -277,6 +284,7 @@ const Game = {
     this.updateAuras(dt);
     if (G.mode !== 'guest' && !G.cut && !G.dialog && G.kissCin <= 0) this.updateLoveTrials(dt);
     if (!G.cut && G.kissCin <= 0) this.enforceProgressLocks(dt);
+    if (G.mode !== 'guest' && !G.cut && !G.dialog && G.kissCin <= 0) this.updateDateJourney(dt);
 
     // ----- touch damage from enemies -----
     if (!G.me.down && G.me.invuln <= 0 && G.kissCin <= 0 && !G.cut) {
@@ -407,7 +415,11 @@ const Game = {
     for (const e of this.enemiesAll()) {
       if (e.dead) continue;
       e.t += dt; e.flash -= dt; e.hurtShow -= dt;
-      if (e.dying > 0) { e.dying += dt; continue; }
+      if (e.dying > 0) {
+        e.dying += dt;
+        if (e.type === 'boss' && e.dying > 1.35) { e.dead = true; e.dying = 0; G.bossActive = false; }
+        continue;
+      }
       if (e.tx != null) {
         const k = Math.min(1, 10 * dt);
         e.x += (e.tx - e.x) * k; e.y += (e.ty - e.y) * k;
@@ -1501,11 +1513,47 @@ const Game = {
     this.dropWeapons(b.x, b.y, 2);
     this.emit('bossdead', {});
     SND.startMusic(G.levelIndex, false);
+    const journey = G.level.postBoss;
+    if (!journey) {
+      if (G.levelIndex >= World.LEVELS.length - 1) this.cutStart('ending');
+      else { G.announce = { txt: Story.t('chapterClear'), sub: Story.t('nextAdventure'), t: 3.2 }; G.nextLevelT = 4.2; }
+      return;
+    }
+    journey.unlocked = true;
+    journey.ready = 0;
+    this.setCheckpoint(journey.start, World.topAt(G.level, journey.start) || b.y + 125, Story.t('dateJourney'), true);
+    const info = Story.dateJourney(G.levelIndex);
+    G.announce = { txt: Story.t('dateJourney'), sub: info.title, t: 3.8 };
+    Ptc.burst('heart', journey.start + 40, (World.topAt(G.level, journey.start) || b.y) - 72, 14, { sp: 150, r: 7, life: 1.2 });
+    this.emit('journey', { unlocked: 1, ready: 0 });
+  },
+
+  updateDateJourney(dt) {
+    const journey = G.level && G.level.postBoss;
+    if (!journey || !journey.unlocked || journey.completed) return;
+    const atDoor = p => p && !p.down && Math.abs(p.x - journey.doorX) < 94 && Math.abs(p.y - journey.doorY) < 115;
+    const bothHere = atDoor(G.me) && atDoor(G.mate);
+    journey.ready = bothHere ? Math.min(1, (journey.ready || 0) + dt) : Math.max(0, (journey.ready || 0) - dt * 2.5);
+
+    const oneHere = atDoor(G.me) || atDoor(G.mate);
+    if (oneHere && !bothHere && G._lockHintT <= 0) {
+      G.announce = { txt: Story.t('dateDoor'), sub: Story.t('dateDoorSub'), t: 2.3 };
+      G._lockHintT = 2.1;
+    }
+    if (!bothHere || journey.ready < .72) return;
+
+    journey.completed = true;
+    journey.ready = 1;
+    SND.sfx('gate');
+    this.shake(5);
+    Ptc.add({ kind: 'ring', x: journey.doorX, y: journey.doorY - 70, vx: 0, vy: 0, r: 180, life: .9, color: 'rgba(255,190,225,.92)' });
+    Ptc.burst('heart', journey.doorX, journey.doorY - 70, 18, { sp: 180, r: 7, life: 1.35 });
+    this.emit('journey', { unlocked: 1, completed: 1, ready: 100 });
     if (G.levelIndex >= World.LEVELS.length - 1) {
       this.cutStart('ending');
     } else {
-      G.announce = { txt: Story.t('chapterClear'), sub: Story.t('nextAdventure'), t: 3.2 };
-      G.nextLevelT = 4.2;
+      G.announce = { txt: Story.t('chapterClear'), sub: Story.t('dateComplete'), t: 2.8 };
+      G.nextLevelT = 3.1;
     }
   },
 
@@ -1713,6 +1761,14 @@ const Game = {
         color: Math.random() < .5 ? '#ffb3d6' : '#9fe0ff', spin: Math.random()
       });
     }
+    // The quiet post-boss route is intentionally more romantic than dangerous.
+    const journey = G.level.postBoss;
+    if (journey && journey.unlocked && G.cam.x > journey.start - 320 && G.cam.x < journey.end + 320 && Math.random() < dt * 4) {
+      const x = U.clamp(G.cam.x + (Math.random() - .5) * this.cssW / this.scale, journey.start, journey.end);
+      const y = (World.topAt(G.level, x) || journey.doorY) - 64 - Math.random() * 105;
+      const kind = th === 'blossom' ? 'petal' : (th === 'star' ? 'star' : 'heart');
+      Ptc.add({ kind, x, y, vx: (Math.random() - .5) * 24, vy: -18 - Math.random() * 25, r: 4 + Math.random() * 3, life: 2.4, color: th === 'falls' ? '#9fd8ff' : '#ffb4d6', spin: 1 });
+    }
     // collectibles twinkle
     if (Math.random() < dt * 2.5 && G.level.items.length) {
       const it = G.level.items[(Math.random() * G.level.items.length) | 0];
@@ -1800,6 +1856,7 @@ const Game = {
       if (!e.dead) foes.push([e.id, Math.round(e.x), Math.round(e.y), e.dir, Math.round(e.hp)]);
     }
     const b = G.level.boss;
+    const journey = G.level.postBoss;
     const trials = (G.level.loveTrials || []).map(t => [t.id, t.done ? 1 : 0, Math.round((t.charge || 0) * 100), t.stage || 0]);
     const dead = G.level.foes.filter(e => e.dead).map(e => e.id);
     const items = G.level.items
@@ -1815,6 +1872,7 @@ const Game = {
       t: 'w', q: ++G.netT.wseq, love: Math.round(G.love), foes,
       dead, items, trials, gate: G.level.gateOpen ? 1 : 0, shrine: G.level.shrineDone ? 1 : 0,
       bossActive: G.bossActive ? 1 : 0,
+      journey: journey ? [journey.unlocked ? 1 : 0, journey.completed ? 1 : 0, Math.round((journey.ready || 0) * 100)] : null,
       cp: [Math.round(G.checkpoint.x), Math.round(G.checkpoint.y)],
       boss: b ? [Math.round(b.x), Math.round(b.y), Math.round(b.hp), b.dying > 0 ? 1 : 0] : null
     }, { volatile: true, maxBuffered: 32768 });
@@ -1870,6 +1928,11 @@ const Game = {
         if (m.gate != null) G.level.gateOpen = !!m.gate;
         if (m.shrine != null) G.level.shrineDone = !!m.shrine;
         if (m.bossActive != null) G.bossActive = !!m.bossActive;
+        if (m.journey && G.level.postBoss) {
+          G.level.postBoss.unlocked = !!m.journey[0];
+          G.level.postBoss.completed = !!m.journey[1];
+          G.level.postBoss.ready = (m.journey[2] || 0) / 100;
+        }
         if (m.cp) G.checkpoint = { x: m.cp[0], y: m.cp[1] };
         if (m.dead) {
           for (const id of m.dead) {
@@ -1988,6 +2051,20 @@ const Game = {
       case 'bossdead':
         if (G.level.boss && !(G.level.boss.dying > 0)) { G.level.boss.hp = 0; G.level.boss.dying = .01; }
         break;
+      case 'journey': {
+        const journey = G.level.postBoss;
+        if (!journey) break;
+        const wasLocked = !journey.unlocked;
+        if (d.unlocked != null) journey.unlocked = !!d.unlocked;
+        if (d.completed != null) journey.completed = !!d.completed;
+        if (d.ready != null) journey.ready = Math.min(1, (d.ready || 0) / 100);
+        if (wasLocked && journey.unlocked) {
+          const info = Story.dateJourney(G.levelIndex);
+          G.announce = { txt: Story.t('dateJourney'), sub: info.title, t: 3.8 };
+          SND.sfx('gate');
+        }
+        break;
+      }
       case 'fx':
         if (d.kind === 'dash') { SND.sfx('dash'); }
         if (d.kind === 'bloom') { SND.sfx('bloom'); this.addAura(d.x, d.y, false); }
@@ -2012,6 +2089,45 @@ const Game = {
         }
         break;
     }
+  },
+
+  drawDateJourney(ctx, journey, pal, t, viewL, viewR) {
+    if (!journey || journey.end < viewL || journey.start > viewR) return;
+    const colors = {
+      forest: ['#b6f4a0', '#ffb4d6'], falls: ['#a8ecff', '#fff2ae'], blossom: ['#ffafd8', '#fff0b5'],
+      shadow: ['#c5a6ff', '#a9edff'], ember: ['#ffad80', '#9eeeff'], star: ['#fff2ad', '#cbb8ff']
+    }[journey.theme] || ['#ffd0e6', '#b5efff'];
+    const active = journey.unlocked ? 1 : .28;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < journey.lights.length; i++) {
+      const light = journey.lights[i];
+      if (light.x < viewL - 60 || light.x > viewR + 60) continue;
+      const pulse = .38 + Math.sin(t * 2.4 + light.phase) * .16;
+      Art.glow(ctx, light.x, light.y, light.size * (1 + pulse), colors[i % colors.length], active * (.45 + pulse));
+      if (journey.unlocked && i % 2 === 0) Art.star(ctx, light.x, light.y, 4.5, colors[(i + 1) % colors.length]);
+    }
+    const ready = journey.ready || 0;
+    Art.glow(ctx, journey.doorX, journey.doorY - 115, 64 + ready * 58, '#ffb6db', active * (.28 + ready * .52));
+    if (journey.unlocked && typeof ASSETS !== 'undefined' && ASSETS.has && ASSETS.has('fx_rings')) {
+      ASSETS.draw(ctx, 'fx_rings', journey.theme === 'star' ? 5 : 0, journey.doorX, journey.doorY - 112, {
+        h: 128 + ready * 34, anchor: 'center', add: 1, alpha: .22 + ready * .38, rot: t * .22
+      });
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    const nearDoor = Math.abs(G.me.x - journey.doorX) < 170 || Math.abs(G.mate.x - journey.doorX) < 170;
+    Art.drawGate(ctx, journey.doorX, journey.doorY, t, nearDoor && journey.unlocked);
+    if (journey.unlocked && journey.doorX > viewL && journey.doorX < viewR) {
+      const info = Story.dateJourney(G.levelIndex);
+      ctx.textAlign = 'center';
+      ctx.font = '600 14px Fredoka, sans-serif';
+      ctx.fillStyle = 'rgba(255,243,220,.94)';
+      ctx.shadowColor = 'rgba(12,8,20,.82)'; ctx.shadowBlur = 7;
+      ctx.fillText(info.title, journey.doorX, journey.doorY - 238);
+      ctx.shadowBlur = 0;
+    }
+    ctx.restore();
   },
 
   /* ================= RENDER ================= */
@@ -2055,6 +2171,7 @@ const Game = {
       if (pl.x + pl.w < viewL || pl.x > viewR) continue;
       Art.drawPlatform(ctx, pl, pal, t);
     }
+    this.drawDateJourney(ctx, L.postBoss, pal, t, viewL, viewR);
     for (const ob of (L.coopObstacles || [])) {
       if (ob.x + ob.w < viewL || ob.x > viewR) continue;
       const tr = (L.loveTrials || []).find(x => x.id === ob.trialId);
@@ -2334,9 +2451,9 @@ const Game = {
     if (!p) return;
     const w = p.weapon && Weapons[p.weapon] ? Weapons[p.weapon] : null;
     const items = [
-      { icon: '⚔', label: 'Atk', cd: Math.max(0, p.atkCd) / (p.char === 'joku' ? .38 : .46), color: '#ffffff' },
-      { icon: p.char === 'joku' ? '🌊' : '🌸', label: 'Sp', cd: Math.max(0, p.spCd) / 2.2, color: p.char === 'joku' ? '#7fd8ff' : '#ff9fce' },
-      { icon: w ? w.skillIcon : '✦', label: 'Wpn', cd: w ? Math.max(0, p.weaponCd || 0) / (w.cd || 6) : 1, color: w ? w.color : '#fff3a8' },
+      { icon: '⚔', kit: 'attack', label: 'Atk', cd: Math.max(0, p.atkCd) / (p.char === 'joku' ? .38 : .46), color: '#ffffff' },
+      { icon: p.char === 'joku' ? '🌊' : '🌸', kit: p.char === 'joku' ? 'water' : 'heart', label: 'Sp', cd: Math.max(0, p.spCd) / 2.2, color: p.char === 'joku' ? '#7fd8ff' : '#ff9fce' },
+      { icon: w ? w.skillIcon : '✦', kit: w && ['heartHeal', 'loveBeacon', 'pandaGift'].includes(w.special) ? 'gift' : 'star', label: 'Wpn', cd: w ? Math.max(0, p.weaponCd || 0) / (w.cd || 6) : 1, color: w ? w.color : '#fff3a8' },
     ];
     const r = small ? 12 : 14;
     const gap = small ? 34 : 40;
@@ -2357,9 +2474,13 @@ const Game = {
         ctx.arc(x, y, r + 1, -Math.PI / 2, -Math.PI / 2 + U.TAU * cd);
         ctx.closePath(); ctx.fill();
       }
-      ctx.font = `${small ? 12 : 14}px Fredoka, sans-serif`;
-      ctx.fillStyle = cd > .01 ? 'rgba(255,255,255,.58)' : '#ffffff';
-      ctx.fillText(it.icon, x, y + (small ? 4 : 5));
+      const kitDrawn = typeof ASSETS !== 'undefined' && ASSETS.drawUiKit &&
+        ASSETS.drawUiKit(ctx, it.kit, x - r * .72, y - r * .72, r * 1.44, r * 1.44, { alpha: cd > .01 ? .58 : 1 });
+      if (!kitDrawn) {
+        ctx.font = `${small ? 12 : 14}px Fredoka, sans-serif`;
+        ctx.fillStyle = cd > .01 ? 'rgba(255,255,255,.58)' : '#ffffff';
+        ctx.fillText(it.icon, x, y + (small ? 4 : 5));
+      }
       ctx.font = `600 ${small ? 8 : 9}px Fredoka, sans-serif`;
       ctx.fillStyle = cd > .01 ? 'rgba(220,235,245,.62)' : it.color;
       const max = it.label === 'Sp' ? 2.2 : it.label === 'Wpn' && w ? (w.cd || 6) : .45;

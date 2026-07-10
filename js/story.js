@@ -27,6 +27,10 @@ const Story = {
     const names = this.isVietnamese() ? this.LEVEL_NAMES_VI : this.LEVEL_NAMES_EN;
     return (names && names[i]) || (World.LEVELS[i] && World.LEVELS[i].name) || ('Chapter ' + (i + 1));
   },
+  dateJourney(i) {
+    const list = this.isVietnamese() ? this.DATE_JOURNEYS_VI : this.DATE_JOURNEYS_EN;
+    return (list && list[i]) || (list && list[0]) || { title: 'Moonlit Walk', sub: 'Reach the Heartwood Door together.' };
+  },
   weaponText(id, field) {
     if (typeof Weapons === 'undefined' || !Weapons[id]) return '';
     if (this.isVietnamese()) return Weapons[id][field + 'Vi'] || Weapons[id][field] || '';
@@ -38,6 +42,23 @@ const Story = {
     'Mỗi chương sáng hơn vì Joku, Jolie, Lulu và Biscuit luôn chọn bảo vệ nhau.',
     'Khu rừng sẽ nhớ mãi: hai trái tim, hai bạn đồng hành, và một cuộc phiêu lưu không bao giờ hết yêu.',
     'Lulu sủa vang, Biscuit reo mừng, còn Joku và Jolie biến mọi bóng tối thành chuyện tình rực sáng.'
+  ],
+
+  DATE_JOURNEYS_EN: [
+    { title: 'Lantern Canopy Walk', sub: 'Run beneath waking leaves to the Heartwood Door.' },
+    { title: 'Rainbow Falls Balcony', sub: 'Leap across the mist and meet at the water-lit door.' },
+    { title: 'Petal Moonbridge', sub: 'Follow the floating blossoms to a garden made for two.' },
+    { title: 'Lantern Mirror Grotto', sub: 'Light the quiet cave path and find each other at the door.' },
+    { title: 'Rainfire Skywalk', sub: 'Cross the cooled embers beneath a sky of warm rain.' },
+    { title: 'Starlight Promise Terrace', sub: 'Reach the last door together beneath the constellation.' }
+  ],
+  DATE_JOURNEYS_VI: [
+    { title: 'Duong den long den', sub: 'Cung chay duoi tan la den cua trai tim.' },
+    { title: 'Ban cong thac cau vong', sub: 'Cung nhay qua suong mu den cua nuoc sang.' },
+    { title: 'Cau hoa duoi trang', sub: 'Theo canh hoa bay den khu vuon danh cho hai nguoi.' },
+    { title: 'Hang guong den long', sub: 'Cung thap den va tim den cua trai tim.' },
+    { title: 'Cau troi mua lua', sub: 'Vuot than hong duoi con mua am ap.' },
+    { title: 'San hen duoi anh sao', sub: 'Cung den cua cuoi cung duoi chom sao.' }
   ],
 
   TRIALS: [
@@ -275,7 +296,7 @@ const Story = {
         return [{ a: 'wait', t: .5 }, { a: 'dlg', key: bossKey }, { a: 'fn', f: () => Game.bossWake() }];
       }
       case 'ending': {
-        const bx = G.level.boss ? G.level.boss.x : L.width * .6;
+        const bx = L.postBoss ? L.postBoss.doorX : (G.level.boss ? G.level.boss.x : L.width * .6);
         return [
           { a: 'wait', t: 1.2 },
           { a: 'dlg', key: 'ending' },
@@ -595,6 +616,10 @@ Story.UI_EN = {
   bossDropSub: 'two weapons dropped',
   chapterClear: 'Chapter Clear!',
   nextAdventure: 'next adventure opening...',
+  dateJourney: 'Date Journey Unlocked!',
+  dateDoor: 'Heartwood Door',
+  dateDoorSub: 'Both hearts need to stand here together.',
+  dateComplete: 'The next chapter is opening...',
   downJoku: 'Joku is down! Jolie, hug him back up!',
   downJolie: 'Jolie is down! Joku, hug her back up!',
   mist: 'The mist caught you. Careful!',
@@ -708,6 +733,10 @@ Story.UI_VI = {
   bossDropSub: 'roi hai vu khi',
   chapterClear: 'Qua chuong!',
   nextAdventure: 'cuoc phieu luu tiep theo dang mo...',
+  dateJourney: 'Lo trinh hen ho da mo!',
+  dateDoor: 'Cua trai tim',
+  dateDoorSub: 'Ca hai can dung o day cung nhau.',
+  dateComplete: 'Chuong tiep theo dang mo...',
   downJoku: 'Joku guc roi! Jolie, hay om va cuu anh ay!',
   downJolie: 'Jolie guc roi! Joku, hay om va cuu co ay!',
   mist: 'Suong mu da bat ban. Can than!',

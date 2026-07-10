@@ -512,7 +512,12 @@ const Ent = {
     if (!b || b.dead) return;
     b.t += dt; b.flash -= dt; b.hurtShow -= dt;
     b.shieldT = Math.max(0, (b.shieldT || 0) - dt);
-    if (b.dying > 0) { b.dying += dt; b.y += Math.sin(b.t * 2) * dt * 10 - 14 * dt; return; }
+    if (b.dying > 0) {
+      b.dying += dt;
+      b.y += Math.sin(b.t * 2) * dt * 10 - 14 * dt;
+      if (b.dying > 1.35) { b.dead = true; b.dying = 0; G.bossActive = false; }
+      return;
+    }
 
     b.phase = b.hp < b.maxHp / 3 ? 2 : (b.hp < b.maxHp * 2 / 3 ? 1 : 0);
     const speedUp = 1 + b.phase * .3;
