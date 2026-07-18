@@ -9,10 +9,10 @@ it's a single static web page with peer-to-peer networking.
 ## The story
 
 The Gloomheart is stealing the forest's love. **Joku** (phoenix of the ocean 💙, with
-**Kai** the blue puppy) and **Jolie** (heart of the flowers 💗, with **Momo** the pink panda)
-journey through 4 chapters — *Enchanted Forest*, *Crystal Falls*, *Blossom Glade*, and
-*Gloomheart Hollow* — fighting shadows side by side, holding hands, hugging, and (when the
-Love Meter is full) kissing to unleash a screen-clearing **Love Burst**. 💥💋
+**Lulu** the blue puppy) and **Jolie** (heart of the flowers 💗, with **Biscuit** the pink panda)
+journey through seven chapters, ending in the Vietnamese folklore-inspired *Bamboo Homeland*.
+They fight shadows side by side, hold hands, hug, and (when the
+Love Meter is full) kiss to unleash a screen-clearing **Love Burst**. 💥💋
 
 ## How to play together (during your call)
 
@@ -32,6 +32,8 @@ Love Meter is full) kissing to unleash a screen-clearing **Love Burst**. 💥�
 | Jump / double-jump | W / ▲ / Space | ⬆️ button (or flick joystick up) |
 | Attack | J or Z | ⚔️ button |
 | Special (35 MP) | K or X | 🌊 / 🌸 button |
+| Equipped weapon skill | U, O or B | ✦ button |
+| Pick / drop weapon | Q | ⇩ button |
 | **Heart** | L, C or E | 💗 button |
 
 **The Heart button ❤ (stand close to each other):**
@@ -44,8 +46,25 @@ everything in the way). Jolie's special blooms a healing flower field, and holdi
 lets her glide on petals. Hitting the same enemy within a second of each other triggers a
 **Combo of Love** for bonus meter.
 
-**Your supporters fight too:** 🐶 Kai dashes in and BITES enemies that get close to you.
-🐼 Momo lobs healing hearts at whoever is hurting. They also fetch nearby pickups.
+**Your supporters fight too:** 🐶 Lulu dashes in and BITES enemies that get close to you.
+🐼 Biscuit lobs healing hearts at whoever is hurting. They also fetch nearby pickups.
+
+## Bamboo Homeland
+
+The seventh chapter turns Vietnamese countryside and folklore into gameplay: bamboo groves,
+rice fields, water buffalo, a village drum, a woven hammock, and a peaceful harvest terrace.
+Joku and Jolie must take separate drum marks, combine water and flower magic, then hold hands,
+hug, and kiss to awaken **Thánh Gióng** and bridge an uncrossable burning flood. Two strong
+bosses guard the road before the supernatural memory of a thirteenth-century invading army,
+the **Mongol Iron Warlord**, attacks with arrow rain, cavalry shockwaves, and a magic shield.
+
+Bosses in this chapter favor four new drops: **Sacred Bamboo Spear**, **Buffalo Horn Shield**,
+**Golden Rice Sickle**, and the playful **Dép Tổ Ong Boomerang**. Bàu Đá and banana-seed rice
+wine appear only as a cultural still life in the rest area, not as a combat power-up.
+
+The chapter's large PNGs are loaded only when that chapter is selected or prefetched. Each new
+sprite atlas is also physically downscaled and optimized so it stays sharp without making the
+first mobile load heavier.
 
 **The devils:** grinning slimes, spiky thorns, ghostly wisps that snipe from above, and
 dive-bombing imps — plus the Gloomheart itself, whose shockwaves you must jump and whose

@@ -491,7 +491,7 @@ const Game = {
   trialCoopPulse(tr, dt) {
     const colors = {
       forestBridge: '#9be27d', oceanPhoenix: '#56d6ff', flowerLift: '#ff9fce',
-      shadowLantern: '#d9b6ff', emberRain: '#ffb36b', starMirror: '#fff3a8'
+      shadowLantern: '#d9b6ff', emberRain: '#ffb36b', starMirror: '#fff3a8', giongBridge: '#e8c65f'
     };
     const color = colors[tr.kind] || '#ff9fce';
     if (Math.random() < dt * 12) {
@@ -529,7 +529,6 @@ const Game = {
       if (!tr.started) {
         tr.started = true;
         const info = Story.trialInfo(G.levelIndex, tr.id);
-        G.announce = { txt: info.title, sub: tr.stage === 1 ? 'Tiếp tục giữ trái tim để trao nụ hôn mở khóa.' : info.hint, t: 2.8 };
         SND.sfx('heart');
         G.announce = { txt: info.title, sub: tr.stage === 1 ? Story.t('trialKissPrompt') : info.hint, t: 2.8 };
       }
@@ -541,9 +540,6 @@ const Game = {
         tr.stage = 1; tr.charge = 0; tr.started = false;
         me.pose = mate.pose = 'hug'; me.poseT = mate.poseT = 1.25;
         this.hugHearts(tr.x);
-        G.announce = { txt: 'Phép hợp sức đã thức dậy', sub: 'Lại gần nhau, giữ trái tim, rồi trao nụ hôn mở đường.', t: 2.7 };
-        G.announce = { txt: 'Cái ôm đã đánh thức vòng sáng', sub: 'Giữ thêm một chút để hôn và nhận vũ khí.', t: 2.7 };
-        G.announce = { txt: 'Phép hợp sức đã thức dậy', sub: 'Lại gần nhau, giữ trái tim, rồi trao nụ hôn mở đường.', t: 2.7 };
         SND.sfx('heal');
         G.announce = { txt: Story.t('trialHugAwake'), sub: Story.t('trialHugSub'), t: 2.7 };
       } else if (tr.charge >= 1) {
@@ -571,8 +567,8 @@ const Game = {
     tr._celebrated = true;
     this.setCheckpoint(tr.x, tr.y, Story.t('loveTrial'), true);
     const info = Story.trialInfo(G.levelIndex, tr.id);
-    G.announce = { txt: info.done, sub: 'Vũ khí sáng đã xuất hiện. Hãy chọn món phù hợp!', t: 3.2 };
     SND.sfx('gate');
+    if (G.level && G.level.theme === 'village') SND.sfx('drum');
     G.announce = { txt: info.done, sub: Story.t('trialRewardSub'), t: 3.2 };
     Ptc.add({ kind: 'ring', x: tr.x, y: tr.y - 24, vx: 0, vy: 0, r: 180, life: .9, color: 'rgba(255,170,210,.9)' });
     Ptc.burst('heart', tr.x, tr.y - 60, 18, { sp: 170, r: 7, life: 1.3 });
@@ -596,14 +592,14 @@ const Game = {
     }
     for (const e of L.foes) {
       if (e.bossTier && !e.dead && !(e.dying > 0)) {
-        locks.push({ x: e.x, limit: e.x + 330, txt: e.bossName || 'Strong Boss', sub: 'Đánh bại boss này để tiếp tục.' });
+        locks.push({ x: e.x, limit: e.x + 330, txt: e.bossName || Story.t('strongBoss'), sub: Story.t('strongBossLock') });
       }
     }
     if (L.gateX && !L.gateOpen) {
-      locks.push({ x: L.gateX, limit: L.gateX + 135, txt: 'Cổng trái tim', sub: 'Cả hai đứng cạnh cổng để mở lối vào boss.' });
+      locks.push({ x: L.gateX, limit: L.gateX + 135, txt: Story.t('heartGate'), sub: Story.t('heartGateSub') });
     }
     if (L.boss && G.bossActive && !L.boss.dead && !(L.boss.dying > 0)) {
-      locks.push({ x: L.boss.x, limit: L.boss.x + 420, txt: L.boss.bossName || 'Final Boss', sub: 'Đánh bại boss cuối để kết thúc chương.' });
+      locks.push({ x: L.boss.x, limit: L.boss.x + 420, txt: L.boss.bossName || Story.t('finalBoss'), sub: Story.t('finalBossLock') });
     }
     for (const lock of locks) {
       const span = Math.round(lock.limit - lock.x);
@@ -924,6 +920,24 @@ const Game = {
         break;
       case 'auroraShield':
         p.invuln = Math.max(p.invuln, 1.4); for (let i = 0; i < 6; i++) { const a = i * U.TAU / 6; shoot('bolt', Math.cos(a) * 330, Math.sin(a) * 330, 12, 1); }
+        break;
+      case 'bambooPhalanx':
+        for (let i = -2; i <= 2; i++) shoot('bamboo', dir * (520 + Math.abs(i) * 45), i * 62, 19, 1.25, 0, p.x + dir * 26, p.y - 48 + i * 9);
+        areaHit(12, 210, 1.1);
+        break;
+      case 'buffaloCharge':
+        for (const q of team) q.invuln = Math.max(q.invuln, q === p ? 1.8 : 1.25);
+        p.dashT = .5; p.invuln = Math.max(p.invuln, 1.1);
+        areaHit(24, 190, .9);
+        for (const side of [-1, 1]) shoot('shock', side * 430, 0, 20, 1.65, 0, p.x + side * 36, p.y);
+        this.shake(7);
+        break;
+      case 'harvestArc':
+        for (const side of [-1, 1]) shoot('sickle', side * 520, -80, 20, 1.35, 100, p.x + side * 22, p.y - 48);
+        healTeam(10, 6); this.loveAdd(4);
+        break;
+      case 'sandalRicochet':
+        for (const side of [-1, 1]) for (const vy of [-150, 20, 150]) shoot('sandal', side * 560, vy, 15, 1.28, 0, p.x + side * 20, p.y - 44);
         break;
       case 'loveBeacon':
       default:
@@ -1292,8 +1306,8 @@ const Game = {
     if (!fromNet) this.emit('pick', { id: it.id, by });
   },
 
-  randomWeapon() {
-    return Weapons.IDS[(Math.random() * Weapons.IDS.length) | 0];
+  randomWeapon(pool = Weapons.IDS) {
+    return pool[(Math.random() * pool.length) | 0];
   },
 
   weaponBurst(x, y, weapon, power = 1) {
@@ -1306,8 +1320,10 @@ const Game = {
   dropWeapons(x, y, n = 2) {
     if (G.mode === 'guest') return;
     SND.sfx('weaponDrop');
+    const villagePool = ['sacredBamboo', 'buffaloShield', 'goldenRiceSickle', 'toOngSandal'];
     for (let i = 0; i < n; i++) {
-      const weapon = this.randomWeapon();
+      const themed = G.level && G.level.theme === 'village' && Math.random() < .72;
+      const weapon = this.randomWeapon(themed ? villagePool : Weapons.IDS);
       const side = i % 2 ? 1 : -1;
       const it = this.weaponDropItem(weapon, x + side * (38 + i * 8), y - 62, 0, -105 - i * 16);
       G.level.items.push(it);
@@ -1339,7 +1355,7 @@ const Game = {
   bossColor(kind) {
     return ({
       root: '#63d18a', tide: '#56d6ff', briar: '#ff86b8',
-      gloom: '#9e5eff', ember: '#ff8a4a', eclipse: '#d7b7ff'
+      gloom: '#9e5eff', ember: '#ff8a4a', eclipse: '#d7b7ff', horde: '#8b78d6'
     })[kind || (G.level && G.level.boss && G.level.boss.bossKind)] || '#9e5eff';
   },
 
@@ -1430,6 +1446,19 @@ const Game = {
         for (const p of players) shoot('darkball', p.x, p.y - 260, 0, 250 + phase * 30, 20 + phase * 2, 2.3, 150);
         break;
       }
+      case 'horde': {
+        const count = 8 + phase * 3;
+        for (const p of players) {
+          for (let i = 0; i < count; i++) {
+            const spread = (i - (count - 1) / 2) * 54;
+            shoot('arrow', p.x + spread, p.y - 410 - (i % 3) * 45, spread * -.08, 120 + (i % 2) * 35, 19 + phase * 3, 2.7, 360);
+          }
+        }
+        for (const side of [-1, 1]) {
+          shoot('darkball', b.x, b.y - 54, side * (460 + phase * 50), -40, 21 + phase * 2, 2.1);
+        }
+        break;
+      }
       case 'gloom':
       default:
         b.x = U.clamp(mid + (Math.random() < .5 ? -230 : 230), 320, G.level.width - 320);
@@ -1445,8 +1474,8 @@ const Game = {
     SND.sfx('boss');
     this.shake(7 + b.phase * 2);
     Ptc.add({ kind: 'ring', x: b.x, y: b.y - 10, vx: 0, vy: 0, r: 210, life: .75, color: color + 'bb' });
-    const shoot = (x, y, vx, vy, dmg = 17, life = 3, g = 0) => {
-      this.addProj({ kind: 'darkball', color, x, y, vx, vy, dmg, life, g, mine: false, foe: true, host: true });
+    const shoot = (x, y, vx, vy, dmg = 17, life = 3, g = 0, kind = 'darkball') => {
+      this.addProj({ kind, color, x, y, vx, vy, dmg, life, g, mine: false, foe: true, host: true });
     };
     switch (b.bossKind) {
       case 'root':
@@ -1469,6 +1498,19 @@ const Game = {
         b.shieldT = Math.max(b.shieldT || 0, 1.7 + b.phase * .45);
         for (let i = 0; i < 12; i++) { const a = i * U.TAU / 12 + b.t * .2; shoot(b.x, b.y - 15, Math.cos(a) * 300, Math.sin(a) * 300, 16, 2.2); }
         break;
+      case 'horde': {
+        b.shieldT = Math.max(b.shieldT || 0, 1.9 + b.phase * .45);
+        const side = Math.random() < .5 ? -1 : 1;
+        b.x = U.clamp(mid + side * 330, 320, G.level.width - 320);
+        for (const dir of [-1, 1]) {
+          this.addProj({ kind: 'shock', color, x: b.x + dir * 55, y: 520, vx: dir * (430 + b.phase * 45), vy: 0, dmg: 23 + b.phase * 3, life: 2.5, mine: false, foe: true, host: true });
+        }
+        for (let i = 0; i < 10 + b.phase * 2; i++) {
+          const a = i * U.TAU / (10 + b.phase * 2);
+          shoot(b.x, b.y - 36, Math.cos(a) * (310 + b.phase * 35), Math.sin(a) * (310 + b.phase * 35), 18 + b.phase * 2, 2.2, 0, 'arrow');
+        }
+        break;
+      }
       case 'gloom':
       default:
         b.shieldT = Math.max(b.shieldT || 0, 1.0 + b.phase * .3);
@@ -1485,7 +1527,8 @@ const Game = {
     if (n <= 0) return;
     SND.sfx('boss');
     const pl = G.level.plats.find(p => p.type === 'ground' && b.x >= p.x && b.x <= p.x + p.w) || G.level.plats[G.level.plats.length - 1];
-    const summonTypes = G.level.theme === 'ember' ? ['golem', 'imp', 'bat'] :
+    const summonTypes = G.level.theme === 'village' ? ['slime', 'thorn', 'wisp', 'imp'] :
+      G.level.theme === 'ember' ? ['golem', 'imp', 'bat'] :
       G.level.theme === 'star' ? ['bat', 'wisp', 'golem'] :
       G.level.theme === 'shadow' ? ['wisp', 'bat', 'thorn'] : ['slime', 'thorn', 'wisp'];
     for (const off of [-140, 140, -260, 260].slice(0, n)) {
@@ -1750,6 +1793,7 @@ const Game = {
     if (Math.random() < dt * 3) {
       const x = G.cam.x + (Math.random() - .5) * this.cssW / this.scale;
       if (th === 'blossom') Ptc.add({ kind: 'petal', x, y: G.cam.y - 300, vx: 20 + Math.random() * 30, vy: 40 + Math.random() * 30, r: 4, life: 6, spin: 1 });
+      else if (th === 'village') Ptc.add({ kind: Math.random() < .6 ? 'petal' : 'star', x, y: G.cam.y - 280, vx: 15 + Math.random() * 22, vy: 28 + Math.random() * 24, r: 3 + Math.random() * 2, life: 5.5, color: '#f2cf58', spin: 1 });
       else if (th === 'shadow') Ptc.add({ kind: 'dot', x, y: G.cam.y + 260, vx: (Math.random() - .5) * 20, vy: -30, r: 5, life: 4, color: '#9e5eff' });
       else Ptc.add({ kind: 'dot', x, y: G.cam.y - 280, vx: (Math.random() - .5) * 16, vy: 22, r: 4, life: 6, color: th === 'falls' ? '#9fd8ff' : '#aef2d8' });
     }
@@ -2095,7 +2139,8 @@ const Game = {
     if (!journey || journey.end < viewL || journey.start > viewR) return;
     const colors = {
       forest: ['#b6f4a0', '#ffb4d6'], falls: ['#a8ecff', '#fff2ae'], blossom: ['#ffafd8', '#fff0b5'],
-      shadow: ['#c5a6ff', '#a9edff'], ember: ['#ffad80', '#9eeeff'], star: ['#fff2ad', '#cbb8ff']
+      shadow: ['#c5a6ff', '#a9edff'], ember: ['#ffad80', '#9eeeff'], star: ['#fff2ad', '#cbb8ff'],
+      village: ['#f4d66e', '#9be27d']
     }[journey.theme] || ['#ffd0e6', '#b5efff'];
     const active = journey.unlocked ? 1 : .28;
     ctx.save();
@@ -2170,6 +2215,12 @@ const Game = {
     for (const pl of L.plats) {
       if (pl.x + pl.w < viewL || pl.x > viewR) continue;
       Art.drawPlatform(ctx, pl, pal, t);
+    }
+    if (typeof ASSETS !== 'undefined' && ASSETS.drawVillageProp) {
+      for (const prop of (L.culturalProps || [])) {
+        if (prop.x < viewL - 180 || prop.x > viewR + 180) continue;
+        ASSETS.drawVillageProp(ctx, prop, t);
+      }
     }
     this.drawDateJourney(ctx, L.postBoss, pal, t, viewL, viewR);
     for (const ob of (L.coopObstacles || [])) {
@@ -2598,18 +2649,64 @@ const Game = {
   drawAnnounce(ctx, W, H) {
     const a = G.announce;
     const k = Math.min(1, a.t > 2.6 ? (3.2 - a.t) / .6 : (a.t < .6 ? a.t / .6 : 1));
+    const fit = (text, maxSize, minSize, maxWidth, weight) => {
+      let size = maxSize;
+      while (size > minSize) {
+        ctx.font = `${weight} ${size}px Fredoka, sans-serif`;
+        if (ctx.measureText(String(text)).width <= maxWidth) break;
+        size--;
+      }
+      return size;
+    };
+    const wrap = (text, maxWidth, size, weight, maxLines = 3) => {
+      ctx.font = `${weight} ${size}px Fredoka, sans-serif`;
+      const words = String(text || '').split(/\s+/);
+      const lines = [];
+      let line = '';
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const next = line ? line + ' ' + word : word;
+        if (line && ctx.measureText(next).width > maxWidth) {
+          lines.push(line);
+          if (lines.length === maxLines - 1) {
+            const rest = words.slice(i);
+            let last = '';
+            let used = 0;
+            while (used < rest.length) {
+              const candidate = last ? last + ' ' + rest[used] : rest[used];
+              const suffix = used < rest.length - 1 ? '...' : '';
+              if (last && ctx.measureText(candidate + suffix).width > maxWidth) break;
+              last = candidate;
+              used++;
+            }
+            lines.push(last + (used < rest.length ? '...' : ''));
+            return lines;
+          }
+          line = word;
+        } else line = next;
+      }
+      if (line) lines.push(line);
+      return lines.slice(0, maxLines);
+    };
     ctx.save();
     ctx.globalAlpha = U.clamp(k, 0, 1);
     ctx.textAlign = 'center';
-    ctx.font = `700 ${Math.min(46, W * .06)}px Fredoka, sans-serif`;
+    const phoneLandscape = H < 500 && W < 1000;
+    const textWidth = phoneLandscape ? W * .44 : W * .9;
+    const titleY = phoneLandscape ? Math.max(152, H * .38) : H * .3;
+    const titleSize = fit(a.txt, phoneLandscape ? 29 : Math.min(46, W * .06), phoneLandscape ? 17 : 21, textWidth, 700);
+    ctx.font = `700 ${titleSize}px Fredoka, sans-serif`;
     ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 14;
     const gr = ctx.createLinearGradient(W / 2 - 200, 0, W / 2 + 200, 0);
     gr.addColorStop(0, '#7fd8ff'); gr.addColorStop(1, '#ffa9d8');
     ctx.fillStyle = gr;
-    ctx.fillText(a.txt, W / 2, H * .3);
-    ctx.font = `600 ${Math.min(19, W * .028)}px Fredoka, sans-serif`;
+    ctx.fillText(a.txt, W / 2, titleY);
+    const subSize = phoneLandscape ? 12 : Math.max(12, Math.min(18, W * .024));
+    const lines = wrap(a.sub, textWidth, subSize, 600, phoneLandscape ? 4 : 3);
+    ctx.font = `600 ${subSize}px Fredoka, sans-serif`;
     ctx.fillStyle = '#e8f4fc';
-    ctx.fillText(a.sub, W / 2, H * .3 + 34);
+    const subY = titleY + (phoneLandscape ? 24 : 32);
+    lines.forEach((line, i) => ctx.fillText(line, W / 2, subY + i * (subSize + 4)));
     ctx.restore();
   },
 

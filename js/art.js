@@ -698,6 +698,7 @@ const Art = {
       shadow: { main: '#9e5eff', glow: '#cfa8ff', eye: '#ff5e8f', accent: 'smoke' },
       ember: { main: '#ff8a4a', glow: '#ffd08a', eye: '#ffe66d', accent: 'flame' },
       star: { main: '#9fe7ff', glow: '#d7f7ff', eye: '#fff3a8', accent: 'star' },
+      village: { main: '#466d3f', glow: '#d9b65d', eye: '#ff665c', accent: 'leaf' },
     })[theme] || { main: '#9e5eff', glow: '#cfa8ff', eye: '#ff5e8f', accent: 'smoke' };
   },
 
@@ -1341,11 +1342,21 @@ const Art = {
       ctx.beginPath(); ctx.arc(0, -3, 15, .25, Math.PI - .25); ctx.stroke();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
       for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * 4, -16); ctx.lineTo(i * 3, 12); ctx.stroke(); }
-    } else if (shape === 'scythe') {
+    } else if (shape === 'scythe' || shape === 'sickle') {
       ctx.strokeStyle = '#f7fbff'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(-5, 17); ctx.lineTo(6, -19); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-5, 17); ctx.lineTo(shape === 'sickle' ? 3 : 6, shape === 'sickle' ? -12 : -19); ctx.stroke();
       ctx.strokeStyle = def.color; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.arc(1, -16, 17, -1.25, .65); ctx.stroke();
+      ctx.beginPath(); ctx.arc(1, shape === 'sickle' ? -10 : -16, shape === 'sickle' ? 14 : 17, -1.25, .65); ctx.stroke();
+    } else if (shape === 'sandal') {
+      ctx.rotate(-.45);
+      ctx.fillStyle = def.color;
+      ctx.beginPath(); ctx.roundRect(-9, -21, 18, 42, 8); ctx.fill();
+      ctx.strokeStyle = '#fff0c8'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, -3, 8, Math.PI * .12, Math.PI * .88); ctx.stroke();
+      ctx.fillStyle = 'rgba(80,45,22,.55)';
+      for (let y = -12; y <= 13; y += 8) for (const x of [-4, 4]) {
+        ctx.beginPath(); ctx.arc(x, y, 1.4, 0, U.TAU); ctx.fill();
+      }
     } else if (shape === 'orb') {
       ctx.globalCompositeOperation = 'lighter';
       this.glow(ctx, 0, -1, 20, def.color, .9);
@@ -1704,7 +1715,7 @@ const Art = {
     const charge = U.clamp(tr.charge || 0, 0, 1);
     const colors = {
       forestBridge: '#9be27d', oceanPhoenix: '#56d6ff', flowerLift: '#ff9fce',
-      shadowLantern: '#d9b6ff', emberRain: '#ffb36b', starMirror: '#fff3a8'
+      shadowLantern: '#d9b6ff', emberRain: '#ffb36b', starMirror: '#fff3a8', giongBridge: '#e8c65f'
     };
     const col = colors[type] || '#ff9fce';
 
@@ -1725,7 +1736,18 @@ const Art = {
     ctx.save();
     ctx.translate(155, -30);
     ctx.globalAlpha = done ? .85 : 1;
-    if (type === 'oceanPhoenix') {
+    if (type === 'giongBridge') {
+      ctx.fillStyle = done ? 'rgba(120,170,78,.44)' : 'rgba(34,28,34,.86)';
+      ctx.beginPath(); ctx.roundRect(-92, -88, 184, 124, 18); ctx.fill();
+      ctx.strokeStyle = done ? '#f4dc7b' : '#7f5d44'; ctx.lineWidth = 5;
+      for (let i = -3; i <= 3; i++) {
+        ctx.beginPath(); ctx.moveTo(i * 24, 27); ctx.lineTo(i * 24 + 8, -44 - charge * 24); ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'lighter';
+      this.glow(ctx, 0, -42, 34 + charge * 50, '#e8c65f', .35 + charge * .5);
+      ctx.globalCompositeOperation = 'source-over';
+      this.star(ctx, 0, -46 + Math.sin(t * 2) * 4, 12, '#fff3a8');
+    } else if (type === 'oceanPhoenix') {
       ctx.strokeStyle = done ? '#bdf5ff' : '#56d6ff';
       ctx.lineWidth = 5;
       for (let i = 0; i < 3; i++) {
@@ -1870,7 +1892,35 @@ const Art = {
     const type = ob.kind || 'forestBridge';
     ctx.save();
     ctx.globalAlpha = done ? .78 : 1;
-    if (type === 'oceanPhoenix') {
+    if (type === 'giongBridge') {
+      const flood = ctx.createLinearGradient(0, y - h * .38, 0, y + 30);
+      flood.addColorStop(0, done ? 'rgba(90,180,155,.36)' : 'rgba(44,38,72,.84)');
+      flood.addColorStop(1, done ? 'rgba(34,110,92,.55)' : 'rgba(16,20,50,.96)');
+      ctx.fillStyle = flood;
+      ctx.fillRect(x, y - h * .4, w, h * .45);
+      if (!done) {
+        ctx.fillStyle = 'rgba(100,38,70,.82)';
+        for (let i = 0; i < 22; i++) {
+          const bx = x + i * w / 21;
+          const bh = 170 + (i % 4) * 48 + Math.sin(t * 2 + i) * 18;
+          ctx.beginPath(); ctx.moveTo(bx - 18, y + 5); ctx.lineTo(bx - 8, y - bh); ctx.lineTo(bx + 10, y - bh - 28); ctx.lineTo(bx + 18, y + 5); ctx.fill();
+        }
+        ctx.strokeStyle = 'rgba(255,92,65,.7)'; ctx.lineWidth = 5;
+        for (let i = 0; i < 7; i++) {
+          const fx = x + 80 + i * (w - 160) / 6;
+          ctx.beginPath(); ctx.moveTo(fx, y - 2); ctx.quadraticCurveTo(fx - 45, y - 130, fx + 5, y - h * .62); ctx.stroke();
+        }
+      } else {
+        ctx.strokeStyle = '#d7b65e'; ctx.lineWidth = 12;
+        ctx.beginPath(); ctx.moveTo(x, y - 14); ctx.quadraticCurveTo(x + w * .5, y - 78, x + w, y - 14); ctx.stroke();
+        ctx.strokeStyle = '#73964f'; ctx.lineWidth = 6;
+        for (let i = 0; i <= 18; i++) {
+          const px = x + i * w / 18;
+          const py = y - 14 - Math.sin(i / 18 * Math.PI) * 64;
+          ctx.beginPath(); ctx.moveTo(px - 18, py); ctx.lineTo(px + 18, py); ctx.stroke();
+        }
+      }
+    } else if (type === 'oceanPhoenix') {
       const sea = ctx.createLinearGradient(0, y - h * .45, 0, y + 40);
       sea.addColorStop(0, 'rgba(30,150,210,.72)');
       sea.addColorStop(1, 'rgba(10,65,115,.92)');
@@ -1951,7 +2001,7 @@ const Art = {
     }
     if (done) {
       ctx.globalCompositeOperation = 'lighter';
-      const col = type === 'oceanPhoenix' ? '#56d6ff' : type === 'emberRain' ? '#7fd8ff' : '#ff9fce';
+      const col = type === 'oceanPhoenix' ? '#56d6ff' : type === 'emberRain' ? '#7fd8ff' : type === 'giongBridge' ? '#e8c65f' : '#ff9fce';
       this.glow(ctx, x + w * .5, y - h * .45, Math.min(220, w * .28), col, .45);
       ctx.globalCompositeOperation = 'source-over';
     }
@@ -2121,6 +2171,25 @@ const Art = {
         ctx.closePath(); ctx.fill();
         break;
       }
+      case 'arrow': {
+        ctx.rotate(Math.atan2(pr.vy, pr.vx));
+        ctx.globalCompositeOperation = 'lighter';
+        this.glow(ctx, 0, 0, 14, pr.color || '#8b78d6', .55);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = '#d9d2f4'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(-17, 0); ctx.lineTo(14, 0); ctx.stroke();
+        ctx.fillStyle = pr.color || '#8b78d6';
+        ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(9, -5); ctx.lineTo(11, 0); ctx.lineTo(9, 5); ctx.closePath(); ctx.fill();
+        break;
+      }
+      case 'bamboo':
+      case 'sickle':
+      case 'sandal': {
+        const weapon = pr.kind === 'bamboo' ? 'sacredBamboo' : pr.kind === 'sickle' ? 'goldenRiceSickle' : 'toOngSandal';
+        ctx.rotate(pr.kind === 'bamboo' ? Math.atan2(pr.vy, pr.vx) + Math.PI / 2 : pr.t * 9);
+        this.drawWeaponGlyph(ctx, weapon, 0, 0, pr.kind === 'sandal' ? 15 : 17, t);
+        break;
+      }
       case 'shock': {
         ctx.globalCompositeOperation = 'lighter';
         this.glow(ctx, 0, -6, 20, '#b06aff', .7);
@@ -2158,6 +2227,9 @@ const Art = {
     star: { skyT: '#071025', skyB: '#27416e', glowSky: '#cfe8ff', far: '#1e3154', farHi: '#385f86', mid: '#142442', midHi: '#2e4d74', near: '#08162a',
       soilT: '#27324a', soilB: '#101827', grassT: '#5aa8a0', grassB: '#32696a',
       shroom: ['#9fe7ff', '#7a8cff'], shroomGlow: '#d7f7ff', mist: 'rgba(180,220,255,.14)', fall: true },
+    village: { skyT: '#385a69', skyB: '#e7b860', glowSky: '#fff1b2', far: '#648774', farHi: '#8cab78', mid: '#426957', midHi: '#68885f', near: '#25483c',
+      soilT: '#8a5735', soilB: '#3c2519', grassT: '#7ca94d', grassB: '#446f35',
+      shroom: ['#7fb65a', '#d5aa4b'], shroomGlow: '#f5da7a', mist: 'rgba(255,225,165,.12)', fall: false },
   },
 
   makeBackground(theme, seed) {

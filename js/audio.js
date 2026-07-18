@@ -93,6 +93,9 @@ const SND = {
                       this.noise({ d: .5, v: .15, f: 300 }); break;
       case 'slam':    this.noise({ d: .3, v: .25, f: 250 });
                       this.tone({ f: 100, f2: 40, type: 'sawtooth', d: .3, v: .16 }); break;
+      case 'drum':    this.noise({ d: .32, v: .2, f: 260 });
+                      this.tone({ f: 120, f2: 58, type: 'sine', d: .38, v: .17 });
+                      this.tone({ f: 180, f2: 90, type: 'triangle', d: .24, v: .08, delay: .12 }); break;
       case 'bark':    this.tone({ f: 520, f2: 340, type: 'square', d: .08, v: .11 });
                       this.tone({ f: 480, f2: 300, type: 'square', d: .09, v: .11, delay: .09 }); break;
     }
@@ -106,6 +109,7 @@ const SND = {
     { roots: [110.0, 116.5, 110.0, 103.8], mood: .94 }, // shadow  darker
     { roots: [130.8, 164.8, 196.0, 146.8], mood: .98 }, // ember
     { roots: [196.0, 246.9, 164.8, 220.0], mood: 1.02 },// starlit
+    { roots: [196.0, 220.0, 293.7, 246.9], mood: 1.0 }, // bamboo village, open pentatonic color
   ],
   ARP: [1, 1.5, 2, 2.4, 3, 4, 3, 2.4],
 

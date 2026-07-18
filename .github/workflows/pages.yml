@@ -39,6 +39,8 @@ jobs:
           test -f dist/js/game.js
           test -f dist/js/vendor/peerjs.min.js
           test -f dist/assets/title_art.png
+          test -f dist/assets/bg_village.png
+          test -f dist/assets/boss_IronHordeWarlord.png
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4

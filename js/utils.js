@@ -42,7 +42,11 @@ const Weapons = {
   dreamLyre: { name: 'Dream Lyre', color: '#d9b6ff', shape: 'lyre', icon: '♪', skillIcon: '🎵', skill: 'sleep song', special: 'dreamSong', dmg: 1.02 },
   vineScythe: { name: 'Vine Scythe', color: '#9be27d', shape: 'scythe', icon: '☘', skillIcon: '🌿', skill: 'vine snare', special: 'vineSnare', dmg: 1.24 },
   auroraOrb: { name: 'Aurora Orb', color: '#8fffe7', shape: 'orb', icon: '◉', skillIcon: '🫧', skill: 'aurora shield', special: 'auroraShield', dmg: 1.05, shots: 3, spread: .22 },
-  loveLantern: { name: 'Love Lantern', color: '#ff9fce', shape: 'lantern', icon: '♡', skillIcon: '💞', skill: 'love beacon', special: 'loveBeacon', dmg: 1.0, mpSave: true }
+  loveLantern: { name: 'Love Lantern', color: '#ff9fce', shape: 'lantern', icon: '♡', skillIcon: '💞', skill: 'love beacon', special: 'loveBeacon', dmg: 1.0, mpSave: true },
+  sacredBamboo: { name: 'Sacred Bamboo Spear', nameVi: 'Thương Tre Thánh', color: '#a9dc62', shape: 'spear', icon: '🎋', skillIcon: '🎋', skill: 'bamboo phalanx', special: 'bambooPhalanx', dmg: 1.26, range: .18, speed: 1.08 },
+  buffaloShield: { name: 'Buffalo Horn Shield', nameVi: 'Khiên Sừng Trâu', color: '#7fd8a6', shape: 'shield', icon: '🐃', skillIcon: '🛡', skill: 'guardian charge', special: 'buffaloCharge', dmg: 1.08 },
+  goldenRiceSickle: { name: 'Golden Rice Sickle', nameVi: 'Liềm Lúa Vàng', color: '#f2cf58', shape: 'sickle', icon: '🌾', skillIcon: '🌾', skill: 'harvest moon', special: 'harvestArc', dmg: 1.22, speed: 1.06 },
+  toOngSandal: { name: 'Dép Tổ Ong Boomerang', nameVi: 'Dép Tổ Ong Hồi Quy', color: '#e6bb73', shape: 'sandal', icon: '🩴', skillIcon: '🌀', skill: 'returning sandal', special: 'sandalRicochet', dmg: 1.12, speed: 1.12 }
 };
 const WeaponRoles = {
   tideSpear: 'Attack / mobility',
@@ -64,7 +68,11 @@ const WeaponRoles = {
   dreamLyre: 'Love / control',
   vineScythe: 'Control / attack',
   auroraOrb: 'Defense / attack',
-  loveLantern: 'Love / support'
+  loveLantern: 'Love / support',
+  sacredBamboo: 'Attack / control',
+  buffaloShield: 'Defense / mobility',
+  goldenRiceSickle: 'Attack / support',
+  toOngSandal: 'Attack / crowd control'
 };
 for (const id in WeaponRoles) if (Weapons[id]) Weapons[id].role = WeaponRoles[id];
 const WeaponRolesVI = {
@@ -87,7 +95,11 @@ const WeaponRolesVI = {
   dreamLyre: 'Tinh yeu / khong che',
   vineScythe: 'Khong che / tan cong',
   auroraOrb: 'Phong thu / tan cong',
-  loveLantern: 'Tinh yeu / ho tro'
+  loveLantern: 'Tinh yeu / ho tro',
+  sacredBamboo: 'Tan cong / khong che',
+  buffaloShield: 'Phong thu / di chuyen',
+  goldenRiceSickle: 'Tan cong / ho tro',
+  toOngSandal: 'Tan cong / don nhieu quai'
 };
 for (const id in WeaponRolesVI) if (Weapons[id]) Weapons[id].roleVi = WeaponRolesVI[id];
 const WeaponSkillText = {
@@ -110,7 +122,11 @@ const WeaponSkillText = {
   dreamLyre: 'Love sleep song',
   vineScythe: 'Vine snare control',
   auroraOrb: 'Aurora guard burst',
-  loveLantern: 'Love beacon heal'
+  loveLantern: 'Love beacon heal',
+  sacredBamboo: 'Sacred bamboo phalanx',
+  buffaloShield: 'Guardian buffalo charge',
+  goldenRiceSickle: 'Golden harvest moon',
+  toOngSandal: 'Returning sandal ricochet'
 };
 for (const id in WeaponSkillText) if (Weapons[id]) Weapons[id].skill = WeaponSkillText[id];
 const WeaponSkillTextVI = {
@@ -133,7 +149,11 @@ const WeaponSkillTextVI = {
   dreamLyre: 'Khuc ru tinh yeu',
   vineScythe: 'Day leo troi chan',
   auroraOrb: 'Khien cuc quang bung no',
-  loveLantern: 'Den tinh yeu hoi mau'
+  loveLantern: 'Den tinh yeu hoi mau',
+  sacredBamboo: 'Trận thương tre thần',
+  buffaloShield: 'Trâu hộ mệnh xung phong',
+  goldenRiceSickle: 'Trăng gặt lúa vàng',
+  toOngSandal: 'Dép tổ ong hồi quy'
 };
 for (const id in WeaponSkillTextVI) if (Weapons[id]) Weapons[id].skillVi = WeaponSkillTextVI[id];
 const WeaponDesc = {
@@ -156,7 +176,11 @@ const WeaponDesc = {
   dreamLyre: 'Adds love, damages weak enemies, and delays enemy attacks.',
   vineScythe: 'Roots a wide area, damages enemies, and slows their attacks.',
   auroraOrb: 'Gives a shield and fires orbiting bolts around the player.',
-  loveLantern: 'Heals both players, adds love, and creates a safe beacon.'
+  loveLantern: 'Heals both players, adds love, and creates a safe beacon.',
+  sacredBamboo: 'Fires a disciplined line of bamboo spears that pierces and delays enemy attacks.',
+  buffaloShield: 'Guards both players, then charges forward with two protective ground waves.',
+  goldenRiceSickle: 'Throws returning harvest arcs that damage enemies and restore a little HP to nearby partners.',
+  toOngSandal: 'Throws playful returning sandals in both directions, excellent for enemies surrounding the couple.'
 };
 const WeaponDescVI = {
   tideSpear: 'Luot toi an toan va dam xuyen mot hang quai.',
@@ -178,7 +202,11 @@ const WeaponDescVI = {
   dreamLyre: 'Tang tinh yeu, gay sat thuong nhe, va lam cham don tan cong cua quai.',
   vineScythe: 'Troi chan vung rong, gay sat thuong va lam cham quai.',
   auroraOrb: 'Tao khien va ban tia sang quay quanh nguoi choi.',
-  loveLantern: 'Hoi mau ca hai, tang tinh yeu, va tao diem an toan.'
+  loveLantern: 'Hoi mau ca hai, tang tinh yeu, va tao diem an toan.',
+  sacredBamboo: 'Phóng một hàng thương tre xuyên qua và làm chậm đòn đánh của quái.',
+  buffaloShield: 'Bảo vệ cả hai người rồi xung phong cùng hai làn sóng hộ vệ.',
+  goldenRiceSickle: 'Ném liềm gặt hồi quy, gây sát thương và hồi một ít HP cho người yêu ở gần.',
+  toOngSandal: 'Ném dép tổ ong quay về theo hai hướng, rất hữu ích khi cả hai bị bao vây.'
 };
 for (const id in WeaponDesc) if (Weapons[id]) Weapons[id].desc = WeaponDesc[id];
 for (const id in WeaponDescVI) if (Weapons[id]) Weapons[id].descVi = WeaponDescVI[id];
@@ -186,7 +214,8 @@ const WeaponCooldowns = {
   tideSpear: 5.2, roseScepter: 6.4, starBlade: 6.2, heartStaff: 7.2, moonBow: 5.6,
   emberAxe: 6.2, thunderHammer: 6.8, crystalDagger: 5.1, shadowKatana: 5.4, sunShield: 7.2,
   lotusFan: 6.0, riverBow: 6.1, cometSword: 5.8, pandaBell: 7.5, luluClaw: 6.4,
-  phoenixWand: 7.0, dreamLyre: 6.8, vineScythe: 6.2, auroraOrb: 6.5, loveLantern: 7.0
+  phoenixWand: 7.0, dreamLyre: 6.8, vineScythe: 6.2, auroraOrb: 6.5, loveLantern: 7.0,
+  sacredBamboo: 5.8, buffaloShield: 7.0, goldenRiceSickle: 6.2, toOngSandal: 5.4
 };
 for (const id in WeaponCooldowns) if (Weapons[id]) Weapons[id].cd = WeaponCooldowns[id];
 Weapons.IDS = Object.keys(Weapons);

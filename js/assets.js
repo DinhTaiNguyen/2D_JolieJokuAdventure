@@ -11,13 +11,14 @@ const ASSETS = {
   /* manifest: cols/rows for sheets; trim = alpha-trim frames; black = FX on black */
   MAN: {
     // backgrounds (one painterly layer per theme)
-    bg_forest: {}, bg_falls: {}, bg_blossom: {}, bg_shadow: {}, bg_ember: {}, bg_star: {},
+    bg_forest: {}, bg_falls: {}, bg_blossom: {}, bg_shadow: {}, bg_ember: {}, bg_star: {}, bg_village: {},
     // terrain
     tile_forest: { trim: 1 }, tile_falls: { trim: 1 }, tile_blossom: { trim: 1 },
-    tile_shadow: { trim: 1 }, tile_ember: { trim: 1 }, tile_star: { trim: 1 },
+    tile_shadow: { trim: 1 }, tile_ember: { trim: 1 }, tile_star: { trim: 1 }, tile_village: { trim: 1 },
     float_falls: { trim: 1 }, float_blossom: { trim: 1 }, float_shadow: { trim: 1 },
-    float_ember: { trim: 1 }, float_star: { trim: 1 },
+    float_ember: { trim: 1 }, float_star: { trim: 1 }, float_village: { trim: 1 },
     prop_mushroom: { trim: 1 }, prop_gate: { trim: 1 }, prop_shrine: { trim: 1 },
+    props_village: { cols: 4, rows: 2, trim: 1 },
     // heroes & supporters — legacy 8-pose sheets (fallback)
     joku_sheet: { cols: 4, rows: 2, trim: 1, lockScale: 1, bleed: .06,  stableX: 1, groundPad: 2 },
     jolie_sheet: { cols: 4, rows: 2, trim: 1, lockScale: 1, bleed: .05,  stableX: 1, groundPad: 2 },
@@ -39,14 +40,17 @@ const ASSETS = {
     enemies_elite_sheet: { cols: 4, rows: 1, trim: 1 },
     enemy_golem: { trim: 1 }, enemy_golem_elite: { trim: 1 },
     enemy_bat: { trim: 1 }, enemy_bat_elite: { trim: 1 },
+    enemies_village: { cols: 4, rows: 1, trim: 1 },
+    miniboss_village: { cols: 2, rows: 1, trim: 1 },
     // bosses
     boss_RootboundGloom: { trim: 1 }, boss_StormwaterLeviathan: { trim: 1 },
     boss_BriarheartQueen: { trim: 1 }, boss_NightmareGloomheart: { trim: 1 },
-    boss_CinderCrown: { trim: 1 }, boss_EclipseHeart: { trim: 1 },
+    boss_CinderCrown: { trim: 1 }, boss_EclipseHeart: { trim: 1 }, boss_IronHordeWarlord: { trim: 1 },
     // items & weapons
     items_sheet: { cols: 4, rows: 1, trim: 1 },
     weapons_1: { cols: 5, rows: 2, trim: 1 },
     weapons_2: { cols: 5, rows: 2, trim: 1 },
+    weapons_village: { cols: 4, rows: 1, trim: 1 },
     // FX (on black — drawn additive)
     fx_projectiles: { cols: 4, rows: 2, black: 1 },
     fx_rings: { cols: 4, rows: 2, black: 1 },
@@ -57,10 +61,11 @@ const ASSETS = {
     fx_thunderslam: { cols: 4, rows: 2, black: 1 },
     // love trials
     trial_pads: { trim: 1 }, trial_forest: { trim: 1 }, trial_falls: { trim: 1 },
-    trial_blossom: { trim: 1 }, trial_shadow: { trim: 1 }, trial_ember: { trim: 1 }, trial_star: { trim: 1 },
+    trial_blossom: { trim: 1 }, trial_shadow: { trim: 1 }, trial_ember: { trim: 1 }, trial_star: { trim: 1 }, trial_village: { trim: 1 },
     // portraits, story CGs, ui
     portrait_joku: {}, portrait_jolie: {}, portrait_lulu: {}, portrait_biscuit: {},
     chapter_badges: { cols: 3, rows: 2, trim: 1 },
+    badge_village: { trim: 1 },
     // decorative HUD icons and frames supplied as a single atlas
     ui_kit: { maxW: 1152 },
     title_art: {},
@@ -69,11 +74,12 @@ const ASSETS = {
 
   TRIAL_MAP: {
     forestBridge: 'trial_forest', oceanPhoenix: 'trial_falls', flowerLift: 'trial_blossom',
-    shadowLantern: 'trial_shadow', emberRain: 'trial_ember', starMirror: 'trial_star'
+    shadowLantern: 'trial_shadow', emberRain: 'trial_ember', starMirror: 'trial_star', giongBridge: 'trial_village'
   },
   BOSS_MAP: {
     root: 'boss_RootboundGloom', tide: 'boss_StormwaterLeviathan', briar: 'boss_BriarheartQueen',
-    gloom: 'boss_NightmareGloomheart', ember: 'boss_CinderCrown', eclipse: 'boss_EclipseHeart'
+    gloom: 'boss_NightmareGloomheart', ember: 'boss_CinderCrown', eclipse: 'boss_EclipseHeart',
+    horde: 'boss_IronHordeWarlord'
   },
 
   /* The menu needs only a handful of files.  Everything else is loaded when a
@@ -157,6 +163,9 @@ const ASSETS = {
       this.BOSS_MAP[cfg.bossKind]
     ];
     if (cfg.theme !== 'forest') themed.push('float_' + cfg.theme);
+    if (cfg.theme === 'village') {
+      themed.push('props_village', 'enemies_village', 'miniboss_village', 'weapons_village', 'badge_village');
+    }
     this.request(this.PLAY_ASSETS, urgent);
     this.request(themed, urgent);
     const lateArt = () => this.request(this.DEFERRED_ASSETS, false);
@@ -425,7 +434,7 @@ const ASSETS = {
     if (special === 'heartHeal' || special === 'loveBeacon' || special === 'dreamSong' || special === 'pandaGift') return 6;
     if (special === 'sunGuard' || special === 'auroraShield' || special === 'riverWall') return 4;
     if (shape === 'axe' || shape === 'hammer') return 1;
-    if (shape === 'sword' || shape === 'katana' || shape === 'dagger' || shape === 'claw') return 0;
+    if (shape === 'sword' || shape === 'katana' || shape === 'dagger' || shape === 'claw' || shape === 'sickle' || shape === 'sandal') return 0;
     if (shape === 'spear' || shape === 'staff' || shape === 'scythe') return 2;
     if (shape === 'bow') return 3;
     if (shape === 'shield') return 4;
@@ -458,6 +467,8 @@ const ASSETS = {
     if (shape === 'shield') return { x: 15, y: -28, rot: -.02, size: 18 };
     if (shape === 'axe' || shape === 'hammer') return { x: 16, y: -31, rot: -.65, size: 19 };
     if (shape === 'spear' || shape === 'staff' || shape === 'scythe') return { x: 18, y: -30, rot: -.38, size: 18 };
+    if (shape === 'sickle') return { x: 18, y: -31, rot: -.68, size: 17 };
+    if (shape === 'sandal') return { x: 20, y: -32, rot: -.5, size: 15 };
     return base;
   },
 
@@ -616,6 +627,48 @@ const ASSETS = {
 
   /* ---------------- devils ---------------- */
   drawEnemy(ctx, e, t) {
+    if (e.variant === 'village' && e.bossTier && this.has('miniboss_village')) {
+      const idx = Math.min(1, e.bossRank || 0);
+      const h = idx ? 142 : 136;
+      if (Art.glow) {
+        ctx.globalCompositeOperation = 'lighter';
+        Art.glow(ctx, e.x, e.y - h * .48, 62, idx ? '#6f7194' : '#9d3658', .3 + Math.sin(t * 3) * .06);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      this.draw(ctx, 'miniboss_village', idx, e.x, e.y, {
+        h, flip: e.dir > 0, filter: e.flash > 0 ? 'brightness(2.1)' : 'none'
+      });
+      if (e.hurtShow > 0 && e.hp > 0) {
+        ctx.fillStyle = 'rgba(0,0,0,.58)';
+        ctx.fillRect(e.x - 28, e.y - h - 11, 56, 5);
+        ctx.fillStyle = '#ffb44a';
+        ctx.fillRect(e.x - 28, e.y - h - 11, 56 * Math.max(0, e.hp / e.maxHp), 5);
+      }
+      return true;
+    }
+    if (e.variant === 'village' && this.has('enemies_village')) {
+      const map = { slime: 0, thorn: 1, golem: 1, wisp: 2, imp: 3, bat: 3 };
+      const idx = map[e.type] != null ? map[e.type] : 0;
+      const fly = e.type === 'wisp' || e.type === 'imp' || e.type === 'bat';
+      const h = ({ slime: 48, thorn: 54, golem: 70, wisp: 50, imp: 55, bat: 55 })[e.type] || 48;
+      const yy = fly ? e.y - 12 : e.y;
+      if (fly && Art.glow) {
+        ctx.globalCompositeOperation = 'lighter';
+        Art.glow(ctx, e.x, yy, h * .58, idx === 2 ? '#a8324e' : '#6151a2', .28);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      this.draw(ctx, 'enemies_village', idx, e.x, yy, {
+        h, flip: e.dir > 0, anchor: fly ? 'center' : 'bottom',
+        rot: fly ? Math.sin(e.t * 8) * .045 : 0,
+        filter: e.flash > 0 ? 'brightness(2.1)' : 'none'
+      });
+      if (e.hurtShow > 0 && e.hp > 0) {
+        const hy = (fly ? yy - h / 2 : e.y - h) - 9;
+        ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(e.x - 16, hy, 32, 4);
+        ctx.fillStyle = '#ff5e7a'; ctx.fillRect(e.x - 16, hy, 32 * Math.max(0, e.hp / e.maxHp), 4);
+      }
+      return true;
+    }
     const elite = !!e.bossTier;
     let name = null, idx = 0, h = 40, fly = false;
     switch (e.type) {
@@ -680,7 +733,7 @@ const ASSETS = {
     if (e.flash > 0) filter = 'brightness(2)';
     else if (dying > 0) filter = 'hue-rotate(300deg) saturate(1.1) brightness(1.35)';
     this.draw(ctx, name, 0, e.x, e.y - 8, {
-      h: 235 * pulse, anchor: 'center', flip: e.dir > 0, filter,
+      h: (e.bossKind === 'horde' ? 260 : 235) * pulse, anchor: 'center', flip: e.dir > 0, filter,
       alpha: dying > 0 ? Math.max(.35, 1 - dying * .18) : 1
     });
     if (dying > 0 && Art.heart) {
@@ -707,6 +760,12 @@ const ASSETS = {
   },
 
   drawWeaponGlyph(ctx, weapon, x, y, size, t) {
+    const villageWeapons = ['sacredBamboo', 'buffaloShield', 'goldenRiceSickle', 'toOngSandal'];
+    const vi = villageWeapons.indexOf(weapon);
+    if (vi >= 0 && this.has('weapons_village')) {
+      this.draw(ctx, 'weapons_village', vi, x, y, { h: size * 2.45, anchor: 'center' });
+      return true;
+    }
     if (!this.has('weapons_1')) return false;
     const order = (this._worder || (this._worder = Object.keys(Weapons)));
     const i = order.indexOf(weapon);
@@ -731,7 +790,8 @@ const ASSETS = {
       blossom: 13,
       shadow: 20,
       ember: 50,
-      star: 20
+      star: 20,
+      village: 42
     };
     const topY = pl.y - (GROUND_SURFACE[th] || 13);// grass tufts poke above the walk line
 
@@ -776,12 +836,33 @@ const ASSETS = {
     const w = pl.w + 30;
     const d = this.data[name], f = d.frames[0];
     const dh = w * (f.sh / f.sw);
-    this.draw(ctx, name, 0, pl.x + pl.w / 2 + sway * .3, pl.y - dh * .055, { w, anchor: 'top' });
+    const surfaceOffset = th === 'village' ? dh * .31 : dh * .055;
+    this.draw(ctx, name, 0, pl.x + pl.w / 2 + sway * .3, pl.y - surfaceOffset, { w, anchor: 'top' });
     if (Art.glow) {
       ctx.globalCompositeOperation = 'lighter';
       Art.glow(ctx, pl.x + pl.w / 2, pl.y + 16, pl.w * .4, pl.glowC || '#8fdcff', .18 + Math.sin(t * 1.8 + pl.x) * .06);
       ctx.globalCompositeOperation = 'source-over';
     }
+    return true;
+  },
+
+  drawVillageProp(ctx, prop, t) {
+    if (!this.has('props_village') || !prop) return false;
+    const idx = U.clamp(prop.kind | 0, 0, 7);
+    const breathe = idx === 1 ? 1 + Math.sin(t * 1.35 + prop.x * .01) * .008 : 1;
+    const sway = idx === 3 ? Math.sin(t * 1.15 + prop.x * .004) * .009 : 0;
+    if (prop.glow && Art.glow) {
+      const colors = ['#9be27d', '#fff3a8', '#ffe28f', '#ffb6d9', '#ffd36e', '#fff0c8', '#ff8a4a', '#ffd08a'];
+      ctx.globalCompositeOperation = 'lighter';
+      Art.glow(ctx, prop.x, prop.y - (prop.h || 80) * .48, (prop.h || 80) * .62, colors[idx], .16 + Math.sin(t * 2 + idx) * .04);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    this.draw(ctx, 'props_village', idx, prop.x, prop.y + 1, {
+      h: (prop.h || 80) * breathe,
+      flip: !!prop.flip,
+      rot: sway,
+      alpha: prop.alpha == null ? 1 : prop.alpha
+    });
     return true;
   },
 
@@ -839,10 +920,10 @@ const ASSETS = {
 
   drawCoopScene(ctx, tr, t) { // ctx is pre-translated to the trial origin
     const sceneName = this.TRIAL_MAP[tr.kind || 'forestBridge'];
-    if (!this.has('trial_pads') || !this.has(sceneName)) return false;
+    if (!this.has(sceneName)) return false;
     const charge = U.clamp(tr.charge || 0, 0, 1);
-    // pads
-    this.draw(ctx, 'trial_pads', 0, 0, 13, { w: 205, alpha: tr.done ? .8 : 1 });
+    // The lightweight procedural marks remain valid when the optional pad atlas is not loaded.
+    if (this.has('trial_pads')) this.draw(ctx, 'trial_pads', 0, 0, 13, { w: 205, alpha: tr.done ? .8 : 1 });
     if (Art.glow) {
       ctx.globalCompositeOperation = 'lighter';
       for (const s of [-1, 1]) {
@@ -887,6 +968,15 @@ const ASSETS = {
         return this.draw(ctx, 'fx_enemy', 0, pr.x, pr.y, { h: 32 + Math.sin(t * 12) * 3, anchor: 'center', add: 1, rot: pr.t * 3 });
       case 'shock':
         return this.draw(ctx, 'fx_enemy', 1, pr.x, pr.y + 2, { h: 48, add: 1, flip: pr.vx < 0, alpha: .95 });
+      case 'bamboo':
+        if (!this.has('weapons_village')) return false;
+        return this.draw(ctx, 'weapons_village', 0, pr.x, pr.y, { h: 46, anchor: 'center', rot: Math.atan2(pr.vy, pr.vx) + Math.PI / 4 });
+      case 'sickle':
+        if (!this.has('weapons_village')) return false;
+        return this.draw(ctx, 'weapons_village', 2, pr.x, pr.y, { h: 42, anchor: 'center', rot: pr.t * 8 });
+      case 'sandal':
+        if (!this.has('weapons_village')) return false;
+        return this.draw(ctx, 'weapons_village', 3, pr.x, pr.y, { h: 40, anchor: 'center', rot: pr.t * 10 });
     }
     return false;
   },
@@ -999,12 +1089,15 @@ const ASSETS = {
   },
 
   _badge(ctx, W, H) {
-    if (typeof G === 'undefined' || !G.announce || !this.has('chapter_badges')) return;
+    if (typeof G === 'undefined' || !G.announce) return;
+    const village = (G.level && G.level.theme === 'village') || G.levelIndex === 6;
+    if (village ? !this.has('badge_village') : !this.has('chapter_badges')) return;
     const a = G.announce;
     const k = Math.min(1, a.t > 2.6 ? (3.2 - a.t) / .6 : (a.t < .6 ? a.t / .6 : 1));
     ctx.save();
     ctx.globalAlpha = U.clamp(k, 0, 1);
-    this.draw(ctx, 'chapter_badges', Math.min(5, G.levelIndex || 0), W / 2, H * .3 - 46, { h: 72, anchor: 'center' });
+    if (village) this.draw(ctx, 'badge_village', 0, W / 2, H * .3 - 46, { h: 78, anchor: 'center' });
+    else this.draw(ctx, 'chapter_badges', Math.min(5, G.levelIndex || 0), W / 2, H * .3 - 46, { h: 72, anchor: 'center' });
     ctx.restore();
   },
 
@@ -1048,7 +1141,7 @@ const ASSETS = {
       if (Game.weaponSpecial) {
         wrap(Game, 'weaponSpecial', (orig, p, w) => {
           orig(p, w);
-          const def = (typeof Weapons !== 'undefined') && Weapons[w];
+          const def = w && typeof w === 'object' ? w : ((typeof Weapons !== 'undefined') && Weapons[w]);
           if (def && p) {
             if (def.special === 'thunderSlam') S.playFB('fx_thunderslam', p.x + p.dir * 46, p.y + 2, 300, .6);
             if (def.special === 'phoenixNova') S.playFB('fx_phoenixnova', p.x, p.y - 40, 330, .7);

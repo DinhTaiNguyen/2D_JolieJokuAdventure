@@ -50,7 +50,8 @@ const Story = {
     { title: 'Petal Moonbridge', sub: 'Follow the floating blossoms to a garden made for two.' },
     { title: 'Lantern Mirror Grotto', sub: 'Light the quiet cave path and find each other at the door.' },
     { title: 'Rainfire Skywalk', sub: 'Cross the cooled embers beneath a sky of warm rain.' },
-    { title: 'Starlight Promise Terrace', sub: 'Reach the last door together beneath the constellation.' }
+    { title: 'Starlight Promise Terrace', sub: 'Reach the next door together beneath the constellation.' },
+    { title: 'Golden Harvest Date', sub: 'Cross the bamboo skywalk, rest by the hammock, and meet at the village door.' }
   ],
   DATE_JOURNEYS_VI: [
     { title: 'Duong den long den', sub: 'Cung chay duoi tan la den cua trai tim.' },
@@ -58,7 +59,8 @@ const Story = {
     { title: 'Cau hoa duoi trang', sub: 'Theo canh hoa bay den khu vuon danh cho hai nguoi.' },
     { title: 'Hang guong den long', sub: 'Cung thap den va tim den cua trai tim.' },
     { title: 'Cau troi mua lua', sub: 'Vuot than hong duoi con mua am ap.' },
-    { title: 'San hen duoi anh sao', sub: 'Cung den cua cuoi cung duoi chom sao.' }
+    { title: 'San hen duoi anh sao', sub: 'Cung den canh cua tiep theo duoi chom sao.' },
+    { title: 'Hen nhau mua gat vang', sub: 'Qua cau tre, nghi ben vong, roi cung den cong lang.' }
   ],
 
   TRIALS: [
@@ -86,6 +88,10 @@ const Story = {
       { title: 'Lời thề dưới trời sao', hint: 'Hai người cùng nắm tay để những vì sao ghi nhớ lời hứa.', done: 'Các vì sao mở lối cho chương cuối!' },
       { title: 'Chòm sao của bốn người bạn', hint: 'Joku, Jolie, Lulu và Biscuit cần cùng một nhịp yêu thương.', done: 'Chòm sao tình yêu đã sáng trọn vẹn!' }
     ],
+    [
+      { title: 'Lời thề của tre thần', hint: 'Mỗi người giữ một dấu trống, nắm tay qua biển lũ, rồi ôm và hôn để đánh thức người bảo hộ.', done: 'Thánh Gióng đã đáp lời, tre thần kết thành cầu!' },
+      { title: 'Lời hứa mùa gặt', hint: 'Đứng bên lúa vàng và cùng giữ nhịp trái tim.', done: 'Mùa gặt vàng đã chúc phúc hành trình!' }
+    ],
   ],
   COOP_TRIALS: [
     { title: 'Nàng tiên hoa và cây cầu rừng', hint: 'Mỗi người đứng trên một dấu sáng, nắm tay bằng trái tim để nàng tiên mọc cầu dây leo.', done: 'Cây cầu hoa đã mở. Hai bạn đã qua được khe rừng!' },
@@ -94,6 +100,7 @@ const Story = {
     { title: 'Đèn đôi trong hang tối', hint: 'Hai người thắp hai ngọn đèn cùng lúc bằng trái tim, đừng để bóng tối tách ra.', done: 'Hai ngọn đèn đã nhập một, hang tối nhường đường!' },
     { title: 'Mưa tình yêu dập lửa', hint: 'Joku giữ dấu nước, Jolie giữ dấu hoa, cùng nắm tay để gọi cơn mưa dịu lửa.', done: 'Ngọn lửa đã tắt, tro nóng biến thành đường an toàn!' },
     { title: 'Gương sao của bốn trái tim', hint: 'Đứng trên hai gương sao và giữ trái tim để Lulu, Biscuit nối chòm sao còn thiếu.', done: 'Chòm sao đã thẳng hàng, con đường cuối cùng sáng lên!' },
+    { title: 'Thánh Gióng và biển lũ', hint: 'Mỗi người giữ một dấu trống làng, phối hợp nước và hoa, rồi nắm tay, ôm và hôn để dựng cầu tre thần.', done: 'Ngựa sắt đã qua trời, tre thần mở đường cho hai trái tim!' },
   ],
 
   trialInfo(levelIdx, id) {
@@ -182,19 +189,35 @@ const Story = {
       ['joku', 'Anh hiểu. Sức mạnh để bảo vệ, dịu dàng để chữa lành.'],
     ],
     lvl5: [
-      ['joku', 'Rừng Sao là con đường cuối. Mọi ánh sao như đang nhìn chúng ta.'],
-      ['jolie', 'Vậy hãy để chúng thấy bốn người bạn kết thúc chuyện này bằng tình yêu.'],
+      ['joku', 'Rừng Sao đang chỉ một con đường vàng về phía quê tre. Mọi ánh sao như đang nhìn chúng ta.'],
+      ['jolie', 'Vậy hãy để chúng thấy bốn người bạn mở con đường ấy bằng tình yêu.'],
       ['dog', 'Lulu và Biscuit cũng là sao hôm nay!'],
     ],
     shrine5: [
-      ['jolie', 'Miếu cuối cùng. Em nghe thấy rất nhiều lời ước trong ánh sao.'],
+      ['jolie', 'Miếu sao này đang giữ một lời ước dẫn về quê hương. Em nghe thấy tiếng tre trong gió.'],
       ['joku', 'Anh chỉ ước một điều: sau trận này, chúng ta vẫn cùng nhau cười.'],
       ['panda', 'Biscuit ước thêm đồ ăn mừng chiến thắng. Nhưng cũng ước hai bạn hạnh phúc.'],
     ],
     gate5: [
-      ['joku', 'Cổng cuối. Sau nó là trái tim mạnh nhất của bóng tối.'],
+      ['joku', 'Cổng sao này không phải kết thúc. Sau nó là con đường trở về Làng Tre.'],
       ['jolie', 'Không sao. Trái tim của chúng ta còn mạnh hơn.'],
       ['dog', 'Lulu đi trước một bước... à không, đi cùng mọi người!'],
+    ],
+    lvl6: [
+      ['jolie', 'Làng Tre đẹp như một ký ức: lúa chín, trâu nằm bên ruộng, võng tre đợi dưới mái làng. Nhưng bầu trời đang mang tiếng vó ngựa của chiến tranh xưa.'],
+      ['joku', 'Gloomheart đã biến ký ức những cuộc xâm lược thành bóng ma. Ta bảo vệ quê hương, nhưng không mang thù hận vào hiện tại.'],
+      ['dog', 'Lulu sẽ canh ruộng lúa và cây tre! Không bóng ma nào được giẫm lên mùa gặt!'],
+      ['panda', 'Biscuit sẽ bảo vệ trống làng. Và kiểm tra chuối hột, rượu Bàu Đá... chỉ để nghiên cứu văn hóa thôi!'],
+    ],
+    shrine6: [
+      ['joku', 'Miếu quê hương nhớ sức mạnh của cây tre: mềm trong gió, nhưng đứng cùng nhau thì không dễ gãy.'],
+      ['jolie', 'Giống chúng ta. Anh dập lửa, em kết tre; không ai tự vượt trận lũ này được.'],
+      ['panda', 'Qua thử thách rồi mình nghỉ ở võng nhé. Biscuit nhận phần canh đồ ăn.'],
+    ],
+    gate6: [
+      ['jolie', 'Sau cổng là bóng ma thiết kỵ của cuộc xâm lược thế kỷ mười ba. Nó có mưa tên, ngựa sắt và khiên tà thuật.'],
+      ['joku', 'Ta né cùng nhịp, phá khiên cùng lúc, rồi dùng sức mạnh Thánh Gióng đẩy nó ra khỏi ký ức của ngôi làng.'],
+      ['dog', 'Cả bốn cùng vào. Không ai bị bỏ lại phía sau!'],
     ],
     bossGate: [
       ['joku', 'Một cổng boss. Hít thở nào, Jolie. Chúng ta chuẩn bị rồi mới bước vào.'],
@@ -227,9 +250,15 @@ const Story = {
       ['dog', 'Lulu không thích lửa, nhưng Lulu thích bảo vệ gia đình hơn!'],
     ],
     bossIntro5: [
-      ['joku', 'Trái tim nhật thực đã dựng khiên sao quanh nó. Đây là trận cuối, Jolie.'],
+      ['joku', 'Trái tim nhật thực đã dựng khiên sao quanh nó. Phía sau nó còn một cánh cửa vàng, Jolie.'],
       ['jolie', 'Vậy để các vì sao nhìn thấy tình yêu của chúng ta không né tránh bóng tối.'],
       ['panda', 'Biscuit và Lulu cũng là một phần lời thề này. Đi cùng nhau nào!'],
+    ],
+    bossIntro6: [
+      ['joku', 'Hắc Thiết Tướng Quân Mông chỉ là bóng ma của đoàn quân xâm lược xưa, nhưng mưa tên và vó ngựa của nó là thật trong giấc mộng này.'],
+      ['jolie', 'Khi nó dựng khiên, mình ở gần nhau và chờ thời điểm. Khi tên rơi, mình đổi phía cùng nhịp.'],
+      ['dog', 'Lulu nghe trống làng rồi. Thánh Gióng đang ở bên chúng ta!'],
+      ['panda', 'Biscuit giữ tình yêu, hai bạn giữ đội hình. Đưa mùa lúa trở về nào!'],
     ],
     bossIntro: [
       ['joku', () => 'Nó kia rồi! ' + ((G.level && G.level.boss && G.level.boss.bossName) || 'Boss cuối') + ' đang giữ tình yêu của chương này!'],
@@ -347,6 +376,10 @@ Story.TRIALS_EN = [
     { title: 'Vow Under the Stars', hint: 'Hold hands together so the stars can remember your promise.', done: 'The stars opened the final chapter path!' },
     { title: 'Constellation of Four Friends', hint: 'Joku, Jolie, Lulu, and Biscuit need the same loving rhythm.', done: 'The love constellation shone completely!' }
   ],
+  [
+    { title: 'Oath of Sacred Bamboo', hint: 'Take one drum mark each, hold hands across the flood, then hug and kiss to awaken the guardian.', done: 'Thánh Gióng answered, and sacred bamboo became a bridge!' },
+    { title: 'Harvest Promise', hint: 'Stand beside the rice sheaves and keep the heart rhythm together.', done: 'The golden harvest blessed your journey!' }
+  ],
 ];
 
 Story.COOP_TRIALS_EN = [
@@ -356,6 +389,7 @@ Story.COOP_TRIALS_EN = [
   { title: 'Twin Lanterns in the Sealed Cave', hint: 'The cave wall blocks all paths. Light both lanterns together with the heart button before the darkness separates you.', done: 'The twin lanterns joined, and the cave gave way!' },
   { title: 'Love Rain and the Fire Wall', hint: 'The fire is too tall to pass. Joku holds the water mark, Jolie holds the flower mark, and both hold the heart to call cooling rain.', done: 'The fire went out, and warm ash became a safe road!' },
   { title: 'Star Mirror and the Endless Void', hint: 'The star void cannot be crossed normally. Stand on the two mirrors and hold the heart so Lulu and Biscuit complete the constellation.', done: 'The stars lined up, and the final path lit ahead!' },
+  { title: "Thánh Gióng's Sacred Bridge", hint: 'Take one drum mark each. Joku cools the fire, Jolie binds the bamboo; then hold hands, hug, and kiss to awaken Thánh Gióng.', done: 'The guardian rode across the sky. Sacred bamboo formed a bridge for both hearts!' },
 ];
 
 Story.COOP_TRIALS_VI = [
@@ -365,6 +399,7 @@ Story.COOP_TRIALS_VI = [
   { title: 'Hai ngon den trong hang bi niem phong', hint: 'Buc tuong hang chan tat ca loi di. Thap hai den cung luc bang trai tim truoc khi bong toi tach hai ban ra.', done: 'Hai ngon den hoa mot, hang toi nhường duong!' },
   { title: 'Mua tinh yeu dap buc tuong lua', hint: 'Lua qua cao, khong the vuot qua. Joku giu dau nuoc, Jolie giu dau hoa, ca hai giu trai tim de goi mua mat.', done: 'Lua da tat, tro am bien thanh con duong an toan!' },
   { title: 'Guong sao va khoang khong vo tan', hint: 'Khoang khong sao khong the vuot binh thuong. Dung tren hai guong sao va giu trai tim de Lulu, Biscuit noi chom sao.', done: 'Cac vi sao thang hang, con duong cuoi cung sang len!' },
+  { title: 'Cầu tre thần của Thánh Gióng', hint: 'Mỗi người giữ một dấu trống: Joku dập lửa, Jolie kết tre; rồi nắm tay, ôm và hôn để đánh thức Thánh Gióng.', done: 'Thánh Gióng cưỡi ngựa sắt qua trời. Tre thần kết thành cây cầu cho hai trái tim!' },
 ];
 
 Story.DLG_EN = {
@@ -444,19 +479,35 @@ Story.DLG_EN = {
     ['joku', 'I understand. Strength to protect, gentleness to heal.']
   ],
   lvl5: [
-    ['joku', 'The Star Forest is the final road. Every star seems to be watching us.'],
-    ['jolie', 'Then let them see four friends finish this with love.'],
+    ['joku', 'The Star Forest is pointing toward a golden road home. Every star seems to be watching us.'],
+    ['jolie', 'Then let them see four friends open that road with love.'],
     ['dog', 'Lulu and Biscuit are stars today too!']
   ],
   shrine5: [
-    ['jolie', 'The last shrine. I can hear many wishes inside the starlight.'],
+    ['jolie', 'This star shrine holds a wish that leads home. I can hear bamboo moving in its light.'],
     ['joku', 'I only wish for one thing: after this battle, we are still laughing together.'],
     ['panda', 'Biscuit wishes for victory food. Also your happiness, of course.']
   ],
   gate5: [
-    ['joku', 'The final gate. Behind it is the strongest heart of darkness.'],
+    ['joku', 'This star gate is not the end. Behind it is the road to the Bamboo Homeland.'],
     ['jolie', 'That is fine. Our hearts are stronger.'],
     ['dog', 'Lulu will go first... wait, no, together!']
+  ],
+  lvl6: [
+    ['jolie', 'The Bamboo Homeland feels like a treasured memory: ripe rice, a buffalo by the field, and a hammock beneath the village roof. But the sky carries hoofbeats from an old war.'],
+    ['joku', 'Gloomheart turned memories of invasion into spirits. We protect this homeland without carrying old hatred into the present.'],
+    ['dog', 'Lulu will guard the rice and bamboo! No shadow steps on this harvest!'],
+    ['panda', 'Biscuit will guard the village drum, and inspect the Bàu Đá and banana-seed rice wine strictly for cultural research.']
+  ],
+  shrine6: [
+    ['joku', 'The homeland shrine remembers bamboo: it bends in the wind, but a whole grove is hard to break.'],
+    ['jolie', 'Like us. You cool the fire, I bind the bamboo, and neither of us can cross this flood alone.'],
+    ['panda', 'After the trial, we rest by the hammock. Biscuit volunteers to guard the picnic.']
+  ],
+  gate6: [
+    ['jolie', 'Beyond this gate is a supernatural memory of the thirteenth-century Mongol invasion. It attacks with arrow rain, iron cavalry, and a cursed shield.'],
+    ['joku', 'We dodge in one rhythm, break its guard together, and let Thánh Gióng carry courage into the final fight.'],
+    ['dog', 'All four go in. Nobody gets left behind!']
   ],
   bossGate: [
     ['joku', 'A boss gate. Breathe with me, Jolie. We enter when we are ready.'],
@@ -489,9 +540,15 @@ Story.DLG_EN = {
     ['dog', 'Lulu dislikes fire, but Lulu loves protecting family more!']
   ],
   bossIntro5: [
-    ['joku', 'The eclipse heart has raised star shields around itself. This is the final fight, Jolie.'],
+    ['joku', 'The eclipse heart has raised star shields around itself. A golden door still waits beyond it, Jolie.'],
     ['jolie', 'Then let the stars see that our love does not run from darkness.'],
     ['panda', 'Biscuit and Lulu are part of this promise too. Together!']
+  ],
+  bossIntro6: [
+    ['joku', 'The Mongol Iron Warlord is a spirit of an invading army from long ago, but its arrow rain and iron horse are real inside this dream.'],
+    ['jolie', 'When it raises the shield, stay close and wait. When the arrows fall, we change sides in the same rhythm.'],
+    ['dog', 'Lulu hears the village drum. Thánh Gióng is riding with us!'],
+    ['panda', 'Biscuit holds the love; you two hold the formation. Bring the golden harvest back!']
   ],
   bossIntro: [
     ['joku', () => 'There it is! ' + ((G.level && G.level.boss && G.level.boss.bossName) || 'the boss') + ' is holding this chapter love hostage!'],
@@ -516,7 +573,8 @@ Story.LEVEL_NAMES_EN = [
   'Blossom Glade',
   'Gloomheart Hollow',
   'Ember Canopy',
-  'Starlit Grove'
+  'Starlit Grove',
+  'Bamboo Homeland'
 ];
 
 Story.LEVEL_NAMES_VI = [
@@ -525,7 +583,8 @@ Story.LEVEL_NAMES_VI = [
   'Thung Lung Hoa No',
   'Hang Tim Bong Toi',
   'Tan Cay Lua Hong',
-  'Rung Sao'
+  'Rung Sao',
+  'Làng Tre Thánh Gióng'
 ];
 
 Story.UI_EN = {
@@ -620,6 +679,7 @@ Story.UI_EN = {
   strongBossLock: 'Defeat this boss to continue.',
   heartGate: 'Heart Gate',
   heartGateSub: 'Both players stand beside the gate to open the boss path.',
+  finalBoss: 'Final Boss',
   finalBossLock: 'Defeat the final boss to finish this chapter.',
   savePoint: 'Save point: {label}',
   loveTrial: 'Love Trial',
@@ -753,6 +813,7 @@ Story.UI_VI = {
   strongBossLock: 'Danh bai boss nay de tiep tuc.',
   heartGate: 'Cong Trai Tim',
   heartGateSub: 'Ca hai dung canh cong de mo duong vao boss.',
+  finalBoss: 'Boss cuoi',
   finalBossLock: 'Danh bai boss cuoi de ket thuc chuong.',
   savePoint: 'Diem luu: {label}',
   loveTrial: 'Thu thach tinh yeu',

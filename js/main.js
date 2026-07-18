@@ -166,6 +166,36 @@ const Main = {
         G.cam.x = xx;
       }
       if (q.has('boss')) G.bossActive = true;
+      if (q.has('qaBoss') || q.has('qaDate')) { // test hook: bypass progression for visual QA
+        for (const tr of G.level.loveTrials || []) { tr.done = true; tr._celebrated = true; tr.stage = 3; }
+        for (const foe of G.level.foes || []) if (foe.bossTier) { foe.dead = true; foe.dying = 0; }
+        G.level.shrineDone = true;
+        G.level.gateOpen = true;
+        G.cut = null; G.dialog = null; G.announce = null;
+
+        const dateMode = q.has('qaDate') && G.level.postBoss;
+        if (dateMode) {
+          G.level.boss.dead = true;
+          G.level.boss.dying = 0;
+          G.bossActive = false;
+          G.level.postBoss.unlocked = true;
+          const first = G.level.postBoss.platforms[0];
+          const xx = q.get('qaDate') === 'end'
+            ? G.level.postBoss.doorX - 520
+            : first.x + Math.min(90, first.w * .25);
+          const ty = World.topAt(G.level, xx) || first.y;
+          G.me.x = xx; G.mate.x = xx + 46;
+          G.me.y = G.mate.y = ty;
+          G.cam.x = xx;
+        } else {
+          G.bossActive = true;
+          const xx = G.level.boss.x - 300;
+          const ty = World.topAt(G.level, xx) || G.level.gateY || 520;
+          G.me.x = xx; G.mate.x = xx + 46;
+          G.me.y = G.mate.y = ty;
+          G.cam.x = G.level.boss.x - 70;
+        }
+      }
       if (q.has('zoom')) G.devZoom = +q.get('zoom') || 1;
       if (q.has('auto')) G.autoDlg = true;
       if (q.has('kiss')) { G.love = 100; Game.applyLove('kiss', (G.me.x + G.mate.x) / 2); }

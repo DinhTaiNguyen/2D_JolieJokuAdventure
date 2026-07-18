@@ -8,10 +8,18 @@ const World = {
     { name: 'Gloomheart Hollow', theme: 'shadow', width: 13800, seed: 404, density: 1.45, bossName: 'Nightmare Gloomheart', bossKind: 'gloom', miniBosses: [{ name: 'Umbra Fang', type: 'bat' }, { name: 'Dreadroot Captain', type: 'golem' }] },
     { name: 'Ember Canopy', theme: 'ember', width: 12800, seed: 505, density: 1.55, bossName: 'Cinder Crown', bossKind: 'ember', miniBosses: [{ name: 'Ashthorn Warden', type: 'thorn' }, { name: 'Magmahide Golem', type: 'golem' }] },
     { name: 'Starlit Grove', theme: 'star', width: 14200, seed: 606, density: 1.7, bossName: 'Eclipse Heart', bossKind: 'eclipse', miniBosses: [{ name: 'Moonbite Shade', type: 'bat' }, { name: 'Cometstone Colossus', type: 'golem' }] },
+    {
+      name: 'Bamboo Homeland', nameVi: 'Làng Tre Thánh Gióng', theme: 'village', width: 16800, seed: 707, density: 1.82,
+      bossName: 'Mongol Iron Warlord', bossNameVi: 'Hắc Thiết Tướng Quân Mông', bossKind: 'horde',
+      miniBosses: [
+        { name: 'Shadow Protectorate Overseer', nameVi: 'Quan Đô Hộ Bóng Tối', type: 'thorn' },
+        { name: 'Iron Vanguard Captain', nameVi: 'Kỵ Tướng Tiền Phong', type: 'golem' }
+      ]
+    },
   ],
 
   DEATH_Y: 860,
-  COOP_CHALLENGES: ['forestBridge', 'oceanPhoenix', 'flowerLift', 'shadowLantern', 'emberRain', 'starMirror'],
+  COOP_CHALLENGES: ['forestBridge', 'oceanPhoenix', 'flowerLift', 'shadowLantern', 'emberRain', 'starMirror', 'giongBridge'],
 
   // Safe but lively post-boss platform routes. Each has different heights and pacing,
   // so the couple gets a distinct date location instead of an automatic chapter skip.
@@ -45,11 +53,18 @@ const World = {
       ['mush', 98, 190, -86], ['ground', 106, 270, -132], ['mush', 106, 180, -176],
       ['mush', 100, 170, -104], ['ground', 108, 300, -52], ['mush', 104, 190, -120],
       ['ground', 110, 290, -66], ['ground', 96, 290, 0]
+    ],
+    village: [
+      ['ground', 108, 330, -18], ['mush', 92, 215, -76], ['ground', 112, 310, -116],
+      ['mush', 96, 205, -168], ['mush', 100, 230, -96], ['ground', 110, 350, -42],
+      ['mush', 92, 220, -132], ['ground', 108, 320, -72], ['mush', 98, 215, -154],
+      ['ground', 104, 340, -36], ['mush', 92, 205, -88], ['ground', 100, 310, 0]
     ]
   },
 
   gen(idx, difficulty = 'normal') {
     const cfg = this.LEVELS[idx];
+    const vi = typeof Story !== 'undefined' && Story.isVietnamese && Story.isVietnamese();
     const r = U.rng(cfg.seed);
     const plats = [], items = [], foes = [];
     let itemId = 0, foeId = 0;
@@ -105,7 +120,8 @@ const World = {
       const hp = 300 + idx * 55 + rank * 80;
       const air = type === 'bat' ? U.range(r, 150, 210) : 0;
       foes.push({
-        id: 'mb' + idx + '_' + rank, type, variant: cfg.theme, bossTier: 'normal', bossRank: rank, bossStyle: cfg.bossKind, bossName: mini && mini.name ? mini.name : (rank === 0 ? 'Oathbreaker Brute' : 'Dreadroot Captain'),
+        id: 'mb' + idx + '_' + rank, type, variant: cfg.theme, bossTier: 'normal', bossRank: rank, bossStyle: cfg.bossKind,
+        bossName: mini ? ((vi && mini.nameVi) || mini.name) : (rank === 0 ? 'Oathbreaker Brute' : 'Dreadroot Captain'),
         x: U.clamp(x, pl.x + 90, pl.x + pl.w - 90), y: pl.y - air, homeX: x, homeY: pl.y - air, plat: pl,
         vx: 0, vy: 0, dir: -1, hp, maxHp: hp, dmg: 22 + idx * 2 + rank * 3,
         t: r() * 10, atkT: 1.4, hopY: 0, flash: 0, hurtShow: 0, dead: false, announced: false
@@ -175,7 +191,8 @@ const World = {
         if (x + w < 1200) break; // keep the start peaceful
         const t = r();
         const fx = x + 90 + r() * (w - 180);
-        if (cfg.theme === 'ember' && t > .72) foe('golem', fx, pl);
+        if (cfg.theme === 'village') foe(t < .28 ? 'slime' : t < .56 ? 'thorn' : t < .78 ? 'wisp' : 'imp', fx, pl);
+        else if (cfg.theme === 'ember' && t > .72) foe('golem', fx, pl);
         else if (cfg.theme === 'star' && t > .62) foe(t > .82 ? 'golem' : 'bat', fx, pl);
         else if (cfg.theme === 'shadow' && t > .66) foe(t > .84 ? 'golem' : 'bat', fx, pl);
         else if (t < .3) foe('slime', fx, pl);
@@ -230,6 +247,7 @@ const World = {
         shadowLantern: { w: 920, h: 320 },
         emberRain: { w: 980, h: 310 },
         starMirror: { w: 1040, h: 340 },
+        giongBridge: { w: 1420, h: 430 },
       }[tr.kind] || { w: 880, h: 260 };
       return { id: tr.id + '_obstacle', trialId: tr.id, kind: tr.kind, x: tr.x + 230, y: tr.y, w: spec.w, h: spec.h };
     });
@@ -238,16 +256,20 @@ const World = {
       startX: arenaEnd,
       baseY: y
     });
+    const culturalProps = cfg.theme === 'village'
+      ? this._villageProps(plats, loveTrials[0], postBoss)
+      : [];
 
     return this._pack(cfg, idx, plats, items, foes, {
       shrineX, shrineY: this._topAtList(plats, shrineX), gateX, gateY: y,
       loveTrials, coopObstacles,
+      culturalProps,
       startX: 140, checkpoints: [{ x: 140, y: 520 }, ...loveTrials.map(t => ({ x: t.x, y: t.y })), { x: shrineX, y: this._topAtList(plats, shrineX) }],
       postBoss,
       width: postBoss.end + 420,
       difficulty,
       boss: {
-        id: 'boss', type: 'boss', bossName: cfg.bossName, bossKind: cfg.bossKind,
+        id: 'boss', type: 'boss', bossName: (vi && cfg.bossNameVi) || cfg.bossName, bossKind: cfg.bossKind,
         x: bossX, y: y - 125, homeX: bossX, homeY: y - 125, vx: 0, vy: 0, dir: -1,
         hp: 950 + idx * 170, maxHp: 950 + idx * 170, dmg: 20 + idx * 3,
         t: 0, atkT: 3, phase: 0, mode: 'idle', modeT: 2.5, flash: 0, hurtShow: 0, dying: 0, dead: false
@@ -291,6 +313,42 @@ const World = {
       platforms, lights,
       unlocked: false, ready: 0, completed: false, announced: false
     };
+  },
+
+  _villageProps(plats, trial, postBoss) {
+    const props = [];
+    const grounds = plats.filter(pl => pl.type === 'ground' && pl.x + pl.w > 0);
+    const add = (kind, x, y, h, flip = false, glow = false) => props.push({ kind, x, y, h, flip, glow });
+    const addOn = (pl, kind, at, h, flip = false, glow = false) => {
+      if (pl) add(kind, pl.x + pl.w * at, pl.y, h, flip, glow);
+    };
+
+    addOn(grounds[0], 0, .44, 122, false, true);
+    addOn(grounds[0], 1, .72, 66, false, false);
+    addOn(grounds[0], 2, .88, 76, true, false);
+
+    const beforeDate = grounds.filter(pl => !postBoss || pl.x < postBoss.start);
+    const atPart = part => beforeDate[Math.min(beforeDate.length - 1, Math.max(0, Math.floor(beforeDate.length * part)))];
+    addOn(atPart(.18), 2, .22, 72, false, false);
+    addOn(atPart(.34), 0, .78, 112, true, false);
+    addOn(atPart(.58), 3, .24, 92, false, false);
+    addOn(atPart(.76), 1, .76, 64, true, false);
+
+    if (trial) {
+      add(6, trial.x - 176, trial.y, 94, false, true);
+      add(0, trial.x + 332, trial.y, 118, true, true);
+    }
+
+    if (postBoss) {
+      const terrace = grounds.find(pl => postBoss.doorX >= pl.x && postBoss.doorX <= pl.x + pl.w);
+      if (terrace) {
+        addOn(terrace, 7, .20, 142, false, true);
+        addOn(terrace, 3, .48, 94, false, true);
+        addOn(terrace, 4, .64, 72, false, false);
+        addOn(terrace, 2, .78, 74, false, true);
+      }
+    }
+    return props;
   },
 
   _topAtList(plats, x) {

@@ -588,6 +588,12 @@ const Ent = {
     for (let i = G.projs.length - 1; i >= 0; i--) {
       const pr = G.projs[i];
       pr.t += dt;
+      if ((pr.kind === 'sandal' || pr.kind === 'sickle') && !pr._returned && pr.t > .58) {
+        pr._returned = true;
+        pr.vx *= -1;
+        pr.vy *= -.3;
+        pr.g = 0;
+      }
       if (pr.g) pr.vy += pr.g * dt;
       pr.x += pr.vx * dt; pr.y += pr.vy * dt;
       let dead = pr.t >= pr.life;
@@ -605,6 +611,12 @@ const Ent = {
       }
       if (pr.kind === 'starshot' && Math.random() < .55) {
         Ptc.burst('star', pr.x, pr.y, 1, { color: '#fff3a8', sp: 45, r: 4, life: .35 });
+      }
+      if (pr.kind === 'bamboo' && Math.random() < .45) {
+        Ptc.burst('petal', pr.x, pr.y, 1, { color: '#bde47b', sp: 34, r: 3, life: .35 });
+      }
+      if ((pr.kind === 'sickle' || pr.kind === 'sandal') && Math.random() < .4) {
+        Ptc.burst('star', pr.x, pr.y, 1, { color: pr.color || '#f2cf58', sp: 32, r: 3, life: .3 });
       }
 
       // my shots hurt enemies (authoritative on the shooter's device)
