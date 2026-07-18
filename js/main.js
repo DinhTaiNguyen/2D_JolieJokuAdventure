@@ -2,7 +2,7 @@
 /* ============ menus, connection flow, DOM glue ============ */
 const Main = {
   el(id) { return document.getElementById(id); },
-  _toastT: null, _rotDismissed: false,
+  _toastT: null, _rotDismissed: false, _pausedForNet: false,
 
   init() {
     const $ = id => this.el(id);
@@ -82,16 +82,24 @@ const Main = {
     NET.onStatus = (kind, msg) => {
       if (NET.mode === 'host') {
         if (kind === 'code') {
-          $('codeBig').textContent = msg; $('hostCodeInput').value = msg; $('hostStatus').textContent = Story.t('waitingJoin') + ' 💗';
+          const localHint = NET.isLocalOrigin() ? ' ' + Story.t('localTestLink') : '';
+          $('codeBig').textContent = msg; $('hostCodeInput').value = msg; $('hostStatus').textContent = Story.t('waitingJoin') + ' 💗' + localHint;
         } else if (kind === 'ok') $('hostStatus').textContent = Story.t('connectedShort') + ' 💞';
+        else if (kind === 'route') $('hostStatus').textContent = msg;
         else if (kind === 'err') $('hostStatus').textContent = msg;
         else if (kind === 'info') $('hostStatus').textContent = msg;
       } else {
         if (kind === 'err') $('joinStatus').textContent = msg;
         else if (kind === 'info') $('joinStatus').textContent = msg;
+        else if (kind === 'route') $('joinStatus').textContent = msg;
         else if (kind === 'ok') {
           $('joinStatus').textContent = Story.t('connectedStart') + ' 💞';
           NET.send({ t: 'hello' });
+          if (this._pausedForNet) {
+            this._pausedForNet = false;
+            this.toast('💗 ' + Story.t('reconnectedAdventure'));
+            if (G.paused) this.togglePause();
+          }
         }
       }
       this.syncConnectionSettings(kind, msg);
@@ -108,9 +116,13 @@ const Main = {
     };
     NET.onDrop = () => {
       this.toast('💔 ' + Story.t(NET.mode === 'host' ? 'connectionLostHost' : 'connectionLostGuest'));
-      if (NET.mode === 'guest' && G.state === 'play' && !G.paused) this.togglePause();
+      if (NET.mode === 'guest' && G.state === 'play' && !G.paused) {
+        this._pausedForNet = true;
+        this.togglePause();
+      }
       this.syncConnectionSettings();
     };
+    NET.init();
 
     /* ---- rotate hint (dismissible) ---- */
     this.el('rotateHint').onclick = () => { this._rotDismissed = true; this.checkRotate(); };
@@ -123,7 +135,7 @@ const Main = {
     /* ---- copy invite link (host) ---- */
     $('btnCopyLink').onclick = () => {
       const code = NET.code || this.cleanCodeInput('hostCodeInput') || '1234';
-      const url = location.origin + location.pathname + '?join=' + code;
+      const url = NET.inviteUrl(code);
       (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(
         () => this.toast('💌 ' + Story.t('copiedInvite')),
         () => this.toast(url)

@@ -71,18 +71,32 @@ Any static file server works, e.g. from this folder:
 powershell -ExecutionPolicy Bypass -File serve.ps1   # → http://localhost:8340
 ```
 
-Online play uses the free public PeerJS broker to introduce the two phones to each other
-(the gameplay itself is direct peer-to-peer). If a join ever fails, both players refresh
-and try a new room code — and Wi-Fi works better than spotty cellular.
+Online play uses PeerJS Cloud for the introduction, then WebRTC sends the encrypted game
+traffic directly between the two browsers. When a carrier, router, or firewall blocks a
+direct route, the game automatically retries through TURN relay mode. It also keeps the
+same network identity on localhost and GitHub Pages, so a local host and a published guest
+can find the same room.
+
+The included public TURN relay is a best-effort fallback and has no uptime guarantee. For
+dependable overseas play, set the `joku-turn-endpoint` meta tag in `index.html` to a trusted
+HTTPS endpoint that returns either an `iceServers` array or `{ "iceServers": [...] }`. Use
+short-lived TURN credentials from a provider such as Cloudflare Realtime TURN or Metered,
+and keep the provider's permanent secret in the credential endpoint rather than in this
+public GitHub Pages repository. The endpoint must allow cross-origin requests from the
+published game URL.
+
+The `joku-public-url` meta tag controls which published HTTPS link is copied when you host
+from a local test server. Update it if the GitHub Pages address changes.
 
 ## Notes & troubleshooting
 
 - **Connection lost mid-game?** The host keeps the world alive; the guest re-joins with the
-  same code from the menu and lands back at the current chapter.
+  same code automatically and lands back at the current chapter.
 - **No sound on the phone?** Tap the screen once (browsers require a gesture), and check the 🔊 toggle.
 - **Portrait mode?** You'll get a rotate hint — landscape is the way.
 - Dev/test URL flags (solo only): `?solo&lvl=2` jump to a chapter, `&x=1600` teleport,
   `&skip` skip intro, `&auto` auto-advance dialogue, `&boss` wake the boss instantly.
+- Network diagnostic flag: add `&relay=1` to an invite URL to test the TURN-only path.
 
 ---
 

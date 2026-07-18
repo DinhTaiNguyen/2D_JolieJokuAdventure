@@ -33,9 +33,12 @@ jobs:
           mkdir -p dist
           cp index.html style.css manifest.webmanifest dist/
           cp -R js dist/js
+          cp -R assets dist/assets
           touch dist/.nojekyll
           test -f dist/index.html
           test -f dist/js/game.js
+          test -f dist/js/vendor/peerjs.min.js
+          test -f dist/assets/title_art.png
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
