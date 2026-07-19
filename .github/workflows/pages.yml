@@ -2,7 +2,7 @@ name: Deploy static game to GitHub Pages
 
 on:
   push:
-    branches: ["main", "master", "ver=3"]
+    branches: ["main", "master", "ver*"]
   workflow_dispatch:
 
 permissions:

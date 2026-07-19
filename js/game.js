@@ -15,9 +15,9 @@ const G = {
   stats: { orbs: 0, flowers: 0, hearts: 0, hugs: 0, kisses: 0, kills: 0, startT: 0 },
   checkpoint: { x: 140, y: 400 },
   loadout: { joku: null, jolie: null },
-  paused: false, bossActive: false, netLost: false, ended: false, nextLevelT: 0,
+  paused: false, bossActive: false, netLost: false, ended: false, nextLevelT: 0, chapterVictory: null,
   netT: { p: 0, w: 0, seq: 0, wseq: 0 }, mateNet: null, mateBuf: [], lastMateSeq: 0, lastWorldSeq: 0, _dropId: 0, _comboToastT: 0,
-  demo: null, _lockHintT: 0, _uiSyncT: 0, _freshOnlineStart: false,
+  demo: null, _lockHintT: 0, _uiSyncT: 0, _trialShrineT: 0, _freshOnlineStart: false,
 };
 
 const Game = {
@@ -88,7 +88,7 @@ const Game = {
     this.applyDifficulty(G.level);
     G.level.bg = Art.makeBackground(G.level.theme, G.level.cfg.seed);
     G.projs = []; G.auras = []; G.cut = null; G.dialog = null;
-    G.bossActive = false; G.nextLevelT = 0; G.activeMiniBoss = null;
+    G.bossActive = false; G.nextLevelT = 0; G.chapterVictory = null; G.activeMiniBoss = null; G._trialShrineT = 0;
     Ptc.list.length = 0;
 
     const joku = this.byChar('joku'), jolie = this.byChar('jolie');
@@ -257,7 +257,8 @@ const Game = {
     if (G.kissCin > 0) this.kissUpdate(dt);
 
     // ----- my player -----
-    const meInp = (G.paused || G.kissCin > 0) ? { ax: 0 } : Ent.localInput();
+    const meInp = (G.paused || G.kissCin > 0 || G.chapterVictory) ? { ax: 0 } : Ent.localInput();
+    this.captureTrialInput(meInp);
     Ent.updatePlayer(G.me, dt, meInp);
 
     // ----- partner: bot or remote -----
@@ -282,7 +283,7 @@ const Game = {
     Ent.updateProjectiles(dt);
     this.updateItems(dt);
     this.updateAuras(dt);
-    if (G.mode !== 'guest' && !G.cut && !G.dialog && G.kissCin <= 0) this.updateLoveTrials(dt);
+    if (!G.cut && !G.dialog && G.kissCin <= 0 && !G.chapterVictory) this.updateLoveTrials(dt);
     if (!G.cut && G.kissCin <= 0) this.enforceProgressLocks(dt);
     if (G.mode !== 'guest' && !G.cut && !G.dialog && G.kissCin <= 0) this.updateDateJourney(dt);
 
@@ -333,7 +334,12 @@ const Game = {
     this.updateLoveMeter(dt);
 
     // ----- shrine & gate & fell-behind camera -----
-    if (G.mode !== 'guest' && !G.cut && G.kissCin <= 0) {
+    const trialCinematic = (L.loveTrials || []).some(tr => !tr.done && tr.stage >= 2 && tr.stage <= 4);
+    if (G._trialShrineT > 0 && G.mode !== 'guest' && !G.cut && !G.dialog) {
+      G._trialShrineT -= dt;
+      if (G._trialShrineT <= 0 && !L.shrineDone) this.cutStart('shrine');
+    }
+    if (G.mode !== 'guest' && !G.cut && G.kissCin <= 0 && !trialCinematic && G._trialShrineT <= 0) {
       if (!L.shrineDone && L.shrineX && (Math.abs(G.me.x - L.shrineX) < 110 || Math.abs(G.mate.x - L.shrineX) < 110)) {
         this.cutStart('shrine');
       }
@@ -356,6 +362,7 @@ const Game = {
     if (G._uiSyncT <= 0) { G._uiSyncT = .12; if (Main.syncWeaponUI) Main.syncWeaponUI(); }
     if (G.announce) { G.announce.t -= dt; if (G.announce.t <= 0) G.announce = null; }
     if (G._comboToastT > 0) G._comboToastT -= dt;
+    if (G.chapterVictory) this.updateChapterVictory(dt);
     if (G.nextLevelT > 0 && G.mode !== 'guest') {
       G.nextLevelT -= dt;
       if (G.nextLevelT <= 0) this.nextLevel();
@@ -488,15 +495,146 @@ const Game = {
     G.mate.dir = G.me.x > G.mate.x ? 1 : -1;
   },
 
+  activeLoveTrial() {
+    return G.level && (G.level.loveTrials || []).find(tr => !tr.done);
+  },
+
+  trialRoleBit(char) {
+    return char === 'joku' ? 1 : char === 'jolie' ? 2 : 0;
+  },
+
+  captureTrialInput(inp) {
+    if (!inp || !G.level || G.cut || G.dialog || G.paused) return;
+    const tr = this.activeLoveTrial();
+    if (!tr || tr.stage < 2 || tr.stage > 4) return;
+    if (tr.stage === 3 && inp.special) this.activateTrialSkill(tr, G.me.char, false);
+    // Kiss, power invocation, and shared traversal are deliberate co-op moments.
+    // Consume combat movement so the normal character skills cannot fire underneath them.
+    inp.ax = 0;
+    inp.jump = false;
+    inp.jumpHeld = false;
+    inp.attack = false;
+    inp.special = false;
+    inp.weaponSkill = false;
+  },
+
+  trialSkillVisual(tr, char) {
+    const p = this.byChar(char);
+    if (!p) return;
+    const bit = this.trialRoleBit(char);
+    const color = char === 'joku' ? '#72ddff' : '#ff9fce';
+    p.cheerT = Math.max(p.cheerT || 0, 1.1);
+    p.trialPowerT = 1.4;
+    SND.sfx(char === 'joku' ? 'powerWater' : 'powerFlower');
+    Ptc.add({ kind: 'ring', x: p.x, y: p.y - 38, vx: 0, vy: 0, r: 108, life: .75, color: color + 'dd' });
+    Ptc.burst(char === 'joku' ? 'dot' : 'petal', p.x, p.y - 42, 15, { color, sp: 155, r: 6, life: 1.1 });
+    if (typeof ASSETS !== 'undefined' && ASSETS.has && ASSETS.has('fx_rings')) {
+      ASSETS.playFB('fx_rings', p.x, p.y - 35, 155, .55, char === 'joku' ? 1 : 5);
+    }
+    const powers = Story.trialPowers(G.levelIndex);
+    const own = powers[char];
+    if (char === G.me.char && own) {
+      G.announce = { txt: own.name, sub: Story.t('trialWaitingPower', { power: own.name }), t: 3.1 };
+    } else if (bit && own && G._lockHintT <= 0) {
+      G.announce = { txt: own.name, sub: own.effect, t: 2.6 };
+      G._lockHintT = 1.8;
+    }
+  },
+
+  activateTrialSkill(tr, char, fromNet) {
+    if (!tr || tr.done || tr.stage !== 3) return false;
+    const bit = this.trialRoleBit(char);
+    if (!bit || (tr.skillMask & bit)) return false;
+    tr.skillMask = (tr.skillMask || 0) | bit;
+    this.trialSkillVisual(tr, char);
+    if (!fromNet && G.mode === 'guest') this.emit('trialSkill', { id: tr.id, char });
+    return true;
+  },
+
+  announceTrialPower(tr) {
+    if (!tr || tr._powerPrompted) return;
+    tr._powerPrompted = true;
+    const powers = Story.trialPowers(G.levelIndex);
+    const own = powers[G.me.char];
+    if (!own) return;
+    G.announce = { txt: own.name, sub: Story.t('trialUseSpecial', { power: own.name }), t: 4.1 };
+    SND.sfx('gate');
+  },
+
+  startTrialTraversal(tr, fromNet = false) {
+    if (!tr || tr.done) return;
+    if (tr.stage === 4 && tr._travelPrompted) return;
+    tr.stage = 4;
+    tr.travel = Math.max(0, tr.travel || 0);
+    tr.charge = 1;
+    tr._travelPrompted = true;
+    const powers = Story.trialPowers(G.levelIndex);
+    G.announce = { txt: Story.t('trialBothPowers'), sub: powers.travel, t: 4.4 };
+    SND.sfx('trialRide');
+    this.shake(6);
+    for (const p of [this.byChar('joku'), this.byChar('jolie')]) {
+      if (!p) continue;
+      p.trialRide = true;
+      p.invuln = Math.max(p.invuln, (tr.travelDur || 5) + 1);
+      p.vx = p.vy = 0;
+    }
+    if (!fromNet && G.mode === 'host') this.emit('trialRide', { id: tr.id });
+  },
+
+  trialRoutePoint(tr, amount) {
+    const k = U.easeInOut(U.clamp(amount || 0, 0, 1));
+    const sx = tr.routeStartX != null ? tr.routeStartX : tr.x + 34;
+    const ex = tr.endX != null ? tr.endX : tr.x + 900;
+    const sy = tr.y;
+    const ey = tr.endY != null ? tr.endY : tr.y;
+    const arc = tr.travelArc || 150;
+    let lift = Math.sin(k * Math.PI) * arc;
+    if (tr.kind === 'flowerLift') lift += Math.sin(Math.min(1, k * 1.7) * Math.PI) * 55;
+    if (tr.kind === 'oceanPhoenix') lift += Math.sin(k * Math.PI * 3) * 18;
+    if (tr.kind === 'starMirror') lift += Math.sin(k * Math.PI * 4) * 24;
+    if (tr.kind === 'shadowLantern') lift += Math.sin(k * Math.PI * 2) * 12;
+    return { x: U.lerp(sx, ex, k), y: U.lerp(sy, ey, k) - lift, k };
+  },
+
+  applyTrialTraversal(tr) {
+    const pt = this.trialRoutePoint(tr, tr.travel || 0);
+    tr.rideX = pt.x;
+    tr.rideY = pt.y;
+    const joku = this.byChar('joku'), jolie = this.byChar('jolie');
+    const spread = tr.kind === 'oceanPhoenix' ? 24 : 28;
+    for (const [p, off] of [[joku, -spread], [jolie, spread]]) {
+      if (!p) continue;
+      p.x = pt.x + off;
+      p.y = pt.y - (p.char === 'jolie' ? 2 : 0);
+      p.vx = (tr.endX - (tr.routeStartX || tr.x)) / Math.max(1, tr.travelDur || 5);
+      p.vy = 0;
+      p.onGround = false;
+      p.trialRide = true;
+      p.invuln = Math.max(p.invuln, .35);
+      p.dir = 1;
+      p.safeX = p.x;
+      p.safeY = p.y;
+    }
+    for (const pet of G.pets || []) {
+      const side = pet.kind === 'dog' ? -58 : 58;
+      pet.x = pt.x + side;
+      pet.y = pt.y + 10;
+      pet.vx = 0;
+      pet.dir = 1;
+    }
+  },
+
   trialCoopPulse(tr, dt) {
     const colors = {
       forestBridge: '#9be27d', oceanPhoenix: '#56d6ff', flowerLift: '#ff9fce',
       shadowLantern: '#d9b6ff', emberRain: '#ffb36b', starMirror: '#fff3a8', giongBridge: '#e8c65f'
     };
     const color = colors[tr.kind] || '#ff9fce';
+    const x = tr.rideX != null ? tr.rideX : tr.x;
+    const y = tr.rideY != null ? tr.rideY : tr.y;
     if (Math.random() < dt * 12) {
       const side = Math.random() < .5 ? -1 : 1;
-      Ptc.add({ kind: tr.kind === 'flowerLift' ? 'petal' : 'star', x: tr.x + side * 58 + (Math.random() - .5) * 20, y: tr.y - 28 - Math.random() * 48, vx: (Math.random() - .5) * 35, vy: -50, r: 4 + Math.random() * 3, life: 1, color });
+      Ptc.add({ kind: tr.kind === 'flowerLift' ? 'petal' : 'star', x: x + side * 58 + (Math.random() - .5) * 20, y: y - 28 - Math.random() * 48, vx: (Math.random() - .5) * 35, vy: -50, r: 4 + Math.random() * 3, life: 1, color });
     }
   },
 
@@ -505,7 +643,7 @@ const Game = {
     const tr = trials.find(x => !x.done);
     if (!tr) return;
     const me = G.me, mate = G.mate;
-    this.assistBotTrial(tr, dt);
+    if (G.mode !== 'guest') this.assistBotTrial(tr, dt);
     const pads = this.trialPads(tr);
     tr.padL = pads.leftOn;
     tr.padR = pads.rightOn;
@@ -514,13 +652,52 @@ const Game = {
     const together = nearMe && nearMate && !me.down && !mate.down;
     const linked = (G.handHold || me.holding || mate.holding || mate.heartHeld || (Input.held('heart') && U.dist(me.x, me.y, mate.x, mate.y) < 170)) && !me.down && !mate.down;
     const ready = tr.stage === 1 ? (together && linked) : (pads.split && linked);
+    if (tr.stage >= 1 && tr.stage <= 4) {
+      me.invuln = Math.max(me.invuln, .35);
+      mate.invuln = Math.max(mate.invuln, .35);
+    }
 
     if (tr.stage === 2) {
       tr.kissT = (tr.kissT || 1.05) - dt;
       me.pose = mate.pose = 'kiss'; me.poseT = mate.poseT = .25;
       me.dir = tr.x >= me.x ? 1 : -1; mate.dir = -me.dir;
       if (Math.random() < dt * 16) Ptc.add({ kind: 'heart', x: tr.x + (Math.random() - .5) * 55, y: tr.y - 70 - Math.random() * 25, vx: (Math.random() - .5) * 45, vy: -65, r: 5, life: 1.1, color: '#ff9fce' });
-      if (tr.kissT <= 0) this.finishLoveTrial(tr, false);
+      if (tr.kissT <= 0 && G.mode !== 'guest') {
+        tr.stage = 3;
+        tr.charge = 0;
+        tr.skillMask = 0;
+        tr.powerT = 0;
+        tr._powerPrompted = false;
+        G.stats.kisses++;
+        this.announceTrialPower(tr);
+      }
+      return;
+    }
+
+    if (tr.stage === 3) {
+      tr.powerT = (tr.powerT || 0) + dt;
+      this.announceTrialPower(tr);
+      me.vx = mate.vx = 0;
+      if (G.mode === 'solo' && tr.powerT > .75) this.activateTrialSkill(tr, G.mate.char, true);
+      if ((tr.skillMask || 0) === 3 && G.mode !== 'guest') this.startTrialTraversal(tr, false);
+      return;
+    }
+
+    if (tr.stage === 4) {
+      const dur = Math.max(2, tr.travelDur || 5);
+      tr.travel = U.clamp((tr.travel || 0) + dt / dur, 0, 1);
+      this.applyTrialTraversal(tr);
+      this.trialCoopPulse(tr, dt * 1.6);
+      if (G.mode !== 'guest' && tr.travel >= 1) this.finishLoveTrial(tr, false);
+      return;
+    }
+
+    if (G.mode === 'guest') {
+      if ((nearMe || pads.leftOn || pads.rightOn) && G._lockHintT <= 0) {
+        const info = Story.trialInfo(G.levelIndex, tr.id);
+        G.announce = { txt: info.title, sub: info.hint, t: 2.4 };
+        G._lockHintT = 3;
+      }
       return;
     }
 
@@ -560,23 +737,46 @@ const Game = {
 
   finishLoveTrial(tr, fromNet) {
     if (!tr) return;
-    const already = tr.done && tr._celebrated;
+    if (tr._celebrated) return;
     tr.done = true;
     tr.charge = 1;
-    tr.stage = 3;
+    tr.stage = 5;
+    tr.travel = 1;
     tr._celebrated = true;
-    this.setCheckpoint(tr.x, tr.y, Story.t('loveTrial'), true);
+    const rewardX = tr.endX != null ? tr.endX : tr.x;
+    const rewardY = tr.endY != null ? tr.endY : tr.y;
+    const joku = this.byChar('joku'), jolie = this.byChar('jolie');
+    for (const [p, off] of [[joku, -28], [jolie, 28]]) {
+      if (!p) continue;
+      p.x = rewardX + off;
+      p.y = rewardY;
+      p.vx = p.vy = 0;
+      p.onGround = true;
+      p.trialRide = false;
+      p.pose = null;
+      p.safeX = p.x;
+      p.safeY = p.y;
+    }
+    for (const pet of G.pets || []) {
+      pet.x = rewardX + (pet.kind === 'dog' ? -72 : 72);
+      pet.y = rewardY;
+      pet.vx = 0;
+    }
+    this.setCheckpoint(rewardX, rewardY, Story.t('loveTrial'), true);
+    if (!fromNet && G.mode !== 'guest' && !G.level.shrineDone && G.level.shrineX > tr.routeStartX && G.level.shrineX < rewardX) {
+      G._trialShrineT = 2.9;
+    }
     const info = Story.trialInfo(G.levelIndex, tr.id);
     SND.sfx('gate');
     if (G.level && G.level.theme === 'village') SND.sfx('drum');
     G.announce = { txt: info.done, sub: Story.t('trialRewardSub'), t: 3.2 };
-    Ptc.add({ kind: 'ring', x: tr.x, y: tr.y - 24, vx: 0, vy: 0, r: 180, life: .9, color: 'rgba(255,170,210,.9)' });
-    Ptc.burst('heart', tr.x, tr.y - 60, 18, { sp: 170, r: 7, life: 1.3 });
+    Ptc.add({ kind: 'ring', x: rewardX, y: rewardY - 24, vx: 0, vy: 0, r: 180, life: .9, color: 'rgba(255,170,210,.9)' });
+    Ptc.burst('heart', rewardX, rewardY - 60, 18, { sp: 170, r: 7, life: 1.3 });
     if (!fromNet && G.mode !== 'guest') {
       this.loveAdd(18);
-      this.dropWeapons(tr.x, tr.y - 8, 2);
+      this.dropWeapons(rewardX, rewardY - 8, 2);
       this.emit('trial', { id: tr.id });
-    } else if (!already) {
+    } else {
       SND.sfx('weaponDrop');
     }
   },
@@ -585,7 +785,7 @@ const Game = {
     const L = G.level;
     if (!L) return [];
     const locks = [];
-    const trial = (L.loveTrials || []).find(t => !t.done);
+    const trial = (L.loveTrials || []).find(t => !t.done && (t.stage || 0) < 4);
     if (trial) {
       const info = Story.trialInfo(G.levelIndex, trial.id);
       locks.push({ x: trial.x, limit: trial.lockLimit || trial.x + 190, txt: info.title, sub: Story.t('trialExtremeLock') });
@@ -620,7 +820,11 @@ const Game = {
       if (!lock) continue;
       p.x = lock.limit;
       p.vx = Math.min(0, p.vx);
-      if (p.safeX > lock.limit) p.safeX = lock.limit - 20;
+      const ground = World.topAt(G.level, p.x, p.y - 120) || World.topAt(G.level, p.x);
+      if (ground !== null && p.y > ground + 6) {
+        p.y = ground; p.vy = 0; p.onGround = true;
+      }
+      if (p.safeX > lock.limit) { p.safeX = lock.limit - 20; p.safeY = ground || p.safeY; }
       if (G._lockHintT <= 0) {
         G.announce = { txt: lock.txt, sub: lock.sub, t: 2.5 };
         SND.sfx('ui');
@@ -1303,6 +1507,7 @@ const Game = {
         break;
       }
     }
+    if (!fromNet && forMe && Main.showItemPopup) Main.showItemPopup(it.kind, { weapon: it.weapon });
     if (!fromNet) this.emit('pick', { id: it.id, by });
   },
 
@@ -1558,8 +1763,7 @@ const Game = {
     SND.startMusic(G.levelIndex, false);
     const journey = G.level.postBoss;
     if (!journey) {
-      if (G.levelIndex >= World.LEVELS.length - 1) this.cutStart('ending');
-      else { G.announce = { txt: Story.t('chapterClear'), sub: Story.t('nextAdventure'), t: 3.2 }; G.nextLevelT = 4.2; }
+      this.startChapterVictory(G.levelIndex >= World.LEVELS.length - 1, false);
       return;
     }
     journey.unlocked = true;
@@ -1591,13 +1795,45 @@ const Game = {
     this.shake(5);
     Ptc.add({ kind: 'ring', x: journey.doorX, y: journey.doorY - 70, vx: 0, vy: 0, r: 180, life: .9, color: 'rgba(255,190,225,.92)' });
     Ptc.burst('heart', journey.doorX, journey.doorY - 70, 18, { sp: 180, r: 7, life: 1.35 });
-    this.emit('journey', { unlocked: 1, completed: 1, ready: 100 });
-    if (G.levelIndex >= World.LEVELS.length - 1) {
-      this.cutStart('ending');
-    } else {
-      G.announce = { txt: Story.t('chapterClear'), sub: Story.t('dateComplete'), t: 2.8 };
-      G.nextLevelT = 3.1;
+    this.startChapterVictory(G.levelIndex >= World.LEVELS.length - 1, false);
+  },
+
+  startChapterVictory(finalChapter, fromNet = false) {
+    if (G.chapterVictory) return;
+    if (typeof ASSETS !== 'undefined' && ASSETS.request) {
+      ASSETS.request(finalChapter ? ['cg_victory', 'cg_ending'] : ['cg_victory'], true);
     }
+    G.chapterVictory = { t: 4.6, dur: 4.6, final: !!finalChapter };
+    G.announce = null;
+    G.nextLevelT = 0;
+    SND.stopMusic();
+    SND.sfx('victory');
+    for (const p of [G.me, G.mate]) {
+      if (!p) continue;
+      p.vx = p.vy = 0;
+      p.pose = null;
+      p.cheerT = 5;
+      p.invuln = Math.max(p.invuln, 5);
+    }
+    if (!fromNet && G.mode !== 'solo') {
+      this.emit('journey', { unlocked: 1, completed: 1, ready: 100, victory: 1, final: finalChapter ? 1 : 0 });
+    }
+  },
+
+  updateChapterVictory(dt) {
+    const v = G.chapterVictory;
+    if (!v) return;
+    for (const p of [G.me, G.mate]) {
+      if (!p) continue;
+      p.vx = p.vy = 0;
+      p.cheerT = Math.max(p.cheerT || 0, .25);
+    }
+    v.t -= dt;
+    if (v.t > 0) return;
+    G.chapterVictory = null;
+    if (G.mode === 'guest') return;
+    if (v.final) this.cutStart('ending');
+    else this.nextLevel();
   },
 
   /* ================= level flow helpers (called from Story) ================= */
@@ -1901,7 +2137,10 @@ const Game = {
     }
     const b = G.level.boss;
     const journey = G.level.postBoss;
-    const trials = (G.level.loveTrials || []).map(t => [t.id, t.done ? 1 : 0, Math.round((t.charge || 0) * 100), t.stage || 0]);
+    const trials = (G.level.loveTrials || []).map(t => [
+      t.id, t.done ? 1 : 0, Math.round((t.charge || 0) * 100), t.stage || 0,
+      t.skillMask || 0, Math.round((t.travel || 0) * 1000)
+    ]);
     const dead = G.level.foes.filter(e => e.dead).map(e => e.id);
     const items = G.level.items
       .filter(it => !it.taken && (it.id[0] === 'w' || it.id[0] === 'd'))
@@ -2015,7 +2254,23 @@ const Game = {
         if (m.trials) {
           for (const tr of m.trials) {
             const local = (G.level.loveTrials || []).find(x => x.id === tr[0]);
-            if (local) { local.done = !!tr[1]; local.charge = (tr[2] || 0) / 100; local.stage = tr[3] || 0; }
+            if (!local) continue;
+            const wasDone = !!local.done;
+            const oldStage = local.stage || 0;
+            const oldMask = local.skillMask || 0;
+            const nextStage = tr[3] || 0;
+            const nextMask = tr[4] || 0;
+            local.charge = (tr[2] || 0) / 100;
+            local.stage = nextStage;
+            local.skillMask = oldMask | nextMask;
+            local.travel = Math.max(local.travel || 0, (tr[5] || 0) / 1000);
+            for (const [char, bit] of [['joku', 1], ['jolie', 2]]) {
+              if (!(oldMask & bit) && (nextMask & bit)) this.trialSkillVisual(local, char);
+            }
+            if (oldStage < 3 && nextStage === 3) this.announceTrialPower(local);
+            if (oldStage < 4 && nextStage === 4) this.startTrialTraversal(local, true);
+            if (!wasDone && tr[1]) this.finishLoveTrial(local, true);
+            else local.done = !!tr[1];
           }
         }
         if (m.boss && G.level.boss) {
@@ -2082,6 +2337,18 @@ const Game = {
         this.finishLoveTrial(tr, true);
         break;
       }
+      case 'trialSkill': {
+        if (G.mode !== 'host' || !d || d.char !== G.mate.char) break;
+        const tr = (G.level.loveTrials || []).find(x => x.id === d.id);
+        this.activateTrialSkill(tr, d.char, true);
+        break;
+      }
+      case 'trialRide': {
+        if (G.mode !== 'guest') break;
+        const tr = (G.level.loveTrials || []).find(x => x.id === d.id);
+        this.startTrialTraversal(tr, true);
+        break;
+      }
       case 'down':
         SND.sfx('down');
         this.toastMsg('💔 ' + Story.t(G.mate.char === 'joku' ? 'downJoku' : 'downJolie'));
@@ -2107,6 +2374,7 @@ const Game = {
           G.announce = { txt: Story.t('dateJourney'), sub: info.title, t: 3.8 };
           SND.sfx('gate');
         }
+        if (d.victory) this.startChapterVictory(!!d.final, true);
         break;
       }
       case 'fx':
@@ -2234,6 +2502,11 @@ const Game = {
     for (const tr of (L.loveTrials || [])) {
       if (tr.x < viewL || tr.x > viewR) continue;
       Art.drawLoveTrial(ctx, tr, t);
+    }
+    for (const tr of (L.loveTrials || [])) {
+      const fx = tr.rideX != null ? tr.rideX : tr.x;
+      if ((tr.stage || 0) < 3 || fx < viewL - 280 || fx > viewR + 280) continue;
+      Art.drawTrialTraversal(ctx, tr, t);
     }
 
     // contact shadows (grounding!)

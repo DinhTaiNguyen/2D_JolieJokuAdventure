@@ -2,7 +2,7 @@
 /* ============ menus, connection flow, DOM glue ============ */
 const Main = {
   el(id) { return document.getElementById(id); },
-  _toastT: null, _rotDismissed: false, _pausedForNet: false,
+  _toastT: null, _itemPopupT: null, _itemPopupHideT: null, _rotDismissed: false, _pausedForNet: false,
 
   init() {
     const $ = id => this.el(id);
@@ -42,7 +42,7 @@ const Main = {
     $('hostCodeInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnHostGo').click(); });
     $('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnConnGo').click(); });
     $('settingsCodeInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') (G.mode === 'guest' ? $('btnReconnectJoin') : $('btnReconnectHost')).click();
+      if (e.key === 'Enter') $('btnReconnect').click();
     });
     $('btnConnCancel').onclick = () => { SND.sfx('ui'); NET.close(); this.showMenu(); };
 
@@ -57,10 +57,18 @@ const Main = {
     $('btnHelpSettings').onclick = () => this.openHelp();
     $('languageSelect').onchange = () => this.setLanguage($('languageSelect').value);
 
+    SND.setVolume(SND.storedVolume(), true);
+    $('volumeSlider').value = String(Math.round(SND.volume * 100));
+    $('volumeValue').textContent = Math.round(SND.volume * 100) + '%';
     const updSound = () => {
       $('btnSound').textContent = SND.enabled ? '🔊' : '🔇';
       $('btnSound').classList.toggle('off', !SND.enabled);
       $('btnSound2').textContent = SND.enabled ? '🔊 ' + Story.t('soundOn') : '🔇 ' + Story.t('soundOff');
+    };
+    $('volumeSlider').oninput = () => {
+      SND.unlock();
+      const value = SND.setVolume(+$('volumeSlider').value / 100);
+      $('volumeValue').textContent = Math.round(value * 100) + '%';
     };
     $('btnSound').onclick = () => { SND.unlock(); SND.setEnabled(!SND.enabled); updSound(); };
     $('btnSound2').onclick = () => { SND.unlock(); SND.setEnabled(!SND.enabled); updSound(); };
@@ -74,8 +82,7 @@ const Main = {
     $('difficultySelect').onchange = () => { Game.setDifficulty($('difficultySelect').value); };
     $('btnGoChapter').onclick = () => { SND.sfx('ui'); Game.gotoChapter(+$('chapterSelect').value); };
     $('btnDropWeapon').onclick = () => { SND.sfx('ui'); Game.dropMyWeapon(); };
-    $('btnReconnectHost').onclick = () => { SND.unlock(); SND.sfx('ui'); this.reconnectAsHost(); };
-    $('btnReconnectJoin').onclick = () => { SND.unlock(); SND.sfx('ui'); this.reconnectAsJoin(); };
+    $('btnReconnect').onclick = () => { SND.unlock(); SND.sfx('ui'); this.reconnectCurrent(); };
     $('btnQuit').onclick = () => { SND.sfx('ui'); this.hidePause(); Game.quitToMenu(); };
 
     /* ---- network status wiring ---- */
@@ -159,13 +166,43 @@ const Main = {
       Game.startGame('solo', lvl);
       if (q.has('skip')) { G.cut = null; G.dialog = null; G.fade = 0; G.fadeDir = -1; }
       if (q.has('x')) {
-        const xx = q.get('x') === 'gate' ? G.level.gateX - 100 : +q.get('x');
-        G.me.x = xx; G.mate.x = xx + 46;
-        const ty = World.topAt(G.level, xx);
+        const xTarget = q.get('x');
+        const trialTarget = xTarget === 'trial' && G.level.loveTrials && G.level.loveTrials[0]
+          ? G.level.loveTrials[0] : null;
+        const xx = xTarget === 'gate' ? G.level.gateX - 100
+          : trialTarget ? trialTarget.x
+          : +xTarget;
+        G.me.x = trialTarget ? xx - 58 : xx;
+        G.mate.x = trialTarget ? xx + 58 : xx + 46;
+        const ty = trialTarget ? trialTarget.y : World.topAt(G.level, xx);
         if (ty !== null) { G.me.y = ty; G.mate.y = ty; }
         G.cam.x = xx;
       }
       if (q.has('boss')) G.bossActive = true;
+      if (q.has('qaTrial') && G.level.loveTrials && G.level.loveTrials[0]) { // test hook: begin at the two-power step
+        const trial = G.level.loveTrials[0];
+        G.cut = null; G.dialog = null; G.fade = 0; G.fadeDir = -1;
+        for (const foe of G.level.foes || []) {
+          if (foe.bossTier && foe.x < trial.x) { foe.dead = true; foe.dying = 0; }
+        }
+        G.level.shrineDone = true;
+        trial.stage = 3; trial.charge = 0; trial.skillMask = 0; trial.powerT = 0;
+        trial._powerPrompted = false; trial._travelPrompted = false;
+        const writeQaState = () => {
+          document.documentElement.dataset.jjQa = JSON.stringify({
+            me: { x: G.me.x, y: G.me.y, vy: G.me.vy, safeX: G.me.safeX, safeY: G.me.safeY },
+            mate: { x: G.mate.x, y: G.mate.y, vy: G.mate.vy },
+            trial: { x: trial.x, y: trial.y, stage: trial.stage, mask: trial.skillMask, travel: trial.travel, done: trial.done },
+            ground: World.topAt(G.level, G.me.x), announcement: G.announce && G.announce.txt
+          });
+        };
+        writeQaState();
+        setInterval(writeQaState, 100);
+        if (q.get('qaTrial') === 'ride') {
+          trial.skillMask = 3;
+          Game.startTrialTraversal(trial, false);
+        }
+      }
       if (q.has('qaBoss') || q.has('qaDate')) { // test hook: bypass progression for visual QA
         for (const tr of G.level.loveTrials || []) { tr.done = true; tr._celebrated = true; tr.stage = 3; }
         for (const foe of G.level.foes || []) if (foe.bossTier) { foe.dead = true; foe.dying = 0; }
@@ -263,8 +300,12 @@ const Main = {
     set('btnGoChapter', Story.t('goChapter'));
     set('btnDropWeapon', Story.t('dropWeapon'));
     set('btnResume', '▶ ' + Story.t('continue'));
-    set('btnReconnectHost', Story.t('hostReopen'));
-    set('btnReconnectJoin', Story.t('joinRejoin'));
+    set('btnReconnect', Story.t('reconnect'));
+    set('volumeLabelText', Story.t('gameVolume'));
+    const volumeSlider = this.el('volumeSlider');
+    if (volumeSlider) volumeSlider.setAttribute('aria-label', Story.t('gameVolume'));
+    const roomInput = this.el('settingsCodeInput');
+    if (roomInput) roomInput.setAttribute('aria-label', Story.t('roomCode'));
     set('btnQuit', '🚪 ' + Story.t('quitMenu'));
     set('btnSound2', (SND.enabled ? '🔊 ' : '🔇 ') + Story.t(SND.enabled ? 'soundOn' : 'soundOff'));
     set('btnHostGo', Story.t('hostRoom'));
@@ -333,7 +374,7 @@ const Main = {
       </div>
       <h3>Trai tim va hop tac</h3>
       <p>Dung gan nhau roi bam Trai tim de nam tay. Giu Trai tim de om va hoi mau. Khi thanh Love day, bam Trai tim de hon va tao bung sang tinh yeu.</p>
-      <p class="dim">Vu khi khong tu dong nhat. Hay di den dung vi tri vu khi dang sang tren dat va bam Nhat/Tha. Vu khi da roi se nam yen tai vi tri do. Trong moi chuong, hay cung nhau dung tren cac dau sang, nam tay, om, va hon de mo duong hoac nhan qua tot hon.</p>
+      <p class="dim">Vu khi khong tu dong nhat. Hay di den dung vi tri vu khi dang sang tren dat va bam Nhat/Tha. Vu khi da roi se nam yen tai vi tri do. Trong moi chuong, hay cung nhau dung tren cac dau sang, nam tay, om, va hon. Sau do, ca Joku va Jolie phai bam Dac biet de kich hoat hai nang luc tam thoi khac nhau. Hai nang luc ket hop se tao duong di rieng cua chuong.</p>
       <button id="helpClose" class="mbtn">Da hieu</button>
     ` : `
       <h2>How to Play</h2>
@@ -355,7 +396,7 @@ const Main = {
       </div>
       <h3>Heart and Co-op</h3>
       <p>Stand close and tap Heart to hold hands. Hold Heart to hug and heal. When the Love Meter is full, press Heart for a kiss burst that heals and clears danger.</p>
-      <p class="dim">Weapons do not auto-pickup. Move to the shining weapon on the ground and press Pick/Drop. Dropped weapons stay fixed exactly where they land. In each chapter, cooperate on glowing marks, hold hands, hug, and kiss to open paths or earn better rewards.</p>
+      <p class="dim">Weapons do not auto-pickup. Move to the shining weapon on the ground and press Pick/Drop. Dropped weapons stay fixed exactly where they land. At each chapter challenge, meet on the glowing marks, hold hands, hug, and kiss. Then both Joku and Jolie must press Special to invoke their different temporary powers; only the combined powers create the chapter's spectacular crossing.</p>
       <button id="helpClose" class="mbtn">Got it</button>
     `;
     const close = this.el('helpClose');
@@ -394,6 +435,12 @@ const Main = {
     const connected = NET.connected ? Story.t('connected') : (NET.peer ? Story.t('waiting') : Story.t('offline'));
     const modeLabel = mode === 'host' ? Story.t('hostMode') : mode === 'guest' ? Story.t('guestMode') : Story.t('soloMode');
     this.el('settingsConnMode').textContent = Story.t('connection') + ': ' + modeLabel + ' / ' + connected;
+    const reconnect = this.el('btnReconnect');
+    if (reconnect) {
+      reconnect.disabled = mode === 'solo';
+      reconnect.classList.toggle('host', mode !== 'guest');
+      reconnect.classList.toggle('join', mode === 'guest');
+    }
     const status = this.el('settingsConnStatus');
     if (status && kind === 'code') status.textContent = Story.t('hostingRoom', { code: msg });
     else if (status && kind === 'ok') status.textContent = Story.t('connectedRoom', { code: NET.code || input.value });
@@ -420,23 +467,20 @@ const Main = {
     this.syncConnectionSettings();
   },
 
-  reconnectAsHost() {
-    if (G.state === 'play' && G.mode === 'guest') { this.toast(Story.t('hostShouldHost')); return; }
-    if (G.state === 'play' && G.mode === 'solo') { this.toast(Story.t('soloStartHost')); return; }
+  reconnectCurrent() {
+    const role = NET.mode === 'host' || NET.mode === 'guest' ? NET.mode : G.mode;
+    if (role !== 'host' && role !== 'guest') {
+      this.toast(Story.t('soloNoReconnect'));
+      return;
+    }
     const code = this.cleanCodeInput('settingsCodeInput') || '1234';
     if (!NET.validCode(code)) { this.el('settingsConnStatus').textContent = Story.t('enterCode'); return; }
-    NET.host(code);
-    this.el('settingsConnStatus').textContent = Story.t('hostingRoom', { code });
-    this.syncConnectionSettings();
-  },
-
-  reconnectAsJoin() {
-    if (G.state === 'play' && G.mode === 'host') { this.toast(Story.t('jokuKeepHosting')); return; }
-    if (G.state === 'play' && G.mode === 'solo') { this.toast(Story.t('soloStartJoin')); return; }
-    const code = this.cleanCodeInput('settingsCodeInput') || '1234';
-    if (!NET.validCode(code)) { this.el('settingsConnStatus').textContent = Story.t('enterCode'); return; }
-    NET.join(code);
-    this.el('settingsConnStatus').textContent = Story.t('openingPortal');
+    if (NET.connected && NET.code === code) {
+      this.el('settingsConnStatus').textContent = Story.t('alreadyConnected', { code });
+      return;
+    }
+    this.el('settingsConnStatus').textContent = Story.t('reconnectingRoom', { code });
+    NET.reconnect(code, role);
     this.syncConnectionSettings();
   },
 
@@ -577,6 +621,16 @@ const Main = {
     }
   },
 
+  skinTouchControls() {
+    if (typeof ASSETS === 'undefined' || !ASSETS.skinTouchButton || !ASSETS.has('ui_kit')) return;
+    ASSETS.skinTouchButton(this.el('tJump'), 'move', false);
+    ASSETS.skinTouchButton(this.el('tAtk'), 'attack', false);
+    ASSETS.skinTouchButton(this.el('tHeart'), 'heart', false);
+    ASSETS.skinTouchButton(this.el('tSp'), G.me && G.me.char === 'jolie' ? 'star' : 'water', false);
+    ASSETS.skinTouchButton(this.el('tWeapon'), 'star', true);
+    ASSETS.skinTouchButton(this.el('tDrop'), 'gift', true);
+  },
+
   setCooldownButton(id, frac, readyColor) {
     const el = this.el(id);
     if (!el) return;
@@ -595,13 +649,16 @@ const Main = {
 
   syncWeaponUI() {
     if (!G.me) return;
+    this.skinTouchControls();
     const w = G.me.weapon && Weapons[G.me.weapon] ? Weapons[G.me.weapon] : null;
     const weaponName = id => (typeof Story !== 'undefined' && Story.weaponText ? Story.weaponText(id, 'name') : (Weapons[id] && Weapons[id].name)) || (Weapons[id] && Weapons[id].name) || 'weapon';
     const base = G.me.char === 'joku' ? '🌊' : '🌸';
     const sp = this.el('tSp');
     if (sp) {
       sp.textContent = base;
-      sp.title = G.me.char === 'joku' ? Story.t('oceanDash') : Story.t('healingBloom');
+      const tr = typeof Game !== 'undefined' && Game.activeLoveTrial ? Game.activeLoveTrial() : null;
+      const temp = tr && tr.stage === 3 ? Story.trialPowers(G.levelIndex)[G.me.char] : null;
+      sp.title = temp ? temp.name + ': ' + temp.effect : (G.me.char === 'joku' ? Story.t('oceanDash') : Story.t('healingBloom'));
       sp.setAttribute('aria-label', sp.title);
       sp.style.borderColor = '';
       sp.style.boxShadow = '';
@@ -646,26 +703,10 @@ const Main = {
   syncWeaponInfo() {
     const box = this.el('weaponInfo');
     if (!box || typeof Weapons === 'undefined') return;
-    const id = G.me && G.me.weapon && Weapons[G.me.weapon] ? G.me.weapon : '';
-    const w = id ? Weapons[id] : null;
-    const key = [id, w && w.name, w && w.role, w && w.skill, G.me && G.me.char].join('|');
-    if (box.dataset.key === key) return;
-    box.dataset.key = key;
-    if (!w) {
-      box.innerHTML = '<h3>Your Weapon</h3><div class="weaponInfoEmpty">No weapon equipped. Stand near a shining weapon and press Pick/Drop to equip it.</div>';
-      return;
-    }
-    const who = G.me.char === 'joku' ? 'Joku' : 'Jolie';
-    box.innerHTML = `<h3>${who}'s Weapon</h3><div class="weaponInfoItem current"><span>${w.icon}</span><div><b>${w.name}</b><br>${w.skill}. Use Weapon Skill (${Input.touchMode ? '✦' : 'U/O/B'}) when you want its extra power. Staying near your partner gives a bond bonus.</div><span class="weaponInfoRole">${w.role || 'Attack'}</span></div>`;
-  },
-
-  syncWeaponInfo() {
-    const box = this.el('weaponInfo');
-    if (!box || typeof Weapons === 'undefined') return;
     const vi = typeof Story !== 'undefined' && Story.isVietnamese && Story.isVietnamese();
     const id = G.me && G.me.weapon && Weapons[G.me.weapon] ? G.me.weapon : '';
     const w = id ? Weapons[id] : null;
-    const key = [typeof Story !== 'undefined' && Story.LANG, id, w && w.name, w && w.role, w && w.skill, G.me && G.me.char].join('|');
+    const key = [typeof Story !== 'undefined' && Story.LANG, id, w && w.name, w && w.role, w && w.skill, w && w.benefit, G.me && G.me.char, Input.touchMode].join('|');
     if (box.dataset.key === key) return;
     box.dataset.key = key;
     if (!w) {
@@ -673,12 +714,59 @@ const Main = {
       return;
     }
     const who = G.me.char === 'joku' ? 'Joku' : 'Jolie';
-    const trigger = Input.touchMode ? 'Weapon Skill button' : 'U/O/B';
+    const trigger = Input.touchMode ? (vi ? 'nut Ky nang vu khi' : 'Weapon Skill button') : 'U/O/B';
     const skill = Story.weaponText(id, 'skill') || w.skill;
     const desc = Story.weaponText(id, 'desc') || '';
     const role = Story.weaponText(id, 'role') || w.role || 'Attack';
+    const benefit = vi ? (w.benefitVi || w.benefit || desc) : (w.benefit || desc);
+    const attack = Math.round((w.dmg || 1) * 100) + '%';
+    const speed = Math.round((w.speed || 1) * 100) + '%';
+    const cooldown = (w.cd || 6).toFixed(1) + 's';
     const text = Story.t('weaponUse', { skill, desc, trigger });
-    box.innerHTML = `<h3>${Story.t('weaponOwner', { name: who })}</h3><div class="weaponInfoItem current"><span>${w.icon}</span><div><b>${Story.weaponText(id, 'name') || w.name}</b><br>${text}</div><span class="weaponInfoRole">${role}</span></div>`;
+    box.innerHTML = `<h3>${Story.t('weaponOwner', { name: who })}</h3><div class="weaponInfoItem current"><span>${w.icon}</span><div><b>${Story.weaponText(id, 'name') || w.name}</b><br>${text}<div class="weaponInfoStats"><span class="weaponInfoStat"><b>${attack}</b>${Story.t('weaponAttack')}</span><span class="weaponInfoStat"><b>${speed}</b>${Story.t('weaponSpeed')}</span><span class="weaponInfoStat"><b>${cooldown}</b>${Story.t('weaponCooldown')}</span></div><span class="weaponInfoBenefit"><b>${Story.t('weaponTeamEffect')}:</b> ${benefit}</span></div><span class="weaponInfoRole">${role}</span></div>`;
+  },
+
+  showItemPopup(kind, data = {}) {
+    const popup = this.el('itemPopup');
+    if (!popup) return;
+    let icon = '', title = '', summary = '', stats = '';
+    if (kind === 'weapon') {
+      const w = Weapons[data.weapon];
+      if (!w) return;
+      const vi = Story.isVietnamese && Story.isVietnamese();
+      const skill = Story.weaponText(data.weapon, 'skill') || w.skill;
+      const desc = Story.weaponText(data.weapon, 'desc') || w.desc || '';
+      const role = Story.weaponText(data.weapon, 'role') || w.role || Story.t('weaponAttack');
+      const benefit = vi ? (w.benefitVi || w.benefit || desc) : (w.benefit || desc);
+      icon = w.icon;
+      title = Story.t('pickupEquipped') + ': ' + (Story.weaponText(data.weapon, 'name') || w.name);
+      summary = skill + '. ' + desc;
+      stats = `${role} | ${Story.t('weaponAttack')} ${Math.round((w.dmg || 1) * 100)}% | ${Story.t('weaponSpeed')} ${Math.round((w.speed || 1) * 100)}% | ${Story.t('weaponCooldown')} ${(w.cd || 6).toFixed(1)}s | ${benefit}`;
+    } else {
+      const pickups = {
+        orb: ['orb', 'pickupOrb', 'pickupOrbEffect'],
+        flower: ['flower', 'pickupFlower', 'pickupFlowerEffect'],
+        heartDrop: ['heart', 'pickupHeart', 'pickupHeartEffect'],
+        mote: ['mote', 'pickupMote', 'pickupMoteEffect']
+      };
+      const def = pickups[kind];
+      if (!def) return;
+      icon = { orb: 'MP', flower: 'HP', heart: 'LOVE', mote: 'MP' }[def[0]];
+      title = Story.t(def[1]);
+      summary = Story.t(def[2]);
+    }
+    this.el('itemPopupIcon').textContent = icon;
+    this.el('itemPopupTitle').textContent = title;
+    this.el('itemPopupText').textContent = summary;
+    this.el('itemPopupStats').textContent = stats;
+    clearTimeout(this._itemPopupT);
+    clearTimeout(this._itemPopupHideT);
+    popup.classList.remove('hidden');
+    requestAnimationFrame(() => popup.classList.add('show'));
+    this._itemPopupT = setTimeout(() => {
+      popup.classList.remove('show');
+      this._itemPopupHideT = setTimeout(() => popup.classList.add('hidden'), 220);
+    }, kind === 'weapon' ? 5200 : 2600);
   },
 
   togglePause() {

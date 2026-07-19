@@ -12,7 +12,7 @@
 <meta name="x5-orientation" content="landscape">
 <meta name="full-screen" content="yes">
 <meta name="x5-fullscreen" content="true">
-<meta name="joku-network-id" content="dinhtainguyen-2d-joliejoku-v5">
+<meta name="joku-network-id" content="dinhtainguyen-2d-joliejoku-v6">
 <meta name="joku-public-url" content="https://dinhtainguyen.github.io/2D_JolieJokuAdventure/">
 <!-- Optional: add a trusted endpoint that returns { "iceServers": [...] } for guaranteed TURN relay. -->
 <meta name="joku-turn-endpoint" content="">
@@ -145,12 +145,18 @@
         <label>Room Code
           <input id="settingsCodeInput" maxlength="64" autocomplete="one-time-code" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text" enterkeyhint="go" placeholder="1234" aria-label="Connection room code">
         </label>
-        <div class="connBtns">
-          <button id="btnReconnectHost" class="mbtn host">Host/Reopen</button>
-          <button id="btnReconnectJoin" class="mbtn join">Join/Rejoin</button>
+        <div class="connBtns single">
+          <button id="btnReconnect" class="mbtn host">Reconnect</button>
         </div>
         <p id="settingsConnStatus" class="dim"></p>
       </div>
+      <label class="volumeControl">
+        <span id="volumeLabelText">Game Volume</span>
+        <span class="volumeRow">
+          <input id="volumeSlider" type="range" min="0" max="100" step="1" value="50" aria-label="Game volume">
+          <output id="volumeValue" for="volumeSlider">50%</output>
+        </span>
+      </label>
       <button id="btnSound2" class="mbtn ghost">🔊 Sound</button>
       <button id="btnQuit" class="mbtn ghost">🚪 Quit to Menu</button>
     </div>
@@ -170,6 +176,14 @@
   </div>
 
   <div id="toast"></div>
+  <div id="itemPopup" class="itemPopup hidden" role="status" aria-live="polite">
+    <div id="itemPopupIcon" class="itemPopupIcon"></div>
+    <div class="itemPopupBody">
+      <strong id="itemPopupTitle"></strong>
+      <span id="itemPopupText"></span>
+      <small id="itemPopupStats"></small>
+    </div>
+  </div>
   <div id="rotateHint" class="hidden"><div>📱↻<br>Rotate your phone sideways<br>for the best adventure!<br><button id="rotateFullBtn" class="mbtn ghost rotateFull" type="button">&#9974; Fullscreen</button></div></div>
 </div>
 

@@ -210,6 +210,60 @@ const WeaponDescVI = {
 };
 for (const id in WeaponDesc) if (Weapons[id]) Weapons[id].desc = WeaponDesc[id];
 for (const id in WeaponDescVI) if (Weapons[id]) Weapons[id].descVi = WeaponDescVI[id];
+const WeaponBenefits = {
+  tideSpear: 'High attack, 10% faster shots, piercing mobility and brief safety.',
+  roseScepter: '18% stronger attacks, two shots, team HP recovery and area damage.',
+  starBlade: '10% stronger attacks and five falling stars for air or tall targets.',
+  heartStaff: 'Restores team HP and Love Meter; its skill also costs less MP.',
+  moonBow: 'Three arrows with 18% faster shots for practical crowd control.',
+  emberAxe: 'Very high attack power with heavy falling fire arcs.',
+  thunderHammer: 'High area attack plus a stun window for both players to strike.',
+  crystalDagger: '35% faster shots and an eight-direction escape burst.',
+  shadowKatana: 'High attack, safe blink movement and brief invulnerability.',
+  sunShield: 'Protects both players and pushes nearby enemies away.',
+  lotusFan: 'Four projectiles plus a short healing and damage field.',
+  riverBow: 'Two shots at 22% higher speed and a protective river barrage.',
+  cometSword: 'High attack, fast repositioning and a powerful straight comet shot.',
+  pandaBell: 'Biscuit restores team HP and MP and creates recovery pickups.',
+  luluClaw: '18% stronger attacks; Lulu damages and slows threats near both players.',
+  phoenixWand: '15% stronger attacks and a full-circle nova for large groups.',
+  dreamLyre: 'Adds Love Meter, delays enemy attacks and controls weaker monsters.',
+  vineScythe: 'High attack, wide rooting control and slower enemy attack timing.',
+  auroraOrb: 'Three orbiting attacks plus a temporary defensive shield.',
+  loveLantern: 'Restores team HP, increases Love Meter and creates a safe beacon.',
+  sacredBamboo: 'High attack, 8% faster shots, piercing and enemy attack delay.',
+  buffaloShield: 'Protects both players, then adds a guarded forward charge.',
+  goldenRiceSickle: 'High attack, returning arcs and nearby partner HP recovery.',
+  toOngSandal: '12% stronger and faster attacks with returning crowd-control hits.'
+};
+const WeaponBenefitsVI = {
+  tideSpear: 'Tan cong cao, dan nhanh hon 10%, luot xuyen va co khoang an toan ngan.',
+  roseScepter: 'Tan cong manh hon 18%, hai dan, hoi HP cho doi va gay sat thuong vung.',
+  starBlade: 'Tan cong manh hon 10% va nam sao roi de danh muc tieu bay hoac cao.',
+  heartStaff: 'Hoi HP ca doi, tang Love, va ky nang ton it MP hon.',
+  moonBow: 'Ba mui ten nhanh hon 18%, huu ich de don nhieu quai.',
+  emberAxe: 'Sat thuong rat cao voi nhung vong lua nang roi xuong.',
+  thunderHammer: 'Tan cong vung cao va lam choang de ca hai cung danh.',
+  crystalDagger: 'Dan nhanh hon 35% va bung no tam huong khi bi vay.',
+  shadowKatana: 'Tan cong cao, luot nhanh an toan va bat tu ngan.',
+  sunShield: 'Bao ve ca hai va day lui quai dang o gan.',
+  lotusFan: 'Bon vien dan va mot vung ngan vua hoi mau vua gay sat thuong.',
+  riverBow: 'Hai dan nhanh hon 22% va buc tuong song che chan cho doi.',
+  cometSword: 'Tan cong cao, doi vi tri nhanh va ban sao choi manh theo duong thang.',
+  pandaBell: 'Biscuit hoi HP, MP cho doi va tao vat pham hoi phuc.',
+  luluClaw: 'Tan cong manh hon 18%; Lulu gay sat thuong va lam cham quai gan ca hai.',
+  phoenixWand: 'Tan cong manh hon 15% va no vong tron khi bi bao vay.',
+  dreamLyre: 'Tang Love, lam cham don quai va khong che quai yeu.',
+  vineScythe: 'Tan cong cao, troi chan vung rong va lam cham nhip danh cua quai.',
+  auroraOrb: 'Ba tia sang quay quanh va mot lop khien tam thoi.',
+  loveLantern: 'Hoi HP ca doi, tang Love va tao diem sang an toan.',
+  sacredBamboo: 'Tan cong cao, dan nhanh hon 8%, xuyen muc tieu va lam cham don quai.',
+  buffaloShield: 'Bao ve ca hai roi xung phong ve phia truoc trong tu the phong thu.',
+  goldenRiceSickle: 'Tan cong cao, liem quay ve va hoi HP cho nguoi yeu o gan.',
+  toOngSandal: 'Tan cong manh va nhanh hon 12%, quay ve de don nhieu quai.'
+};
+for (const id in WeaponBenefits) if (Weapons[id]) Weapons[id].benefit = WeaponBenefits[id];
+for (const id in WeaponBenefitsVI) if (Weapons[id]) Weapons[id].benefitVi = WeaponBenefitsVI[id];
 const WeaponCooldowns = {
   tideSpear: 5.2, roseScepter: 6.4, starBlade: 6.2, heartStaff: 7.2, moonBow: 5.6,
   emberAxe: 6.2, thunderHammer: 6.8, crystalDagger: 5.1, shadowKatana: 5.4, sunShield: 7.2,

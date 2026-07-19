@@ -1,14 +1,21 @@
 'use strict';
 /* ============ WebAudio: synth SFX + gentle music, no asset files ============ */
 const SND = {
-  ctx: null, master: null, musicGain: null, enabled: true, musicOn: true,
+  ctx: null, master: null, musicGain: null, enabled: true, musicOn: true, volume: .5,
   _musicTimer: null, _step: 0, _theme: 0, _epic: false,
+
+  storedVolume() {
+    try {
+      const raw = localStorage.getItem('jjVolume');
+      return raw == null ? .5 : U.clamp(parseFloat(raw) || 0, 0, 1);
+    } catch (e) { return .5; }
+  },
 
   unlock() { // must be called from a user gesture (iOS/Android)
     if (!this.ctx) {
       try {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        this.master = this.ctx.createGain(); this.master.gain.value = 0.55;
+        this.master = this.ctx.createGain(); this.master.gain.value = this.enabled ? this.volume : 0;
         this.master.connect(this.ctx.destination);
         this.musicGain = this.ctx.createGain(); this.musicGain.gain.value = 0.16;
         this.musicGain.connect(this.master);
@@ -19,7 +26,16 @@ const SND = {
 
   setEnabled(on) {
     this.enabled = on;
-    if (this.master) this.master.gain.value = on ? 0.55 : 0;
+    if (this.master) this.master.gain.value = on ? this.volume : 0;
+  },
+
+  setVolume(value, quiet = false) {
+    this.volume = U.clamp(Number(value) || 0, 0, 1);
+    if (this.master) this.master.gain.value = this.enabled ? this.volume : 0;
+    if (!quiet) {
+      try { localStorage.setItem('jjVolume', String(this.volume)); } catch (e) {}
+    }
+    return this.volume;
   },
 
   tone(o) { // {f, f2, type, d, v, delay, curve}
@@ -96,6 +112,16 @@ const SND = {
       case 'drum':    this.noise({ d: .32, v: .2, f: 260 });
                       this.tone({ f: 120, f2: 58, type: 'sine', d: .38, v: .17 });
                       this.tone({ f: 180, f2: 90, type: 'triangle', d: .24, v: .08, delay: .12 }); break;
+      case 'powerWater':
+                      this.noise({ d: .34, v: .12, f: 1700 });
+                      [330, 494, 740, 988].forEach((f, i) => this.tone({ f, f2: f * 1.35, type: 'sine', d: .28, v: .08, delay: i * .055 })); break;
+      case 'powerFlower':
+                      [523, 659, 988, 1318].forEach((f, i) => this.tone({ f, f2: f * 1.18, d: .32, v: .075, delay: i * .065 })); break;
+      case 'trialRide':
+                      this.tone({ f: 196, f2: 392, type: 'triangle', d: .75, v: .12 });
+                      [523, 659, 784, 1046].forEach((f, i) => this.tone({ f, d: .5, v: .08, delay: .12 + i * .09 })); break;
+      case 'victory':
+                      [392, 523, 659, 784, 1046, 1318].forEach((f, i) => this.tone({ f, d: .58, v: .09, delay: i * .1 })); break;
       case 'bark':    this.tone({ f: 520, f2: 340, type: 'square', d: .08, v: .11 });
                       this.tone({ f: 480, f2: 300, type: 'square', d: .09, v: .11, delay: .09 }); break;
     }

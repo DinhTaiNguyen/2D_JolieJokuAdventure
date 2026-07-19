@@ -236,21 +236,41 @@ const World = {
       const kind = World.COOP_CHALLENGES[idx % World.COOP_CHALLENGES.length];
       return {
         id: 'trial' + i, kind, x: g.x, y: g.pl.y, done: false, charge: 0, stage: 0,
-        lockLimit: g.x + 150, extreme: true
+        skillMask: 0, travel: 0, lockLimit: g.x + 150, extreme: true
       };
     });
     const coopObstacles = loveTrials.map(tr => {
       const spec = {
-        forestBridge: { w: 860, h: 230 },
-        oceanPhoenix: { w: 1180, h: 260 },
-        flowerLift: { w: 760, h: 430 },
-        shadowLantern: { w: 920, h: 320 },
-        emberRain: { w: 980, h: 310 },
-        starMirror: { w: 1040, h: 340 },
-        giongBridge: { w: 1420, h: 430 },
-      }[tr.kind] || { w: 880, h: 260 };
-      return { id: tr.id + '_obstacle', trialId: tr.id, kind: tr.kind, x: tr.x + 230, y: tr.y, w: spec.w, h: spec.h };
+        forestBridge: { w: 1080, h: 260, dur: 4.8, arc: 125 },
+        oceanPhoenix: { w: 1720, h: 330, dur: 6.6, arc: 265 },
+        flowerLift: { w: 1040, h: 500, dur: 5.6, arc: 335 },
+        shadowLantern: { w: 1260, h: 370, dur: 5.4, arc: 155 },
+        emberRain: { w: 1380, h: 360, dur: 5.8, arc: 195 },
+        starMirror: { w: 1480, h: 410, dur: 6.0, arc: 265 },
+        giongBridge: { w: 1740, h: 470, dur: 6.4, arc: 235 },
+      }[tr.kind] || { w: 980, h: 280, dur: 5, arc: 150 };
+      const startX = tr.x + 230;
+      const landing = groundNear(startX + spec.w + 110);
+      const endX = Math.max(startX + 620, landing.x);
+      tr.routeStartX = tr.x + 34;
+      tr.endX = endX;
+      tr.endY = landing.pl.y;
+      tr.travelDur = spec.dur;
+      tr.travelArc = spec.arc;
+      return {
+        id: tr.id + '_obstacle', trialId: tr.id, kind: tr.kind,
+        x: startX, y: tr.y, w: Math.max(620, endX - startX), h: spec.h,
+        endX, endY: landing.pl.y
+      };
     });
+    // The cooperative crossing is a focused set-piece, not an unavoidable combat corridor.
+    // Keep ordinary enemies outside its route while preserving every strong boss lock.
+    for (const tr of loveTrials) {
+      for (let i = foes.length - 1; i >= 0; i--) {
+        const f = foes[i];
+        if (!f.bossTier && f.x > tr.x - 260 && f.x < tr.endX + 130) foes.splice(i, 1);
+      }
+    }
     const postBoss = this._addDateJourney(cfg, idx, {
       ground, mush, row,
       startX: arenaEnd,

@@ -1885,6 +1885,126 @@ const Art = {
     ctx.restore();
   },
 
+  drawTrialTraversal(ctx, tr, t) {
+    if (!tr || tr.done || (tr.stage || 0) < 3) return;
+    const colors = {
+      forestBridge: '#9be27d', oceanPhoenix: '#56d6ff', flowerLift: '#ff9fce',
+      shadowLantern: '#d9b6ff', emberRain: '#7fd8ff', starMirror: '#fff3a8', giongBridge: '#e8c65f'
+    };
+    const color = colors[tr.kind] || '#ff9fce';
+    const joku = typeof Game !== 'undefined' ? Game.byChar('joku') : null;
+    const jolie = typeof Game !== 'undefined' ? Game.byChar('jolie') : null;
+    ctx.save();
+
+    // While waiting, make each invoked temporary power visibly surround its owner.
+    if (tr.stage === 3) {
+      for (const [p, bit, col] of [[joku, 1, '#72ddff'], [jolie, 2, '#ff9fce']]) {
+        if (!p || !(tr.skillMask & bit)) continue;
+        ctx.globalCompositeOperation = 'lighter';
+        this.glow(ctx, p.x, p.y - 42, 52 + Math.sin(t * 5 + bit) * 8, col, .58);
+        ctx.strokeStyle = col + 'cc';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y - 38, 35 + Math.sin(t * 4 + bit) * 5, 0, U.TAU);
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      if ((tr.skillMask || 0) === 3 && joku && jolie) {
+        ctx.strokeStyle = 'rgba(255,225,242,.82)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(joku.x, joku.y - 45);
+        ctx.quadraticCurveTo((joku.x + jolie.x) / 2, Math.min(joku.y, jolie.y) - 88, jolie.x, jolie.y - 45);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+
+    if (tr.stage !== 4 || tr.rideX == null) { ctx.restore(); return; }
+    const x = tr.rideX, y = tr.rideY;
+    const startX = tr.routeStartX || tr.x;
+    const trailStart = Math.max(startX, x - 360);
+    ctx.globalCompositeOperation = 'lighter';
+    const ribbon = ctx.createLinearGradient(trailStart, 0, x + 40, 0);
+    ribbon.addColorStop(0, color + '00');
+    ribbon.addColorStop(1, color + 'bb');
+    ctx.strokeStyle = ribbon;
+    ctx.lineWidth = tr.kind === 'oceanPhoenix' ? 16 : 9;
+    ctx.beginPath();
+    ctx.moveTo(trailStart, y + 38);
+    ctx.quadraticCurveTo((trailStart + x) / 2, y + Math.sin(t * 4) * 18, x + 20, y + 30);
+    ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+
+    const scene = typeof ASSETS !== 'undefined' && ASSETS.TRIAL_MAP ? ASSETS.TRIAL_MAP[tr.kind] : null;
+    if (scene && ASSETS.has(scene)) {
+      const h = tr.kind === 'oceanPhoenix' ? 245 : tr.kind === 'giongBridge' ? 205 : 175;
+      ASSETS.draw(ctx, scene, 0, x, y + (tr.kind === 'oceanPhoenix' ? 102 : 62), {
+        h, anchor: 'center', alpha: .94,
+        filter: tr.kind === 'shadowLantern' ? 'brightness(1.18)' : 'none'
+      });
+    } else if (tr.kind === 'oceanPhoenix') {
+      this.drawProj(ctx, { kind: 'phoenix', x, y: y + 42, vx: 1, vy: 0, t }, t);
+    }
+
+    ctx.globalCompositeOperation = 'lighter';
+    if (tr.kind === 'forestBridge') {
+      ctx.strokeStyle = '#b8ff94cc'; ctx.lineWidth = 5;
+      for (let i = 0; i < 5; i++) {
+        const yy = y + 20 + i * 7;
+        ctx.beginPath(); ctx.moveTo(x - 190, yy); ctx.bezierCurveTo(x - 80, yy - 35, x + 80, yy + 26, x + 185, yy - 8); ctx.stroke();
+      }
+      for (let i = 0; i < 8; i++) this.heart(ctx, x - 150 + i * 42, y + 8 + Math.sin(t * 4 + i) * 14, 4, i % 2 ? '#ffb6e6' : '#d4ffad');
+    } else if (tr.kind === 'oceanPhoenix') {
+      for (let i = 0; i < 13; i++) {
+        const a = t * 5 + i * .8;
+        this.glow(ctx, x - 205 + i * 31, y + 76 + Math.sin(a) * 24, 7, '#bdf5ff', .72);
+      }
+    } else if (tr.kind === 'flowerLift') {
+      for (let i = 0; i < 12; i++) {
+        const a = t * 1.8 + i * U.TAU / 12;
+        this.heart(ctx, x + Math.cos(a) * (75 + i * 3), y + Math.sin(a) * 55, 5, i % 2 ? '#ff9fce' : '#fff3a8');
+      }
+    } else if (tr.kind === 'shadowLantern') {
+      this.glow(ctx, x, y - 28, 122, '#d9b6ff', .68);
+      ctx.strokeStyle = 'rgba(255,232,184,.9)'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(x, y - 28, 88 + Math.sin(t * 3) * 5, 0, U.TAU); ctx.stroke();
+    } else if (tr.kind === 'emberRain') {
+      ctx.strokeStyle = 'rgba(140,225,255,.72)'; ctx.lineWidth = 3;
+      for (let i = -8; i <= 8; i++) {
+        const rx = x + i * 26 + ((t * 90) % 26);
+        ctx.beginPath(); ctx.moveTo(rx, y - 150); ctx.lineTo(rx - 24, y + 50); ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(255,160,205,.92)'; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.arc(x, y + 8, 105, Math.PI + .15, U.TAU - .15); ctx.stroke();
+    } else if (tr.kind === 'starMirror') {
+      ctx.strokeStyle = 'rgba(255,243,168,.86)'; ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let i = 0; i < 9; i++) {
+        const px = x - 190 + i * 48, py = y + Math.sin(i * 1.7 + t * 2) * 42;
+        if (!i) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        this.star(ctx, px, py, 6, i % 2 ? '#fff3a8' : '#d7b7ff');
+      }
+      ctx.stroke();
+    } else if (tr.kind === 'giongBridge') {
+      ctx.strokeStyle = 'rgba(232,198,95,.95)'; ctx.lineWidth = 9;
+      for (let i = -4; i <= 4; i++) {
+        const bx = x + i * 46;
+        ctx.beginPath(); ctx.moveTo(bx - 20, y + 50); ctx.lineTo(bx + 16, y - 42); ctx.stroke();
+      }
+      for (let i = 0; i < 5; i++) {
+        const r = 28 + i * 20 + ((t * 35) % 20);
+        ctx.strokeStyle = `rgba(255,225,130,${.58 - i * .08})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(x - 105, y - 65, r, 0, U.TAU); ctx.stroke();
+      }
+    }
+    this.glow(ctx, x, y - 34, 68, color, .55 + Math.sin(t * 5) * .12);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+  },
+
   drawCoopObstacle(ctx, ob, tr, pal, t) {
     const done = !!(tr && tr.done);
     const charge = U.clamp((tr && tr.charge) || 0, 0, 1);

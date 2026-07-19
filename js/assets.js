@@ -168,7 +168,9 @@ const ASSETS = {
     }
     this.request(this.PLAY_ASSETS, urgent);
     this.request(themed, urgent);
-    const lateArt = () => this.request(this.DEFERRED_ASSETS, false);
+    const lateNames = this.DEFERRED_ASSETS.concat(['cg_victory']);
+    if (index === World.LEVELS.length - 1) lateNames.push('cg_ending');
+    const lateArt = () => this.request(lateNames, false);
     if ('requestIdleCallback' in window) window.requestIdleCallback(lateArt, { timeout: 2600 });
     else setTimeout(lateArt, 1400);
   },
@@ -407,6 +409,35 @@ const ASSETS = {
     return true;
   },
 
+  _touchIcons: Object.create(null),
+  touchIconUrl(key) {
+    if (this._touchIcons[key]) return this._touchIcons[key];
+    const d = this.data.ui_kit, r = this.UI_RECTS[key];
+    if (!d || !d.ok || !r) return '';
+    const sx = r[0] * d.img.width / 2304;
+    const sy = r[1] * d.img.height / 1296;
+    const sw = r[2] * d.img.width / 2304;
+    const sh = r[3] * d.img.height / 1296;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 144;
+    const g = cv.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(d.img, sx, sy, sw, sh, 0, 0, 144, 144);
+    try { this._touchIcons[key] = cv.toDataURL('image/png'); }
+    catch (e) { return ''; }
+    return this._touchIcons[key];
+  },
+
+  skinTouchButton(el, key, showGlyph = false) {
+    if (!el) return false;
+    const url = this.touchIconUrl(key);
+    if (!url) return false;
+    el.style.setProperty('--kit-icon', `url("${url}")`);
+    el.classList.add('kitSkinned');
+    el.classList.toggle('kitNoGlyph', !showGlyph);
+    return true;
+  },
+
   frameCount(name) {
     const d = this.data[name];
     return d && d.ok ? d.frames.length : 0;
@@ -517,13 +548,15 @@ const ASSETS = {
     const sheet = who + '_sheet', runSheet = who + '_run', idleSheet = who + '_idle', actionSheet = who + '_actions';
     if (!this.has(sheet) && !this.has(runSheet) && !this.has(actionSheet)) return false;
     const atk = p.atkT != null && p.atkT < .28;
-    const actionHot = (atk || (p.weaponPose || 0) > .03 || ((p.cheerT || 0) > .18 && p.weapon)) && this.has(actionSheet);
+    const riding = !!p.trialRide;
+    const actionHot = !riding && (atk || (p.weaponPose || 0) > .03 || ((p.cheerT || 0) > .18 && p.weapon)) && this.has(actionSheet);
     const running = Math.abs(p.vx) > 30 && p.onGround;
     let src = sheet;
     let idx = 0;
     if (p.pose === 'kiss' && this.has(sheet)) idx = 7;
     else if (p.pose === 'hug' && this.has(sheet)) idx = 6;
     else if ((p.down || p.hurtT > 0) && this.has(sheet)) idx = 5;
+    else if (riding && this.has(actionSheet)) { src = actionSheet; idx = Math.min(6, this.frameCount(actionSheet) - 1); }
     else if (actionHot) { src = actionSheet; idx = this.heroActionIndex(p); }
     else if (!p.onGround && this.has(sheet)) idx = 3;
     else if (running && this.has(runSheet)) { src = runSheet; idx = this.loopFrame(runSheet, p.animT * 12); }
@@ -1065,7 +1098,8 @@ const ASSETS = {
   _overlay(ctx, W, H) {
     let want = null;
     if (typeof G !== 'undefined' && G.state === 'play') {
-      if (G.cut && G.cut.name === 'ending' && G.me && G.me.pose === 'kiss' && this.has('cg_victory')) want = 'cg_victory';
+      if (G.chapterVictory && this.has('cg_victory')) want = 'cg_victory';
+      else if (G.cut && G.cut.name === 'ending' && G.me && G.me.pose === 'kiss' && this.has('cg_ending')) want = 'cg_ending';
     }
     if (want) this._cgName = want;
     this._cgAlpha = U.clamp(this._cgAlpha + (want ? .045 : -.05), 0, 1);
@@ -1074,16 +1108,31 @@ const ASSETS = {
     if (!d || !d.ok) return;
     const img = d.img;
     const s = Math.max(W / img.width, H / img.height);
-    const dw = img.width * s, dh = img.height * s;
+    const motion = 1.025 + Math.sin((G.time || 0) * .35) * .012;
+    const dw = img.width * s * motion, dh = img.height * s * motion;
     ctx.save();
     ctx.globalAlpha = this._cgAlpha * .96;
-    ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    const panX = Math.sin((G.time || 0) * .18) * W * .012;
+    ctx.drawImage(img, (W - dw) / 2 + panX, (H - dh) / 2, dw, dh);
     // soft frame vignette so it reads as a story moment
     const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .34, W / 2, H / 2, Math.max(W, H) * .62);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
     vg.addColorStop(1, 'rgba(10,4,12,.55)');
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, W, H);
+    if (this._cgName === 'cg_victory' && G.chapterVictory) {
+      ctx.globalAlpha = this._cgAlpha;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(20,4,18,.9)';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#fff7d6';
+      ctx.font = `700 ${Math.max(24, Math.min(46, W * .055))}px Fredoka, sans-serif`;
+      ctx.fillText(Story.t('chapterClear'), W / 2, H * .16);
+      ctx.font = `600 ${Math.max(14, Math.min(22, W * .026))}px Fredoka, sans-serif`;
+      ctx.fillStyle = '#ffd7ec';
+      ctx.fillText(Story.levelName(G.levelIndex), W / 2, H * .16 + 34);
+      ctx.shadowBlur = 0;
+    }
     ctx.restore();
     // chapter badge on the announce splash
   },

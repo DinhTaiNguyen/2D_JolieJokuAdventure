@@ -23,7 +23,7 @@ const NET = {
   onPeerJoin: null,  // host: guest arrived
   onDrop: null,
 
-  PROTOCOL: 5,
+  PROTOCOL: 6,
   ALPHA: 'ABCDEFGHJKMNPQRSTUVWXYZ123456789',
   STUN_SERVERS: [
     { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
@@ -105,7 +105,7 @@ const NET = {
   },
 
   _networkId() {
-    const configured = this._meta('joku-network-id') || 'dinhtainguyen-2d-joliejoku-v5';
+    const configured = this._meta('joku-network-id') || 'dinhtainguyen-2d-joliejoku-v6';
     return configured.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 52);
   },
 
@@ -203,6 +203,49 @@ const NET = {
         iceServers: this._cloneServers(iceServers)
       }
     };
+  },
+
+  reconnect(code, role) {
+    role = role === 'host' || role === 'guest' ? role : this.mode;
+    if (role !== 'host' && role !== 'guest') return false;
+    const desired = this.normalizeCode(code || this.code || '1234');
+    if (!this.validCode(desired)) {
+      this._status('err', this._t('enterCode', 'Enter a 4-character room code.'));
+      return false;
+    }
+    if (this.connected && this.mode === role && this.code === desired) {
+      this._status('ok', this._t('alreadyConnected', 'You are already connected to room {code}.', { code: desired }));
+      return true;
+    }
+    // Changing the code intentionally opens a new transport, but the Game state stays alive.
+    if (this.mode !== role || this.code !== desired) {
+      if (role === 'host') this.host(desired);
+      else this.join(desired);
+      return true;
+    }
+
+    this.code = desired;
+    this._allowReconnect = true;
+    clearTimeout(this._retryTimer); this._retryTimer = null;
+    clearTimeout(this._connectTimer); this._connectTimer = null;
+    this._status('info', this._t('reconnectingRoom', 'Reconnecting to room {code}...', { code: desired }));
+    if (role === 'host') {
+      // An open host peer is already the reconnect endpoint; keep the live world untouched.
+      if (this.peer && !this.peer.destroyed && this._peerOpened) {
+        if (this.peer.disconnected) { try { this.peer.reconnect(); } catch (e) {} }
+        this._status('code', desired);
+        return true;
+      }
+      const operation = ++this._operationToken;
+      this._startHost(operation);
+    } else {
+      this._forceRelay = new URLSearchParams(location.search).has('relay');
+      this._joinStep = this._forceRelay ? 1 : 0;
+      this._joinCycle = 0;
+      ++this._operationToken;
+      this._startJoinAttempt();
+    }
+    return true;
   },
 
   host(code = '1234') {

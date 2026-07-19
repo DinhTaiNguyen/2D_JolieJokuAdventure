@@ -112,6 +112,15 @@ const Story = {
     return set[n] || (trials && trials[0] && trials[0][0]) || this.TRIALS[0][0];
   },
 
+  trialPowers(levelIdx) {
+    const list = this.isVietnamese() ? this.COOP_POWERS_VI : this.COOP_POWERS_EN;
+    return (list && list[levelIdx]) || (list && list[0]) || {
+      joku: { name: 'Water Bond', icon: 'W', effect: 'Stabilizes the path.' },
+      jolie: { name: 'Flower Bond', icon: 'F', effect: 'Completes the path.' },
+      travel: 'Your two powers join and carry you safely onward.'
+    };
+  },
+
   DLG: {
     intro: [
       ['jolie', 'Joku, ánh sáng trong rừng đang yếu dần. Những bông hoa như đang run lên.'],
@@ -402,6 +411,84 @@ Story.COOP_TRIALS_VI = [
   { title: 'Cầu tre thần của Thánh Gióng', hint: 'Mỗi người giữ một dấu trống: Joku dập lửa, Jolie kết tre; rồi nắm tay, ôm và hôn để đánh thức Thánh Gióng.', done: 'Thánh Gióng cưỡi ngựa sắt qua trời. Tre thần kết thành cây cầu cho hai trái tim!' },
 ];
 
+// The love ritual awakens two temporary powers. Both players must press Special;
+// neither power can solve the chapter obstacle without the other one.
+Story.COOP_POWERS_EN = [
+  {
+    joku: { name: 'Waterroot Anchor', icon: 'W', effect: 'Pins the ancient roots to both cliffs so the bridge cannot tear away.' },
+    jolie: { name: 'Blossom-Vine Weave', icon: 'F', effect: 'Grows flowering vines across Joku\'s anchored roots and turns them into a living bridge.' },
+    travel: 'The ravine answers both hearts: roots lock in place while a luminous flower bridge grows beneath you.'
+  },
+  {
+    joku: { name: 'Phoenix Tide Call', icon: 'P', effect: 'Summons and steers the Ocean Phoenix above waves far beyond normal flight range.' },
+    jolie: { name: 'Petal-Wind Saddle', icon: 'S', effect: 'Forms a protected flower saddle that keeps both riders together through wind and spray.' },
+    travel: 'Ride together across the Endless Sea as the Ocean Phoenix climbs, dives, and leaves a shining wake.'
+  },
+  {
+    joku: { name: 'Cloudwater Lift', icon: 'C', effect: 'Raises a cool upward current beside the mountain that no ordinary jump can climb.' },
+    jolie: { name: 'Giant Bloom Steps', icon: 'B', effect: 'Grows enormous flowers inside the current, making safe shared footholds.' },
+    travel: 'The flower fairy guides you up a vertical garden, then carries both hearts over the unclimbable peak.'
+  },
+  {
+    joku: { name: 'Moonwater Lens', icon: 'M', effect: 'Reveals the true route through a cave that constantly rearranges its walls.' },
+    jolie: { name: 'Heart Lantern Ward', icon: 'L', effect: 'Maintains a shared light shield so the darkness cannot separate or hurt either player.' },
+    travel: 'Move inside one lantern sphere while hidden paths appear under Joku\'s moonwater beam.'
+  },
+  {
+    joku: { name: 'Monsoon Break', icon: 'R', effect: 'Calls heavy cooling rain strong enough to weaken the chapter-spanning firestorm.' },
+    jolie: { name: 'Rose Steam Canopy', icon: 'O', effect: 'Turns dangerous steam into a protective petal canopy over both players.' },
+    travel: 'Advance beneath the rose canopy while rain parts the fire wall and turns embers into sparkling steam.'
+  },
+  {
+    joku: { name: 'Comet Compass', icon: 'C', effect: 'Rotates the floating star mirrors until a route appears across the endless void.' },
+    jolie: { name: 'Constellation Thread', icon: 'T', effect: 'Binds each aligned mirror with a ribbon of starlight that can carry the whole team.' },
+    travel: 'Lulu and Biscuit complete the constellation as both players surf one starlight ribbon across the void.'
+  },
+  {
+    joku: { name: 'Sacred Rain Drum', icon: 'D', effect: 'Beats a rain rhythm that cools the burning flood beneath the village.' },
+    jolie: { name: 'Golden Bamboo Weave', icon: 'G', effect: 'Binds sacred bamboo into a bridge strong enough for two hearts and their supporters.' },
+    travel: 'Thanh Giong rides above you while rain cools the flood and golden bamboo forms beneath every step.'
+  }
+];
+
+Story.COOP_POWERS_VI = [
+  {
+    joku: { name: 'Neo Re Nuoc', icon: 'N', effect: 'Ghim re co vao hai vach nui de cay cau khong bi xeu.' },
+    jolie: { name: 'Det Day Hoa', icon: 'H', effect: 'Moc day leo hoa quanh re da neo, tao thanh cay cau song.' },
+    travel: 'Re cay khoa chat, hoa no duoi chan, va hai ban cung vuot khe nui tren mot cay cau song.'
+  },
+  {
+    joku: { name: 'Goi Phuong Hoang Bien', icon: 'P', effect: 'Trieu hoi va dieu khien Phuong Hoang Bien qua dai duong xa hon moi lan bay thuong.' },
+    jolie: { name: 'Yen Gio Canh Hoa', icon: 'Y', effect: 'Tao yen hoa bao ve de ca hai luon ngoi cung nhau giua gio va song.' },
+    travel: 'Cung cuoi Phuong Hoang Bien qua dai duong bat tan, bay cao, lao xuong va de lai duong song sang.'
+  },
+  {
+    joku: { name: 'Thang May May Nuoc', icon: 'M', effect: 'Tao luong khi mat bay thang len vach nui khong the nhay qua.' },
+    jolie: { name: 'Bac Hoa Khong Lo', icon: 'B', effect: 'Moc hoa lon trong luong khi de tao diem tua an toan cho ca hai.' },
+    travel: 'Tien hoa dan hai ban leo vuon hoa thang dung roi nang qua dinh nui khong the leo.'
+  },
+  {
+    joku: { name: 'Kinh Trang Nuoc', icon: 'K', effect: 'Soi ra duong that trong hang dong lien tuc thay doi.' },
+    jolie: { name: 'Khien Den Trai Tim', icon: 'D', effect: 'Giu mot vong sang chung de bong toi khong the tach hay lam hai ca hai.' },
+    travel: 'Cung di trong mot bong den khi tia trang nuoc cua Joku mo tung loi an.'
+  },
+  {
+    joku: { name: 'Mua Lon Pha Lua', icon: 'M', effect: 'Goi mua mat du manh de lam yeu buc tuong lua keo dai khap chuong.' },
+    jolie: { name: 'Mai Hoa Chan Hoi', icon: 'H', effect: 'Bien hoi nong thanh mai canh hoa bao ve ca hai nguoi.' },
+    travel: 'Cung tien duoi mai hoa khi mua xe lua va bien than hong thanh hoi sang.'
+  },
+  {
+    joku: { name: 'La Ban Sao Choi', icon: 'S', effect: 'Xoay guong sao troi noi de hien ra duong qua khoang khong vo tan.' },
+    jolie: { name: 'Chi Chom Sao', icon: 'C', effect: 'Noi cac guong da thang hang bang dai sang co the cho ca doi di qua.' },
+    travel: 'Lulu va Biscuit hoan tat chom sao, con hai ban cung luot tren mot dai anh sao.'
+  },
+  {
+    joku: { name: 'Trong Mua Thanh', icon: 'T', effect: 'Danh nhip mua lam mat bien lua dang nhan chim lang.' },
+    jolie: { name: 'Det Tre Vang', icon: 'V', effect: 'Ket tre thanh cay cau du vung cho hai trai tim va hai ban dong hanh.' },
+    travel: 'Thanh Giong cuoi ngua tren cao, mua dap lu, va tre vang moc duoi tung buoc chan.'
+  }
+];
+
 Story.DLG_EN = {
   intro: [
     ['jolie', 'Joku, the light in the forest is fading. Even the flowers are trembling.'],
@@ -608,9 +695,14 @@ Story.UI_EN = {
   roomCode: 'Room Code',
   hostReopen: 'Host/Reopen',
   joinRejoin: 'Join/Rejoin',
+  reconnect: 'Reconnect',
+  reconnectingRoom: 'Reconnecting to room {code}...',
+  alreadyConnected: 'You are already connected to room {code}.',
+  soloNoReconnect: 'Reconnect is available after starting an online room.',
   quitMenu: 'Quit to Menu',
   soundOn: 'Sound: on',
   soundOff: 'Sound: off',
+  gameVolume: 'Game Volume',
   hostGame: 'Host Game',
   hostPrompt: 'Choose the room code for Jolie:',
   hostRoom: 'Host Room',
@@ -674,6 +766,9 @@ Story.UI_EN = {
   trialKissPrompt: 'Keep holding the heart together to unlock the kiss.',
   trialHugAwake: 'Team magic awakened',
   trialHugSub: 'Move close, keep holding the heart, then kiss to open the path.',
+  trialUseSpecial: 'Press Special now: {power}',
+  trialWaitingPower: '{power} is ready. Waiting for your partner\'s power.',
+  trialBothPowers: 'Two powers, one path!',
   trialRewardSub: 'Two shining weapons appeared. Choose the best one for your team!',
   trialExtremeLock: 'This obstacle is impossible alone. Split onto both marks, hold hands, hug, and kiss to open the way.',
   strongBossLock: 'Defeat this boss to continue.',
@@ -715,6 +810,19 @@ Story.UI_EN = {
   noWeaponInfo: 'No weapon equipped. Stand near a shining weapon on the ground and press Pick/Drop to equip it.',
   weaponOwner: "{name}'s Weapon",
   weaponUse: '{skill}. {desc} Use {trigger} when you want this power. Staying near your partner adds a bond bonus.',
+  weaponAttack: 'Attack',
+  weaponSpeed: 'Shot speed',
+  weaponCooldown: 'Skill cooldown',
+  weaponTeamEffect: 'Team effect',
+  pickupOrb: 'Mana Orb',
+  pickupOrbEffect: '+12 MP for your character.',
+  pickupFlower: 'Healing Flower',
+  pickupFlowerEffect: '+7 HP for your character.',
+  pickupHeart: 'Love Heart',
+  pickupHeartEffect: '+8 Love Meter for the team.',
+  pickupMote: 'Magic Mote',
+  pickupMoteEffect: '+10 MP for your character.',
+  pickupEquipped: 'New weapon equipped',
   bondBonus: 'Bond Bonus',
   togetherStrike: 'TOGETHER STRIKE!',
   tapNext: 'tap >',
@@ -742,9 +850,14 @@ Story.UI_VI = {
   roomCode: 'Ma phong',
   hostReopen: 'Mo lai phong',
   joinRejoin: 'Vao lai phong',
+  reconnect: 'Ket noi lai',
+  reconnectingRoom: 'Dang ket noi lai phong {code}...',
+  alreadyConnected: 'Ban dang ket noi voi phong {code}.',
+  soloNoReconnect: 'Nut ket noi lai chi dung sau khi bat dau phong online.',
   quitMenu: 'Ve menu',
   soundOn: 'Am thanh: bat',
   soundOff: 'Am thanh: tat',
+  gameVolume: 'Am luong game',
   hostGame: 'Tao phong',
   hostPrompt: 'Chon ma phong cho Jolie:',
   hostRoom: 'Mo phong',
@@ -808,6 +921,9 @@ Story.UI_VI = {
   trialKissPrompt: 'Tiep tuc giu trai tim cung nhau de mo khoa nu hon.',
   trialHugAwake: 'Phep hop suc da thuc day',
   trialHugSub: 'Lai gan nhau, giu trai tim, roi hon de mo duong.',
+  trialUseSpecial: 'Bam Ky nang dac biet ngay: {power}',
+  trialWaitingPower: '{power} da san sang. Dang cho suc manh cua nguoi yeu.',
+  trialBothPowers: 'Hai suc manh, mot con duong!',
   trialRewardSub: 'Hai vu khi sang da xuat hien. Hay chon mon tot nhat cho doi!',
   trialExtremeLock: 'Vat can nay khong the vuot mot minh. Hay chia nhau dung tren hai dau sang, nam tay, om, va hon de mo duong.',
   strongBossLock: 'Danh bai boss nay de tiep tuc.',
@@ -849,6 +965,19 @@ Story.UI_VI = {
   noWeaponInfo: 'Chua co vu khi. Dung gan vu khi dang sang tren mat dat va bam Nhat/Tha de trang bi.',
   weaponOwner: 'Vu khi cua {name}',
   weaponUse: '{skill}. {desc} Dung {trigger} khi can suc manh nay. O gan ban doi se co them thuong lien ket.',
+  weaponAttack: 'Tan cong',
+  weaponSpeed: 'Toc do dan',
+  weaponCooldown: 'Hoi ky nang',
+  weaponTeamEffect: 'Loi ich cho doi',
+  pickupOrb: 'Ngoc mana',
+  pickupOrbEffect: '+12 MP cho nhan vat cua ban.',
+  pickupFlower: 'Hoa hoi mau',
+  pickupFlowerEffect: '+7 HP cho nhan vat cua ban.',
+  pickupHeart: 'Trai tim tinh yeu',
+  pickupHeartEffect: '+8 thanh Love cho ca doi.',
+  pickupMote: 'Hat phep',
+  pickupMoteEffect: '+10 MP cho nhan vat cua ban.',
+  pickupEquipped: 'Da trang bi vu khi moi',
   bondBonus: 'Thuong lien ket',
   togetherStrike: 'DON DANH CUNG NHAU!',
   tapNext: 'cham >',
