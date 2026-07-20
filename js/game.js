@@ -487,10 +487,10 @@ const Game = {
   assistBotTrial(tr, dt) {
     if (!G.mate || !G.mate.bot || G.mate.down || G.cut || G.dialog) return;
     const pads = this.trialPads(tr);
-    if (U.dist(G.me.x, G.me.y, tr.x, tr.y) > 210) return;
+    if (U.dist(G.me.x, G.me.y, tr.x, tr.y) > 260) return;
     const targetX = Math.abs(G.me.x - pads.leftX) < Math.abs(G.me.x - pads.rightX) ? pads.rightX : pads.leftX;
-    G.mate.x += (targetX - G.mate.x) * Math.min(1, 5 * dt);
-    G.mate.y += (tr.y - G.mate.y) * Math.min(1, 8 * dt);
+    G.mate.x += (targetX - G.mate.x) * Math.min(1, 8 * dt);
+    G.mate.y += (tr.y - G.mate.y) * Math.min(1, 11 * dt);
     G.mate.vx *= .4;
     G.mate.dir = G.me.x > G.mate.x ? 1 : -1;
   },
@@ -523,8 +523,9 @@ const Game = {
     if (!p) return;
     const bit = this.trialRoleBit(char);
     const color = char === 'joku' ? '#72ddff' : '#ff9fce';
-    p.cheerT = Math.max(p.cheerT || 0, 1.1);
-    p.trialPowerT = 1.4;
+    p.cheerT = Math.max(p.cheerT || 0, .9);
+    p.trialPowerT = 1.15;
+    p.trialKind = tr.kind;
     SND.sfx(char === 'joku' ? 'powerWater' : 'powerFlower');
     Ptc.add({ kind: 'ring', x: p.x, y: p.y - 38, vx: 0, vy: 0, r: 108, life: .75, color: color + 'dd' });
     Ptc.burst(char === 'joku' ? 'dot' : 'petal', p.x, p.y - 42, 15, { color, sp: 155, r: 6, life: 1.1 });
@@ -534,9 +535,9 @@ const Game = {
     const powers = Story.trialPowers(G.levelIndex);
     const own = powers[char];
     if (char === G.me.char && own) {
-      G.announce = { txt: own.name, sub: Story.t('trialWaitingPower', { power: own.name }), t: 3.1 };
+      G.announce = { txt: own.name, sub: Story.t('trialWaitingPower', { power: own.name }), t: 2.25 };
     } else if (bit && own && G._lockHintT <= 0) {
-      G.announce = { txt: own.name, sub: own.effect, t: 2.6 };
+      G.announce = { txt: own.name, sub: own.effect, t: 2.1 };
       G._lockHintT = 1.8;
     }
   },
@@ -557,7 +558,7 @@ const Game = {
     const powers = Story.trialPowers(G.levelIndex);
     const own = powers[G.me.char];
     if (!own) return;
-    G.announce = { txt: own.name, sub: Story.t('trialUseSpecial', { power: own.name }), t: 4.1 };
+    G.announce = { txt: own.name, sub: Story.t('trialUseSpecial', { power: own.name }), t: 2.8 };
     SND.sfx('gate');
   },
 
@@ -569,12 +570,13 @@ const Game = {
     tr.charge = 1;
     tr._travelPrompted = true;
     const powers = Story.trialPowers(G.levelIndex);
-    G.announce = { txt: Story.t('trialBothPowers'), sub: powers.travel, t: 4.4 };
+    G.announce = { txt: Story.t('trialBothPowers'), sub: powers.travel, t: 3.1 };
     SND.sfx('trialRide');
     this.shake(6);
     for (const p of [this.byChar('joku'), this.byChar('jolie')]) {
       if (!p) continue;
       p.trialRide = true;
+      p.trialKind = tr.kind;
       p.invuln = Math.max(p.invuln, (tr.travelDur || 5) + 1);
       p.vx = p.vy = 0;
     }
@@ -621,6 +623,8 @@ const Game = {
       pet.y = pt.y + 10;
       pet.vx = 0;
       pet.dir = 1;
+      pet.trialRide = true;
+      pet.trialKind = tr.kind;
     }
   },
 
@@ -658,7 +662,7 @@ const Game = {
     }
 
     if (tr.stage === 2) {
-      tr.kissT = (tr.kissT || 1.05) - dt;
+      tr.kissT = (tr.kissT || .72) - dt;
       me.pose = mate.pose = 'kiss'; me.poseT = mate.poseT = .25;
       me.dir = tr.x >= me.x ? 1 : -1; mate.dir = -me.dir;
       if (Math.random() < dt * 16) Ptc.add({ kind: 'heart', x: tr.x + (Math.random() - .5) * 55, y: tr.y - 70 - Math.random() * 25, vx: (Math.random() - .5) * 45, vy: -65, r: 5, life: 1.1, color: '#ff9fce' });
@@ -678,7 +682,7 @@ const Game = {
       tr.powerT = (tr.powerT || 0) + dt;
       this.announceTrialPower(tr);
       me.vx = mate.vx = 0;
-      if (G.mode === 'solo' && tr.powerT > .75) this.activateTrialSkill(tr, G.mate.char, true);
+      if (G.mode === 'solo' && tr.powerT > .28) this.activateTrialSkill(tr, G.mate.char, true);
       if ((tr.skillMask || 0) === 3 && G.mode !== 'guest') this.startTrialTraversal(tr, false);
       return;
     }
@@ -702,12 +706,12 @@ const Game = {
     }
 
     if (ready) {
-      tr.charge = U.clamp((tr.charge || 0) + dt / (tr.stage === 1 ? 1.35 : 1.25), 0, 1);
+      tr.charge = U.clamp((tr.charge || 0) + dt / (tr.stage === 1 ? .56 : .68), 0, 1);
       if (!tr.started) {
         tr.started = true;
         const info = Story.trialInfo(G.levelIndex, tr.id);
         SND.sfx('heart');
-        G.announce = { txt: info.title, sub: tr.stage === 1 ? Story.t('trialKissPrompt') : info.hint, t: 2.8 };
+        G.announce = { txt: info.title, sub: tr.stage === 1 ? Story.t('trialKissPrompt') : info.hint, t: 2.1 };
       }
       this.trialCoopPulse(tr, dt);
       if (Math.random() < dt * 12) {
@@ -715,12 +719,12 @@ const Game = {
       }
       if (tr.charge >= 1 && tr.stage !== 1) {
         tr.stage = 1; tr.charge = 0; tr.started = false;
-        me.pose = mate.pose = 'hug'; me.poseT = mate.poseT = 1.25;
+        me.pose = mate.pose = 'hug'; me.poseT = mate.poseT = .72;
         this.hugHearts(tr.x);
         SND.sfx('heal');
-        G.announce = { txt: Story.t('trialHugAwake'), sub: Story.t('trialHugSub'), t: 2.7 };
+        G.announce = { txt: Story.t('trialHugAwake'), sub: Story.t('trialHugSub'), t: 1.9 };
       } else if (tr.charge >= 1) {
-        tr.stage = 2; tr.charge = 0; tr.kissT = 1.05;
+        tr.stage = 2; tr.charge = 0; tr.kissT = .72;
         SND.sfx('kiss');
         Ptc.add({ kind: 'ring', x: tr.x, y: tr.y - 45, vx: 0, vy: 0, r: 110, life: .65, color: 'rgba(255,170,210,.85)' });
       }
@@ -753,6 +757,8 @@ const Game = {
       p.vx = p.vy = 0;
       p.onGround = true;
       p.trialRide = false;
+      p.trialKind = null;
+      p.trialPowerT = 0;
       p.pose = null;
       p.safeX = p.x;
       p.safeY = p.y;
@@ -761,6 +767,8 @@ const Game = {
       pet.x = rewardX + (pet.kind === 'dog' ? -72 : 72);
       pet.y = rewardY;
       pet.vx = 0;
+      pet.trialRide = false;
+      pet.trialKind = null;
     }
     this.setCheckpoint(rewardX, rewardY, Story.t('loveTrial'), true);
     if (!fromNet && G.mode !== 'guest' && !G.level.shrineDone && G.level.shrineX > tr.routeStartX && G.level.shrineX < rewardX) {
@@ -1501,7 +1509,9 @@ const Game = {
         this.setWeapon(by, weapon);
         p.weaponPose = .9;
         p.cheerT = Math.max(p.cheerT || 0, .55);
-        if (forMe) this.toastMsg(Story.t('equipped', { weapon: Story.weaponText(weapon, 'name') || Weapons[weapon].name, keys: Input.touchMode ? '✦' : 'U/O/B' }));
+        if (forMe && !(typeof Main !== 'undefined' && Main.showItemPopup)) {
+          this.toastMsg(Story.t('equipped', { weapon: Story.weaponText(weapon, 'name') || Weapons[weapon].name, keys: Input.touchMode ? 'Weapon Skill' : 'U/O/B' }));
+        }
         if (!fromNet) SND.sfx('weaponPickup');
         this.weaponBurst(it.x, it.y, weapon, 1.15);
         break;

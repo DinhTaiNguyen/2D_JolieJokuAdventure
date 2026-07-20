@@ -212,14 +212,14 @@ const World = {
     // final gate meadow
     const endW = 800;
     y = U.clamp(lastGroundY, 460, 560);
-    const arenaEnd = x + endW + 1200;
+    let arenaEnd = x + endW + 1200;
     ground(x, y, endW + 1200);
     while (bossMarkI < bossMarks.length) {
       strongBoss(bossMarkI, x + 180 + bossMarkI * 180, plats[plats.length - 1]);
       bossMarkI++;
     }
-    const gateX = Math.min(x + endW * .42, cfg.width - 900);
-    const bossX = U.clamp(gateX + 650, x + 520, cfg.width - 260);
+    let gateX = Math.min(x + endW * .42, cfg.width - 900);
+    let bossX = U.clamp(gateX + 650, x + 520, cfg.width - 260);
     row(x + 80, y - 50, 4, 'heartDrop');
     const groundNear = tx => {
       let best = null, bd = 1e9;
@@ -231,44 +231,55 @@ const World = {
       }
       return best;
     };
-    const loveTrials = [cfg.width * .48].map((tx, i) => {
-      const g = groundNear(tx);
-      const kind = World.COOP_CHALLENGES[idx % World.COOP_CHALLENGES.length];
-      return {
-        id: 'trial' + i, kind, x: g.x, y: g.pl.y, done: false, charge: 0, stage: 0,
-        skillMask: 0, travel: 0, lockLimit: g.x + 150, extreme: true
-      };
-    });
-    const coopObstacles = loveTrials.map(tr => {
-      const spec = {
-        forestBridge: { w: 1080, h: 260, dur: 4.8, arc: 125 },
-        oceanPhoenix: { w: 1720, h: 330, dur: 6.6, arc: 265 },
-        flowerLift: { w: 1040, h: 500, dur: 5.6, arc: 335 },
-        shadowLantern: { w: 1260, h: 370, dur: 5.4, arc: 155 },
-        emberRain: { w: 1380, h: 360, dur: 5.8, arc: 195 },
-        starMirror: { w: 1480, h: 410, dur: 6.0, arc: 265 },
-        giongBridge: { w: 1740, h: 470, dur: 6.4, arc: 235 },
-      }[tr.kind] || { w: 980, h: 280, dur: 5, arc: 150 };
-      const startX = tr.x + 230;
-      const landing = groundNear(startX + spec.w + 110);
-      const endX = Math.max(startX + 620, landing.x);
-      tr.routeStartX = tr.x + 34;
-      tr.endX = endX;
-      tr.endY = landing.pl.y;
-      tr.travelDur = spec.dur;
-      tr.travelArc = spec.arc;
-      return {
-        id: tr.id + '_obstacle', trialId: tr.id, kind: tr.kind,
-        x: startX, y: tr.y, w: Math.max(620, endX - startX), h: spec.h,
-        endX, endY: landing.pl.y
-      };
-    });
+    const kind = World.COOP_CHALLENGES[idx % World.COOP_CHALLENGES.length];
+    const spec = {
+      forestBridge: { w: 1080, h: 260, dur: 4.8, arc: 125 },
+      oceanPhoenix: { w: 1720, h: 330, dur: 6.6, arc: 265 },
+      flowerLift: { w: 1040, h: 500, dur: 5.6, arc: 335 },
+      shadowLantern: { w: 1260, h: 370, dur: 5.4, arc: 155 },
+      emberRain: { w: 1380, h: 360, dur: 5.8, arc: 195 },
+      starMirror: { w: 1480, h: 410, dur: 6.0, arc: 265 },
+      giongBridge: { w: 1740, h: 470, dur: 6.4, arc: 235 },
+    }[kind] || { w: 980, h: 280, dur: 5, arc: 150 };
+    const entry = groundNear(cfg.width * .48);
+    const insertAt = entry.pl.x + entry.pl.w;
+    const insertWidth = spec.w + 260;
+
+    // Insert the challenge into new world space. Everything that originally followed it
+    // shifts intact, so no monsters, shrine dialogue, bosses, or normal platforms are skipped.
+    for (const pl of plats) if (pl !== entry.pl && pl.x >= insertAt - 1) pl.x += insertWidth;
+    for (const it of items) if (it.x >= insertAt) it.x += insertWidth;
+    for (const f of foes) {
+      if (f.x >= insertAt) f.x += insertWidth;
+      if (f.homeX >= insertAt) f.homeX += insertWidth;
+    }
+    if (shrineX >= insertAt) shrineX += insertWidth;
+    if (gateX >= insertAt) gateX += insertWidth;
+    if (bossX >= insertAt) bossX += insertWidth;
+    arenaEnd += insertWidth;
+
+    const trialX = U.clamp(insertAt - 165, entry.pl.x + 145, insertAt - 95);
+    const routeStartX = insertAt + 72;
+    const endX = routeStartX + spec.w;
+    const landingY = entry.pl.y;
+    ground(endX - 145, landingY, 520);
+    const loveTrials = [{
+      id: 'trial0', kind, x: trialX, y: entry.pl.y, done: false, charge: 0, stage: 0,
+      skillMask: 0, travel: 0, lockLimit: trialX + 150, extreme: true,
+      routeStartX, endX, endY: landingY, travelDur: spec.dur, travelArc: spec.arc,
+      insertedWidth: insertWidth
+    }];
+    const coopObstacles = [{
+      id: 'trial0_obstacle', trialId: 'trial0', kind,
+      x: routeStartX, y: entry.pl.y, w: spec.w, h: spec.h,
+      endX, endY: landingY
+    }];
     // The cooperative crossing is a focused set-piece, not an unavoidable combat corridor.
     // Keep ordinary enemies outside its route while preserving every strong boss lock.
     for (const tr of loveTrials) {
       for (let i = foes.length - 1; i >= 0; i--) {
         const f = foes[i];
-        if (!f.bossTier && f.x > tr.x - 260 && f.x < tr.endX + 130) foes.splice(i, 1);
+        if (!f.bossTier && f.x > tr.x - 260 && f.x < tr.routeStartX + 90) foes.splice(i, 1);
       }
     }
     const postBoss = this._addDateJourney(cfg, idx, {

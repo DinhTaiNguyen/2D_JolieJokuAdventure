@@ -1885,6 +1885,93 @@ const Art = {
     ctx.restore();
   },
 
+  drawTrialPowerAura(ctx, tr, p, char, t) {
+    if (!tr || !p) return;
+    const x = p.x, y = p.y - 40;
+    const joku = char === 'joku';
+    const col = joku ? '#72ddff' : '#ff9fce';
+    const pulse = .5 + Math.sin(t * 6 + (joku ? 0 : 1.4)) * .12;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    this.glow(ctx, x, y, 55 + pulse * 18, col, .46);
+
+    if (tr.kind === 'forestBridge') {
+      ctx.strokeStyle = joku ? '#8ed8ffdd' : '#b8ff94dd';
+      ctx.lineWidth = joku ? 4 : 3;
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(x, y + 35);
+        ctx.bezierCurveTo(x + i * 12, y + 8, x + i * 22, y - 20, x + i * 34, y - 43);
+        ctx.stroke();
+        if (!joku) this.heart(ctx, x + i * 34, y - 45, 4, '#ffd0e5');
+      }
+    } else if (tr.kind === 'oceanPhoenix') {
+      if (joku) {
+        ctx.strokeStyle = '#bdf5ffdd'; ctx.lineWidth = 4;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath(); ctx.arc(x, y, 25 + i * 11 + Math.sin(t * 5 + i) * 3, -.8, Math.PI * 1.25); ctx.stroke();
+        }
+      } else {
+        ctx.strokeStyle = '#ffd0e5dd'; ctx.lineWidth = 5;
+        for (const s of [-1, 1]) {
+          ctx.beginPath(); ctx.moveTo(x, y - 8); ctx.quadraticCurveTo(x + s * 38, y - 45, x + s * 58, y + 4); ctx.stroke();
+          for (let i = 0; i < 3; i++) this.heart(ctx, x + s * (30 + i * 11), y - 24 + i * 12, 3.5, '#fff3a8');
+        }
+      }
+    } else if (tr.kind === 'flowerLift') {
+      if (joku) {
+        const beam = ctx.createLinearGradient(0, y + 55, 0, y - 80);
+        beam.addColorStop(0, '#56d6ff22'); beam.addColorStop(1, '#bdf5ffcc');
+        ctx.strokeStyle = beam; ctx.lineWidth = 7;
+        for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(x + i * 9, y + 48); ctx.lineTo(x + i * 16, y - 72); ctx.stroke(); }
+      } else {
+        for (let i = 0; i < 8; i++) {
+          const a = t * 1.4 + i * U.TAU / 8;
+          ctx.fillStyle = i % 2 ? '#ff9fceaa' : '#fff3a8aa';
+          ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * 48, y + Math.sin(a) * 34, 12, 6, a, 0, U.TAU); ctx.fill();
+        }
+      }
+    } else if (tr.kind === 'shadowLantern') {
+      if (joku) {
+        ctx.strokeStyle = '#bdf5ffdd'; ctx.lineWidth = 3;
+        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(x, y, 22 + i * 13, t * .7 + i, t * .7 + i + Math.PI * 1.55); ctx.stroke(); }
+        this.star(ctx, x, y, 9, '#e9f8ff');
+      } else {
+        ctx.strokeStyle = '#ffd0e5dd'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.roundRect(x - 27, y - 37, 54, 72, 20); ctx.stroke();
+        this.heart(ctx, x, y, 10, '#fff3a8');
+      }
+    } else if (tr.kind === 'emberRain') {
+      if (joku) {
+        ctx.strokeStyle = '#9feaffdd'; ctx.lineWidth = 3;
+        for (let i = -4; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(x + i * 12 + 18, y - 62); ctx.lineTo(x + i * 12 - 3, y + 42); ctx.stroke(); }
+      } else {
+        ctx.strokeStyle = '#ff9fcedd'; ctx.lineWidth = 7;
+        ctx.beginPath(); ctx.arc(x, y + 24, 55, Math.PI + .12, U.TAU - .12); ctx.stroke();
+        for (let i = -3; i <= 3; i++) this.heart(ctx, x + i * 14, y - 22 - Math.abs(i) * 3, 4, '#ffd0e5');
+      }
+    } else if (tr.kind === 'starMirror') {
+      ctx.strokeStyle = joku ? '#bdf5ffdd' : '#fff3a8dd'; ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let i = 0; i < 7; i++) {
+        const a = t * (joku ? -1 : 1) + i * U.TAU / 7;
+        const px = x + Math.cos(a) * 43, py = y + Math.sin(a) * 34;
+        if (!i) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        this.star(ctx, px, py, 4, i % 2 ? '#fff3a8' : col);
+      }
+      ctx.closePath(); ctx.stroke();
+    } else if (tr.kind === 'giongBridge') {
+      if (joku) {
+        ctx.strokeStyle = '#ffe082dd'; ctx.lineWidth = 4;
+        for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(x, y, 18 + i * 13 + ((t * 22) % 13), 0, U.TAU); ctx.stroke(); }
+      } else {
+        ctx.strokeStyle = '#d9f28ddd'; ctx.lineWidth = 6;
+        for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(x + i * 12, y + 42); ctx.lineTo(x + i * 17, y - 52); ctx.stroke(); }
+      }
+    }
+    ctx.restore();
+  },
+
   drawTrialTraversal(ctx, tr, t) {
     if (!tr || tr.done || (tr.stage || 0) < 3) return;
     const colors = {
@@ -1900,6 +1987,7 @@ const Art = {
     if (tr.stage === 3) {
       for (const [p, bit, col] of [[joku, 1, '#72ddff'], [jolie, 2, '#ff9fce']]) {
         if (!p || !(tr.skillMask & bit)) continue;
+        this.drawTrialPowerAura(ctx, tr, p, bit === 1 ? 'joku' : 'jolie', t);
         ctx.globalCompositeOperation = 'lighter';
         this.glow(ctx, p.x, p.y - 42, 52 + Math.sin(t * 5 + bit) * 8, col, .58);
         ctx.strokeStyle = col + 'cc';

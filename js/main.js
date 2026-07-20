@@ -627,24 +627,46 @@ const Main = {
     ASSETS.skinTouchButton(this.el('tAtk'), 'attack', false);
     ASSETS.skinTouchButton(this.el('tHeart'), 'heart', false);
     ASSETS.skinTouchButton(this.el('tSp'), G.me && G.me.char === 'jolie' ? 'star' : 'water', false);
-    ASSETS.skinTouchButton(this.el('tWeapon'), 'star', true);
     ASSETS.skinTouchButton(this.el('tDrop'), 'gift', true);
   },
 
-  setCooldownButton(id, frac, readyColor) {
+  setTouchGlyph(id, glyph) {
+    const el = this.el(id);
+    if (!el) return null;
+    let layer = el.querySelector('.tbtnGlyph');
+    if (!layer) {
+      for (const node of Array.from(el.childNodes)) if (node.nodeType === 3) node.remove();
+      layer = document.createElement('span');
+      layer.className = 'tbtnGlyph';
+      layer.setAttribute('aria-hidden', 'true');
+      el.prepend(layer);
+    }
+    layer.textContent = glyph || '';
+    return layer;
+  },
+
+  setCooldownButton(id, remaining, total, readyColor, enabled = true) {
     const el = this.el(id);
     if (!el) return;
-    frac = U.clamp(frac || 0, 0, 1);
-    if (frac > .01) {
-      const deg = Math.round(frac * 360);
-      el.style.backgroundImage = `conic-gradient(from -90deg, rgba(3,8,14,.84) 0deg, rgba(3,8,14,.84) ${deg}deg, rgba(255,255,255,.05) ${deg}deg 360deg), linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.05))`;
-      el.style.filter = 'saturate(.75) brightness(.85)';
-      el.style.boxShadow = '0 4px 14px rgba(0,0,0,.4)';
-    } else {
-      el.style.backgroundImage = '';
-      el.style.filter = '';
-      if (readyColor) el.style.boxShadow = `0 0 14px ${readyColor}88, 0 4px 14px rgba(0,0,0,.4)`;
+    remaining = Math.max(0, Number(remaining) || 0);
+    total = Math.max(.01, Number(total) || 1);
+    const frac = enabled ? U.clamp(remaining / total, 0, 1) : 0;
+    const cooling = enabled && remaining > .025;
+    el.classList.toggle('cooling', cooling);
+    el.classList.toggle('skillReady', enabled && !cooling);
+    el.classList.toggle('skillUnavailable', !enabled);
+    el.style.setProperty('--cooldown-angle', Math.round(frac * 360) + 'deg');
+    el.style.setProperty('--ready-color', readyColor || '#ffffff');
+    el.style.backgroundImage = '';
+    el.style.filter = '';
+    let number = el.querySelector('.cooldownNumber');
+    if (!number) {
+      number = document.createElement('span');
+      number.className = 'cooldownNumber';
+      number.setAttribute('aria-hidden', 'true');
+      el.appendChild(number);
     }
+    number.textContent = cooling ? (remaining >= 1 ? String(Math.ceil(remaining)) : remaining.toFixed(1)) : '';
   },
 
   syncWeaponUI() {
@@ -653,11 +675,13 @@ const Main = {
     const w = G.me.weapon && Weapons[G.me.weapon] ? Weapons[G.me.weapon] : null;
     const weaponName = id => (typeof Story !== 'undefined' && Story.weaponText ? Story.weaponText(id, 'name') : (Weapons[id] && Weapons[id].name)) || (Weapons[id] && Weapons[id].name) || 'weapon';
     const base = G.me.char === 'joku' ? '🌊' : '🌸';
+    let temp = null;
     const sp = this.el('tSp');
     if (sp) {
-      sp.textContent = base;
       const tr = typeof Game !== 'undefined' && Game.activeLoveTrial ? Game.activeLoveTrial() : null;
-      const temp = tr && tr.stage === 3 ? Story.trialPowers(G.levelIndex)[G.me.char] : null;
+      temp = tr && tr.stage === 3 ? Story.trialPowers(G.levelIndex)[G.me.char] : null;
+      this.setTouchGlyph('tSp', temp ? temp.icon : base);
+      sp.classList.toggle('trialPowerButton', !!temp);
       sp.title = temp ? temp.name + ': ' + temp.effect : (G.me.char === 'joku' ? Story.t('oceanDash') : Story.t('healingBloom'));
       sp.setAttribute('aria-label', sp.title);
       sp.style.borderColor = '';
@@ -665,11 +689,11 @@ const Main = {
     }
     const wp = this.el('tWeapon');
     if (wp) {
-      wp.textContent = w ? w.skillIcon : '✦';
+      this.setTouchGlyph('tWeapon', '');
+      if (typeof ASSETS !== 'undefined' && ASSETS.skinWeaponButton) ASSETS.skinWeaponButton(wp, w ? G.me.weapon : null);
       wp.title = w ? weaponName(G.me.weapon) + ': ' + Story.weaponText(G.me.weapon, 'skill') : Story.t('equipWeaponUnlock');
       wp.setAttribute('aria-label', wp.title);
       wp.style.borderColor = w ? w.color : '';
-      wp.style.boxShadow = w ? '0 0 18px ' + w.color + '88, 0 4px 14px rgba(0,0,0,.4)' : '';
     }
     const near = (typeof Game !== 'undefined' && Game.nearestWeapon) ? Game.nearestWeapon(G.me) : null;
     const drop = this.el('btnDropWeapon');
@@ -679,13 +703,13 @@ const Main = {
     const tDrop = this.el('tDrop');
     if (tDrop) {
       if (near && Weapons[near.weapon]) {
-        tDrop.textContent = '⬆';
+        this.setTouchGlyph('tDrop', '⬆');
         tDrop.title = Story.t('pickWeapon', { weapon: weaponName(near.weapon) });
       } else if (w) {
-        tDrop.textContent = '⇩';
+        this.setTouchGlyph('tDrop', '⇩');
         tDrop.title = Story.t('dropNamed', { weapon: weaponName(G.me.weapon) });
       } else {
-        tDrop.textContent = '◇';
+        this.setTouchGlyph('tDrop', '◇');
         tDrop.title = Story.t('standNearWeapon');
       }
       tDrop.setAttribute('aria-label', tDrop.title);
@@ -693,9 +717,9 @@ const Main = {
     const p = G.me;
     if (p) {
       const atkMax = p.char === 'joku' ? .38 : .46;
-      this.setCooldownButton('tAtk', Math.max(0, p.atkCd) / atkMax, '#ffffff');
-      this.setCooldownButton('tSp', Math.max(0, p.spCd) / 2.2, p.char === 'joku' ? '#7fd8ff' : '#ff9fce');
-      this.setCooldownButton('tWeapon', w ? Math.max(0, p.weaponCd || 0) / (w.cd || 6) : 1, w ? w.color : '#fff3a8');
+      this.setCooldownButton('tAtk', p.atkCd, atkMax, '#ffffff');
+      this.setCooldownButton('tSp', temp ? 0 : p.spCd, 2.2, p.char === 'joku' ? '#7fd8ff' : '#ff9fce');
+      this.setCooldownButton('tWeapon', w ? p.weaponCd : 0, w ? (w.cd || 6) : 1, w ? w.color : '#fff3a8', !!w);
     }
     this.syncWeaponInfo();
   },
@@ -738,10 +762,10 @@ const Main = {
       const desc = Story.weaponText(data.weapon, 'desc') || w.desc || '';
       const role = Story.weaponText(data.weapon, 'role') || w.role || Story.t('weaponAttack');
       const benefit = vi ? (w.benefitVi || w.benefit || desc) : (w.benefit || desc);
-      icon = w.icon;
+      icon = '';
       title = Story.t('pickupEquipped') + ': ' + (Story.weaponText(data.weapon, 'name') || w.name);
-      summary = skill + '. ' + desc;
-      stats = `${role} | ${Story.t('weaponAttack')} ${Math.round((w.dmg || 1) * 100)}% | ${Story.t('weaponSpeed')} ${Math.round((w.speed || 1) * 100)}% | ${Story.t('weaponCooldown')} ${(w.cd || 6).toFixed(1)}s | ${benefit}`;
+      summary = skill + '. ' + benefit;
+      stats = `${role} | ${Story.t('weaponAttack')} ${Math.round((w.dmg || 1) * 100)}% | ${Story.t('weaponSpeed')} ${Math.round((w.speed || 1) * 100)}% | ${Story.t('weaponCooldown')} ${(w.cd || 6).toFixed(1)}s`;
     } else {
       const pickups = {
         orb: ['orb', 'pickupOrb', 'pickupOrbEffect'],
@@ -755,7 +779,12 @@ const Main = {
       title = Story.t(def[1]);
       summary = Story.t(def[2]);
     }
-    this.el('itemPopupIcon').textContent = icon;
+    const iconEl = this.el('itemPopupIcon');
+    const weaponIcon = kind === 'weapon' && typeof ASSETS !== 'undefined' && ASSETS.weaponIconUrl ? ASSETS.weaponIconUrl(data.weapon) : '';
+    iconEl.textContent = icon;
+    iconEl.classList.toggle('weaponArt', !!weaponIcon);
+    if (weaponIcon) iconEl.style.setProperty('--popup-weapon-icon', `url("${weaponIcon}")`);
+    else iconEl.style.removeProperty('--popup-weapon-icon');
     this.el('itemPopupTitle').textContent = title;
     this.el('itemPopupText').textContent = summary;
     this.el('itemPopupStats').textContent = stats;
@@ -765,8 +794,8 @@ const Main = {
     requestAnimationFrame(() => popup.classList.add('show'));
     this._itemPopupT = setTimeout(() => {
       popup.classList.remove('show');
-      this._itemPopupHideT = setTimeout(() => popup.classList.add('hidden'), 220);
-    }, kind === 'weapon' ? 5200 : 2600);
+      this._itemPopupHideT = setTimeout(() => popup.classList.add('hidden'), 160);
+    }, kind === 'weapon' ? 2800 : 1350);
   },
 
   togglePause() {

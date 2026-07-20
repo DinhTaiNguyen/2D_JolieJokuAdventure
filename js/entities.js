@@ -169,6 +169,7 @@ const Ent = {
     p.blinkT -= dt; p.blink -= dt;
     p.hurtT = Math.max(0, (p.hurtT || 0) - dt);
     p.cheerT = Math.max(0, (p.cheerT || 0) - dt);
+    p.trialPowerT = Math.max(0, (p.trialPowerT || 0) - dt);
     if (p.blinkT <= 0) { p.blink = .13; p.blinkT = 2 + Math.random() * 3; }
     p.animT += dt * Math.min(1.4, Math.abs(p.vx) / 300 + .0001);
     if (p.poseT > 0) { p.poseT -= dt; if (p.poseT <= 0 && !G.cut) p.pose = null; }

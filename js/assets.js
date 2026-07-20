@@ -228,6 +228,7 @@ const ASSETS = {
       stableX: !!(cfg.lockScale || cfg.stableX),
       groundPad: cfg.groundPad || 0
     };
+    if (name.indexOf('weapons_') === 0) this._weaponIcons = Object.create(null);
     if (name.indexOf('portrait_') === 0) this._makePortrait(name, src);
     if (name === 'title_art') this._menuArt(img);
     if (name.indexOf('bg_') === 0) this._refreshLevelBg(name.slice(3));
@@ -438,6 +439,42 @@ const ASSETS = {
     return true;
   },
 
+  _weaponIcons: Object.create(null),
+  weaponIconUrl(weapon) {
+    if (!weapon || typeof Weapons === 'undefined' || !Weapons[weapon]) return '';
+    if (this._weaponIcons[weapon]) return this._weaponIcons[weapon];
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 128;
+    const g = cv.getContext('2d');
+    if (!g) return '';
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    const draw = size => this.drawWeaponGlyph(g, weapon, 64, 65, size, 0) ||
+      (typeof Art !== 'undefined' && Art.drawWeaponGlyph && Art.drawWeaponGlyph(g, weapon, 64, 65, size, 0));
+    // A soft duplicate makes the small controller icon luminous without blurring its silhouette.
+    g.save();
+    g.globalAlpha = .38;
+    if ('filter' in g) g.filter = 'blur(2.2px)';
+    draw(38);
+    g.restore();
+    draw(34);
+    try { this._weaponIcons[weapon] = cv.toDataURL('image/png'); }
+    catch (e) { return ''; }
+    return this._weaponIcons[weapon];
+  },
+
+  skinWeaponButton(el, weapon) {
+    if (!el) return false;
+    el.classList.remove('kitSkinned', 'kitNoGlyph');
+    el.style.removeProperty('--kit-icon');
+    const url = this.weaponIconUrl(weapon);
+    el.classList.toggle('weaponArmed', !!url);
+    el.classList.toggle('weaponEmpty', !url);
+    if (url) el.style.setProperty('--weapon-icon', `url("${url}")`);
+    else el.style.removeProperty('--weapon-icon');
+    return !!url;
+  },
+
   frameCount(name) {
     const d = this.data[name];
     return d && d.ok ? d.frames.length : 0;
@@ -549,14 +586,17 @@ const ASSETS = {
     if (!this.has(sheet) && !this.has(runSheet) && !this.has(actionSheet)) return false;
     const atk = p.atkT != null && p.atkT < .28;
     const riding = !!p.trialRide;
-    const actionHot = !riding && (atk || (p.weaponPose || 0) > .03 || ((p.cheerT || 0) > .18 && p.weapon)) && this.has(actionSheet);
+    const trialPower = !riding && (p.trialPowerT || 0) > .02;
+    const actionHot = !riding && (trialPower || atk || (p.weaponPose || 0) > .03 || ((p.cheerT || 0) > .18 && p.weapon)) && this.has(actionSheet);
     const running = Math.abs(p.vx) > 30 && p.onGround;
     let src = sheet;
     let idx = 0;
     if (p.pose === 'kiss' && this.has(sheet)) idx = 7;
     else if (p.pose === 'hug' && this.has(sheet)) idx = 6;
     else if ((p.down || p.hurtT > 0) && this.has(sheet)) idx = 5;
-    else if (riding && this.has(actionSheet)) { src = actionSheet; idx = Math.min(6, this.frameCount(actionSheet) - 1); }
+    else if (riding && p.trialKind === 'oceanPhoenix' && this.has(sheet)) { src = sheet; idx = Math.min(3, this.frameCount(sheet) - 1); }
+    else if (riding && this.has(actionSheet)) { src = actionSheet; idx = Math.min(who === 'joku' ? 5 : 6, this.frameCount(actionSheet) - 1); }
+    else if (trialPower && this.has(actionSheet)) { src = actionSheet; idx = Math.min(who === 'joku' ? 5 : 6, this.frameCount(actionSheet) - 1); }
     else if (actionHot) { src = actionSheet; idx = this.heroActionIndex(p); }
     else if (!p.onGround && this.has(sheet)) idx = 3;
     else if (running && this.has(runSheet)) { src = runSheet; idx = this.loopFrame(runSheet, p.animT * 12); }
@@ -565,7 +605,9 @@ const ASSETS = {
     else if (!this.has(src)) { src = this.has(sheet) ? sheet : (this.has(runSheet) ? runSheet : actionSheet); idx = 0; }
 
     const run = running && src === runSheet;
-    const bounce = run ? Math.abs(Math.sin(p.animT * 12)) * .7 : (running ? Math.abs(Math.sin(p.animT * 13)) * 1.4 : Math.sin(t * 2.3) * 1.1);
+    const bounce = riding ? Math.sin(t * 5.2 + (who === 'joku' ? 0 : 1.2)) * 1.8
+      : run ? Math.abs(Math.sin(p.animT * 12)) * .7
+        : (running ? Math.abs(Math.sin(p.animT * 13)) * 1.4 : Math.sin(t * 2.3) * 1.1);
     const HERO_H = { joku: 74, jolie: 63 };
     const H = HERO_H[who] || 74;
     
@@ -636,7 +678,8 @@ const ASSETS = {
   drawPet(ctx, pet, t, name) {
     const sheet = name + '_sheet', runSheet = name + '_run', actionSheet = name + '_actions';
     if (!this.has(sheet) && !this.has(runSheet) && !this.has(actionSheet)) return false;
-    const run = Math.abs(pet.vx) > 25;
+    const riding = !!pet.trialRide;
+    const run = riding || Math.abs(pet.vx) > 25;
     let src = sheet, idx = run ? 1 : 0;
     if (name === 'lulu') {
       if (pet.mode === 'dash') idx = 2;
@@ -647,13 +690,15 @@ const ASSETS = {
     }
     const action = idx > 1;
     if (action && this.has(actionSheet)) { src = actionSheet; idx = Math.min(idx - 2, this.frameCount(actionSheet) - 1); }
-    else if (run && this.has(runSheet)) { src = runSheet; idx = this.loopFrame(runSheet, pet.animT * 14); }
+    else if (run && this.has(runSheet)) { src = runSheet; idx = this.loopFrame(runSheet, riding ? t * 9 : pet.animT * 14); }
     else if (!this.has(src)) { src = this.has(sheet) ? sheet : (this.has(runSheet) ? runSheet : actionSheet); idx = 0; }
-    const drawY = this.groundSnapY(pet.x, pet.y, 130, 48);
-    const bob = run && src === runSheet ? Math.abs(Math.sin(pet.animT * 14)) * .8 : (run ? Math.abs(Math.sin(pet.animT * 15)) * 1.6 : Math.sin(t * 3) * 1);
+    const drawY = riding ? pet.y : this.groundSnapY(pet.x, pet.y, 130, 48);
+    const bob = riding ? Math.sin(t * 7 + (name === 'lulu' ? 0 : 1.3)) * 2
+      : run && src === runSheet ? Math.abs(Math.sin(pet.animT * 14)) * .8
+        : (run ? Math.abs(Math.sin(pet.animT * 15)) * 1.6 : Math.sin(t * 3) * 1);
     this.draw(ctx, src, idx, pet.x, drawY - bob, {
       h: name === 'lulu' ? 40 : 46, flip: pet.dir < 0,
-      rot: run ? Math.sin(pet.animT * 14) * .035 : 0
+      rot: riding ? Math.sin(t * 4 + (name === 'lulu' ? 0 : 1)) * .045 : (run ? Math.sin(pet.animT * 14) * .035 : 0)
     });
     return true;
   },
